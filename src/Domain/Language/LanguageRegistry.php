@@ -263,8 +263,12 @@ class LanguageRegistry {
 	/**
 	 * Registers a new language into the registry.
 	 *
+	 * Registering a language does NOT automatically designate it as the default language.
+	 * An unconfigured registry retains default_language = null (NOT_CONFIGURED state)
+	 * unless explicitly set via $is_default = true or set_default().
+	 *
 	 * @param Language $language   Language entity.
-	 * @param bool     $is_default Whether to designate as primary default language.
+	 * @param bool     $is_default Whether to explicitly designate as sovereign default language.
 	 * @return void
 	 * @throws DuplicateLanguageException If code already exists.
 	 * @throws DefaultLanguageException If designating an inactive language as default.
@@ -281,9 +285,6 @@ class LanguageRegistry {
 			if ( ! $language->is_active() ) {
 				throw new DefaultLanguageException( 'Cannot designate an inactive language as default.' );
 			}
-			$this->default_language = $code;
-		} elseif ( null === $this->default_language && $language->is_active() && empty( $this->languages ) ) {
-			// First language added automatically becomes default if active.
 			$this->default_language = $code;
 		}
 

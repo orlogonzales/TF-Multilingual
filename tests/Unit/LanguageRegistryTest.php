@@ -55,9 +55,9 @@ class LanguageRegistryTest extends TestCase {
 	}
 
 	/**
-	 * Tests unconfigured state on clean install.
+	 * Caso 1: Tests empty registry state on clean install.
 	 */
-	public function test_initial_state_is_not_configured(): void {
+	public function test_case_1_empty_registry_is_not_configured(): void {
 		$this->assertFalse( $this->registry->is_configured() );
 		$this->assertEmpty( $this->registry->all() );
 		$this->assertEmpty( $this->registry->active() );
@@ -66,16 +66,114 @@ class LanguageRegistryTest extends TestCase {
 	}
 
 	/**
-	 * Tests adding first active language automatically designates it as default.
+	 * Caso 2: Tests registering first active language retains NOT_CONFIGURED and default = null.
 	 */
-	public function test_first_active_language_becomes_default(): void {
+	public function test_case_2_register_first_active_language_retains_not_configured(): void {
 		$es = Language::create( 'es', 'es_ES', 'Spanish', 'Español', true, 10 );
 		$this->registry->add_language( $es );
+
+		$this->assertFalse( $this->registry->is_configured() );
+		$this->assertNull( $this->registry->get_default() );
+		$this->assertNull( $this->registry->get_default_code() );
+		$this->assertCount( 1, $this->registry->all() );
+		$this->assertTrue( $this->registry->has( 'es' ) );
+	}
+
+	/**
+	 * Caso 3: Tests registering multiple languages retains NOT_CONFIGURED and default = null.
+	 */
+	public function test_case_3_register_multiple_languages_retains_not_configured(): void {
+		$es = Language::create( 'es', 'es_ES', 'Spanish', 'Español', true, 10 );
+		$en = Language::create( 'en', 'en_US', 'English', 'English', true, 20 );
+
+		$this->registry->add_language( $es );
+		$this->registry->add_language( $en );
+
+		$this->assertFalse( $this->registry->is_configured() );
+		$this->assertNull( $this->registry->get_default() );
+		$this->assertNull( $this->registry->get_default_code() );
+		$this->assertCount( 2, $this->registry->all() );
+		$this->assertCount( 2, $this->registry->active() );
+	}
+
+	/**
+	 * Caso 4: Tests explicit set_default establishes CONFIGURED state.
+	 */
+	public function test_case_4_explicit_set_default_configures_registry(): void {
+		$es = Language::create( 'es', 'es_ES', 'Spanish', 'Español', true, 10 );
+		$en = Language::create( 'en', 'en_US', 'English', 'English', true, 20 );
+
+		$this->registry->add_language( $es );
+		$this->registry->add_language( $en );
+		$this->assertFalse( $this->registry->is_configured() );
+
+		$this->registry->set_default( 'es' );
 
 		$this->assertTrue( $this->registry->is_configured() );
 		$this->assertSame( 'es', $this->registry->get_default_code() );
 		$this->assertNotNull( $this->registry->get_default() );
 		$this->assertSame( 'Spanish', $this->registry->get_default()->get_name() );
+
+		// Switch default to en.
+		$this->registry->set_default( 'en' );
+		$this->assertSame( 'en', $this->registry->get_default_code() );
+		$this->assertTrue( $this->registry->is_configured() );
+	}
+
+	/**
+	 * Caso 5: Tests setting non-existent language as default throws LanguageNotFoundException.
+	 */
+	public function test_case_5_set_default_non_existent_throws_exception(): void {
+		$es = Language::create( 'es', 'es_ES', 'Spanish', 'Español', true, 10 );
+		$this->registry->add_language( $es );
+
+		$this->expectException( LanguageNotFoundException::class );
+		$this->registry->set_default( 'fr' );
+	}
+
+	/**
+	 * Caso 6: Tests setting inactive language as default throws DefaultLanguageException.
+	 */
+	public function test_case_6_set_default_inactive_throws_exception(): void {
+		$es = Language::create( 'es', 'es_ES', 'Spanish', 'Español', true, 10 );
+		$fr = Language::create( 'fr', 'fr_FR', 'French', 'Français', false, 30 );
+
+		$this->registry->add_language( $es );
+		$this->registry->add_language( $fr );
+
+		$this->expectException( DefaultLanguageException::class );
+		$this->registry->set_default( 'fr' );
+	}
+
+	/**
+	 * Caso 7: Tests persisting and reloading registry without default remains NOT_CONFIGURED.
+	 */
+	public function test_case_7_persist_and_reload_without_default_remains_not_configured(): void {
+		$es = Language::create( 'es', 'es_ES', 'Spanish', 'Español', true, 10 );
+		$en = Language::create( 'en', 'en_US', 'English', 'English', true, 20 );
+
+		$this->registry->add_language( $es );
+		$this->registry->add_language( $en );
+		$this->registry->persist();
+
+		$reloaded_registry = new LanguageRegistry( $this->repository );
+		$this->assertFalse( $reloaded_registry->is_configured() );
+		$this->assertNull( $reloaded_registry->get_default_code() );
+		$this->assertNull( $reloaded_registry->get_default() );
+		$this->assertCount( 2, $reloaded_registry->all() );
+		$this->assertTrue( $reloaded_registry->has( 'es' ) );
+		$this->assertTrue( $reloaded_registry->has( 'en' ) );
+	}
+
+	/**
+	 * Tests adding language with explicit is_default flag.
+	 */
+	public function test_add_language_with_explicit_is_default_flag(): void {
+		$es = Language::create( 'es', 'es_ES', 'Spanish', 'Español', true, 10 );
+		$this->registry->add_language( $es, true );
+
+		$this->assertTrue( $this->registry->is_configured() );
+		$this->assertSame( 'es', $this->registry->get_default_code() );
 	}
 
 	/**
@@ -92,49 +190,11 @@ class LanguageRegistryTest extends TestCase {
 	}
 
 	/**
-	 * Tests setting sovereign default language.
-	 */
-	public function test_set_default_language(): void {
-		$es = Language::create( 'es', 'es_ES', 'Spanish', 'Español', true, 10 );
-		$en = Language::create( 'en', 'en_US', 'English', 'English', true, 20 );
-
-		$this->registry->add_language( $es );
-		$this->registry->add_language( $en );
-
-		$this->assertSame( 'es', $this->registry->get_default_code() );
-
-		$this->registry->set_default( 'en' );
-		$this->assertSame( 'en', $this->registry->get_default_code() );
-	}
-
-	/**
-	 * Tests setting non-existent language as default throws exception.
-	 */
-	public function test_set_default_non_existent_throws_exception(): void {
-		$this->expectException( LanguageNotFoundException::class );
-		$this->registry->set_default( 'fr' );
-	}
-
-	/**
-	 * Tests setting inactive language as default throws exception.
-	 */
-	public function test_set_default_inactive_throws_exception(): void {
-		$es = Language::create( 'es', 'es_ES', 'Spanish', 'Español', true, 10 );
-		$fr = Language::create( 'fr', 'fr_FR', 'French', 'Français', false, 30 );
-
-		$this->registry->add_language( $es );
-		$this->registry->add_language( $fr );
-
-		$this->expectException( DefaultLanguageException::class );
-		$this->registry->set_default( 'fr' );
-	}
-
-	/**
 	 * Tests cannot deactivate sovereign default language.
 	 */
 	public function test_cannot_deactivate_default_language(): void {
 		$es = Language::create( 'es', 'es_ES', 'Spanish', 'Español', true, 10 );
-		$this->registry->add_language( $es );
+		$this->registry->add_language( $es, true );
 
 		$this->expectException( DefaultLanguageException::class );
 		$this->registry->deactivate( 'es' );
@@ -145,7 +205,7 @@ class LanguageRegistryTest extends TestCase {
 	 */
 	public function test_cannot_remove_default_language(): void {
 		$es = Language::create( 'es', 'es_ES', 'Spanish', 'Español', true, 10 );
-		$this->registry->add_language( $es );
+		$this->registry->add_language( $es, true );
 
 		$this->expectException( DefaultLanguageException::class );
 		$this->registry->remove_language( 'es' );
@@ -158,7 +218,7 @@ class LanguageRegistryTest extends TestCase {
 		$es = Language::create( 'es', 'es_ES', 'Spanish', 'Español', true, 10 );
 		$en = Language::create( 'en', 'en_US', 'English', 'English', true, 20 );
 
-		$this->registry->add_language( $es );
+		$this->registry->add_language( $es, true );
 		$this->registry->add_language( $en );
 
 		$this->assertTrue( $this->registry->is_active( 'en' ) );
@@ -180,7 +240,7 @@ class LanguageRegistryTest extends TestCase {
 		$es = Language::create( 'es', 'es_ES', 'Spanish', 'Español', true, 10 );
 		$en = Language::create( 'en', 'en_US', 'English', 'English', true, 20 );
 
-		$this->registry->add_language( $es );
+		$this->registry->add_language( $es, true );
 		$this->registry->add_language( $en );
 
 		$this->assertTrue( $this->registry->has( 'en' ) );
@@ -245,24 +305,23 @@ class LanguageRegistryTest extends TestCase {
 	 */
 	public function test_update_language_cannot_deactivate_default(): void {
 		$es = Language::create( 'es', 'es_ES', 'Spanish', 'Español', true, 10 );
-		$this->registry->add_language( $es );
+		$this->registry->add_language( $es, true );
 
 		$this->expectException( DefaultLanguageException::class );
 		$this->registry->update_language( 'es', array( 'active' => false ) );
 	}
 
 	/**
-	 * Tests persist saves state to repository and reloads accurately.
+	 * Tests persist saves state to repository and reloads accurately when configured.
 	 */
-	public function test_persist_and_reload(): void {
+	public function test_persist_and_reload_when_configured(): void {
 		$es = Language::create( 'es', 'es_ES', 'Spanish', 'Español', true, 10 );
 		$en = Language::create( 'en', 'en_US', 'English', 'English', true, 20 );
 
-		$this->registry->add_language( $es );
+		$this->registry->add_language( $es, true );
 		$this->registry->add_language( $en );
 		$this->registry->persist();
 
-		// Create a fresh registry instance using same repository.
 		$new_registry = new LanguageRegistry( $this->repository );
 		$this->assertTrue( $new_registry->is_configured() );
 		$this->assertSame( 'es', $new_registry->get_default_code() );
@@ -272,10 +331,36 @@ class LanguageRegistryTest extends TestCase {
 	}
 
 	/**
+	 * Tests inconsistent persisted default (non-existent code) degrades to NOT_CONFIGURED.
+	 */
+	public function test_inconsistent_persisted_default_degrades_to_not_configured(): void {
+		$this->repository->save(
+			array(
+				'default_language' => 'non_existent',
+				'languages'        => array(
+					'es' => array(
+						'code'        => 'es',
+						'locale'      => 'es_ES',
+						'name'        => 'Spanish',
+						'native_name' => 'Español',
+						'active'      => true,
+						'order'       => 10,
+					),
+				),
+			)
+		);
+
+		$registry = new LanguageRegistry( $this->repository );
+		$this->assertFalse( $registry->is_configured() );
+		$this->assertNull( $registry->get_default_code() );
+		$this->assertNull( $registry->get_default() );
+		$this->assertCount( 1, $registry->all() );
+	}
+
+	/**
 	 * Tests corrupt entries in persistence are skipped gracefully.
 	 */
 	public function test_corrupted_entries_in_persistence_are_skipped(): void {
-		// Populate repository directly with corrupted languages array.
 		$this->repository->save(
 			array(
 				'default_language' => 'es',

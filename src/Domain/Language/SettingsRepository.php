@@ -46,7 +46,9 @@ class SettingsRepository {
 	/**
 	 * Persists settings payload into wp_options.
 	 *
-	 * Uses autoload enabled (boolean true) to ensure zero SQL queries in frontend runtime.
+	 * Utiliza la política de autoload seleccionada para que WordPress pueda cargar esta
+	 * configuración frecuente junto con sus opciones autoloaded, evitando normalmente
+	 * una consulta individual posterior para esta opción dentro del request.
 	 *
 	 * @param array<string, mixed> $settings Settings array.
 	 * @return bool True if persisted or unchanged.
