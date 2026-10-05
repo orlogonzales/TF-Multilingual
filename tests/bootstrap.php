@@ -34,3 +34,50 @@ if ( ! class_exists( 'wpdb' ) ) {
 		}
 	}
 }
+
+// In-memory options storage for unit tests.
+$GLOBALS['wp_test_options'] = array();
+
+if ( ! function_exists( 'get_option' ) ) {
+	/**
+	 * Stub for get_option.
+	 *
+	 * @param string $option        Option key.
+	 * @param mixed  $default_value Default value.
+	 * @return mixed
+	 */
+	function get_option( string $option, mixed $default_value = false ): mixed {
+		return $GLOBALS['wp_test_options'][ $option ] ?? $default_value;
+	}
+}
+
+if ( ! function_exists( 'update_option' ) ) {
+	/**
+	 * Stub for update_option.
+	 *
+	 * @param string $option   Option key.
+	 * @param mixed  $value    Option value.
+	 * @param mixed  $autoload Autoload flag.
+	 * @return bool
+	 */
+	function update_option( string $option, mixed $value, mixed $autoload = null ): bool {
+		$GLOBALS['wp_test_options'][ $option ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'delete_option' ) ) {
+	/**
+	 * Stub for delete_option.
+	 *
+	 * @param string $option Option key.
+	 * @return bool
+	 */
+	function delete_option( string $option ): bool {
+		if ( array_key_exists( $option, $GLOBALS['wp_test_options'] ) ) {
+			unset( $GLOBALS['wp_test_options'][ $option ] );
+			return true;
+		}
+		return false;
+	}
+}
