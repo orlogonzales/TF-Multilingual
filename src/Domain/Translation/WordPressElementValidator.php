@@ -44,6 +44,25 @@ class WordPressElementValidator {
 	}
 
 	/**
+	 * Checks whether an element physically exists and matches the required element_type and subtype.
+	 *
+	 * Returns true if valid, false if non-existent, invalid type or subtype mismatch.
+	 *
+	 * @param string $element_type Element type ('post' or 'term').
+	 * @param string $subtype      Subtype (post_type or taxonomy).
+	 * @param int    $element_id   WordPress object ID.
+	 * @return bool True if entity exists and matches subtype, false otherwise.
+	 */
+	public function exists( string $element_type, string $subtype, int $element_id ): bool {
+		try {
+			$this->validate( $element_type, $subtype, $element_id );
+			return true;
+		} catch ( InvalidTranslationElementException $e ) {
+			return false;
+		}
+	}
+
+	/**
 	 * Validates a WordPress post.
 	 *
 	 * @param string $expected_post_type Expected post type.

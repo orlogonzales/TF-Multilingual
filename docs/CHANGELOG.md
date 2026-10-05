@@ -39,11 +39,21 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Prohibición formal de sentencias SQL directas (`DELETE`, etc.) contra tablas de plugins externos (`*_icl_*`).
   - Identificación y caracterización del ciclo de vida de hooks de WPML: en contexto administrativo (`WP_ADMIN = true`), WordPress y WPML enganchan naturalmente `WPML_Admin_Post_Actions::delete_post_actions` en `delete_post` y `SitePress::delete_term` en `delete_term`, eliminando automáticamente los registros creados durante la inserción de fixtures sin requerir intervención SQL manual.
   - Implementación de centinela de solo lectura reforzado: verificación pre y post prueba no sólo por conteo de filas (`COUNT(*)` = 3,403), sino mediante hash determinista MD5 del contenido ordenado de la tabla `icl_translations` (`4241ca7e7ec6399a594537cb04790c10`), garantizando delta cero absoluto e invariabilidad criptográfica.
+- **Resolución Multilingüe de Contenido (Fase 1.4):**
+  - Servicio de aplicación/dominio `TF\Multilingual\Domain\Translation\ContentTranslationResolver` para resolución programática de objetos WordPress (`post` y `term`).
+  - Resolución simétrica y multilateral (`resolve`, `resolve_element`, `resolve_element_id`) soportando posts estándar, páginas, CPTs y taxonomías dinámicas (`term_id + taxonomy`).
+  - Detección soberana del idioma de un objeto vía `language_of(element_type, element_id)` consultando exclusivamente la asignación persistida en TFML (`tfml_group_elements.language_code`) sin inferencias por URL, locale o meta.
+  - Validación rigurosa del idioma destino contra `LanguageRegistry`: idiomas inexistentes arrojan `LanguageNotFoundException`, idiomas inactivos arrojan `InvalidTranslationElementException`.
+  - Ausencia estricta de fallback: traducciones no existentes devuelven inequívocamente `null`, sin degradación automática a canonical ni al idioma predeterminado.
+  - Resolución al mismo idioma (`ES -> ES`) devuelve el elemento correspondiente sin duplicaciones.
+  - Objetos sin asignar a grupos devuelven `null` en `language_of` y `resolve` sin generar filas automáticas.
+  - Manejo seguro de integridad física ante objetos eliminados en Core mediante `WordPressElementValidator::exists()`: degradación segura a `null` sin fatales ni autoreparaciones ambiguas.
+  - Cache en memoria in-request por instancia para eliminación de consultas redundantes (pre-calentamiento O(1) de miembros del grupo) con método explícito `clear_cache()`.
 - **Pruebas y Verificación:**
-  - Suite de pruebas unitarias con PHPUnit: `TranslationElementTest`, `TranslationGroupTest`, `TranslationGroupRepositoryTest`, `LanguageRegistryTest`, `LanguageTest`, `SettingsRepositoryTest`, `SchemaManagerTest` y `PluginTest` (99 tests, 302 assertions, 0 errores, 0 fallos).
+  - Suite de pruebas unitarias con PHPUnit: `ContentTranslationResolverTest`, `TranslationElementTest`, `TranslationGroupTest`, `TranslationGroupRepositoryTest`, `LanguageRegistryTest`, `LanguageTest`, `SettingsRepositoryTest`, `SchemaManagerTest` y `PluginTest` (121 tests, 353 assertions, 0 errores, 0 fallos).
   - Test double `TestableWpdb` para pruebas unitarias de persistencia relacional y concurrencia sin arrancar Core.
   - Stubs de Options API y funciones de Core en `tests/bootstrap.php`.
   - Verificación controlada en WordPress 7.1.2 real (creación de posts y términos con validación estricta de `term_id + taxonomy`, resolución multilingüe, reversibilidad absoluta, restauración a 0-delta en WPML con 3,403 filas y hash criptográfico idéntico, y 3,995 posts).
 
 ### Nota de Estado
-- Esta versión incorpora el núcleo de grupos de traducción y repositorio de dominio con protocolo blindado de pruebas de integración. No incluye interfaces de usuario (UI), filtros de query globales, metaboxes ni enrutamiento de URLs, los cuales corresponden a fases posteriores.
+- Esta versión incorpora el núcleo de resolución multilingüe de contenido y consulta de grupos de traducción. No incluye interfaces de usuario (UI), filtros de query globales, metaboxes ni enrutamiento de URLs, los cuales corresponden a fases posteriores.
