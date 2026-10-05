@@ -35,11 +35,15 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Protección de homogeneidad de tipos/subtipos, unicidad de idioma por grupo y no concurrencia de elementos en múltiples grupos.
     - Gestión controlada y explícita del elemento canónico (`canonical_element_id`).
     - Política de eliminación limpia de relaciones sin alterar objetos WordPress anfitriones y purga automática de grupos huérfanos vacíos.
+- **Saneamiento del Protocolo de Integración y Centinela WPML (Fase 1.3A):**
+  - Prohibición formal de sentencias SQL directas (`DELETE`, etc.) contra tablas de plugins externos (`*_icl_*`).
+  - Identificación y caracterización del ciclo de vida de hooks de WPML: en contexto administrativo (`WP_ADMIN = true`), WordPress y WPML enganchan naturalmente `WPML_Admin_Post_Actions::delete_post_actions` en `delete_post` y `SitePress::delete_term` en `delete_term`, eliminando automáticamente los registros creados durante la inserción de fixtures sin requerir intervención SQL manual.
+  - Implementación de centinela de solo lectura reforzado: verificación pre y post prueba no sólo por conteo de filas (`COUNT(*)` = 3,403), sino mediante hash determinista MD5 del contenido ordenado de la tabla `icl_translations` (`4241ca7e7ec6399a594537cb04790c10`), garantizando delta cero absoluto e invariabilidad criptográfica.
 - **Pruebas y Verificación:**
   - Suite de pruebas unitarias con PHPUnit: `TranslationElementTest`, `TranslationGroupTest`, `TranslationGroupRepositoryTest`, `LanguageRegistryTest`, `LanguageTest`, `SettingsRepositoryTest`, `SchemaManagerTest` y `PluginTest` (99 tests, 302 assertions, 0 errores, 0 fallos).
   - Test double `TestableWpdb` para pruebas unitarias de persistencia relacional y concurrencia sin arrancar Core.
   - Stubs de Options API y funciones de Core en `tests/bootstrap.php`.
-  - Verificación controlada en WordPress 7.1.2 real (creación de posts y términos con validación estricta de `term_id + taxonomy`, resolución multilingüe, reversibilidad absoluta, restauración a 0-delta en WPML con 3,403 filas y 3,995 posts).
+  - Verificación controlada en WordPress 7.1.2 real (creación de posts y términos con validación estricta de `term_id + taxonomy`, resolución multilingüe, reversibilidad absoluta, restauración a 0-delta en WPML con 3,403 filas y hash criptográfico idéntico, y 3,995 posts).
 
 ### Nota de Estado
-- Esta versión incorpora el núcleo de grupos de traducción y repositorio de dominio. No incluye interfaces de usuario (UI), filtros de query globales, metaboxes ni enrutamiento de URLs, los cuales corresponden a fases posteriores.
+- Esta versión incorpora el núcleo de grupos de traducción y repositorio de dominio con protocolo blindado de pruebas de integración. No incluye interfaces de usuario (UI), filtros de query globales, metaboxes ni enrutamiento de URLs, los cuales corresponden a fases posteriores.
