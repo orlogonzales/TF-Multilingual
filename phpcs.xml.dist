@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<ruleset name="TFMultilingual">
+    <description>WordPress Coding Standards for TF Multilingual.</description>
+
+    <!-- Pass flags -->
+    <arg value="ps"/>
+    <arg name="colors"/>
+    <arg name="extensions" value="php"/>
+    <arg name="parallel" value="8"/>
+
+    <!-- Paths to check -->
+    <file>src</file>
+    <file>tests</file>
+    <file>tf-multilingual.php</file>
+    <file>uninstall.php</file>
+
+    <!-- Exclude patterns -->
+    <exclude-pattern>/vendor/*</exclude-pattern>
+    <exclude-pattern>/docs/*</exclude-pattern>
+    <exclude-pattern>/scratch/*</exclude-pattern>
+
+    <!-- Config PHP minimum version -->
+    <config name="testVersion" value="8.1-"/>
+
+    <!-- Include WordPress Core Coding Standards -->
+    <rule ref="WordPress-Core"/>
+
+    <!-- Allow PSR-4 file and class naming conventions in src/ and tests/ -->
+    <rule ref="WordPress.Files.FileName.NotHyphenatedLowercase">
+        <exclude-pattern>src/*</exclude-pattern>
+        <exclude-pattern>tests/*</exclude-pattern>
+    </rule>
+    <rule ref="WordPress.Files.FileName.InvalidClassFileName">
+        <exclude-pattern>src/*</exclude-pattern>
+        <exclude-pattern>tests/*</exclude-pattern>
+    </rule>
+    <rule ref="WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase">
+        <exclude-pattern>src/*</exclude-pattern>
+        <exclude-pattern>tests/*</exclude-pattern>
+    </rule>
+
+    <!-- PHPCompatibility rules -->
+    <rule ref="PHPCompatibilityWP"/>
+</ruleset>

@@ -1,0 +1,25 @@
+# Composer dependencies and tooling
+/vendor/
+
+# Test artifacts and coverage
+/coverage/
+.phpunit.result.cache
+phpunit.xml
+
+# CodeSniffer and cache
+.phpcs-cache
+
+# Operating System and IDE files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs and scratch
+*.log
+/scratch/
