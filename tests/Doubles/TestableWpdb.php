@@ -1,6 +1,6 @@
 <?php
 /**
- * Testable wpdb double for unit testing.
+ * Testable wpdb Double.
  *
  * @package TF\Multilingual\Tests\Doubles
  */
@@ -14,23 +14,58 @@ use wpdb;
 /**
  * Class TestableWpdb
  *
- * In-memory test double for wpdb simulating relational tables tfml_groups and tfml_group_elements.
+ * Double for wpdb database operations in domain and repository tests.
  */
 class TestableWpdb extends wpdb {
 
 	/**
-	 * In-memory rows for groups table.
+	 * Simulated table data for tfml_groups.
 	 *
 	 * @var array<int, array<string, mixed>>
 	 */
 	public array $groups = array();
 
 	/**
-	 * In-memory rows for group elements table.
+	 * Simulated table data for tfml_group_elements.
 	 *
 	 * @var array<int, array<string, mixed>>
 	 */
 	public array $group_elements = array();
+
+	/**
+	 * Posts table name.
+	 *
+	 * @var string
+	 */
+	public string $posts = 'wp_posts';
+
+	/**
+	 * Terms table name.
+	 *
+	 * @var string
+	 */
+	public string $terms = 'wp_terms';
+
+	/**
+	 * Term taxonomy table name.
+	 *
+	 * @var string
+	 */
+	public string $term_taxonomy = 'wp_term_taxonomy';
+
+	/**
+	 * Mock posts storage.
+	 *
+	 * @var array<int, array<string, mixed>>
+	 */
+	public array $mock_posts = array();
+
+	/**
+	 * Mock terms storage.
+	 *
+	 * @var array<int, array<string, mixed>>
+	 */
+	public array $mock_terms = array();
 
 	/**
 	 * Auto-increment counter.
@@ -40,18 +75,22 @@ class TestableWpdb extends wpdb {
 	private int $auto_increment = 0;
 
 	/**
-	 * Force error on next insert for concurrency testing.
+	 * Next error string to simulate failure.
 	 *
 	 * @var string|null
 	 */
 	public ?string $force_next_error = null;
 
 	/**
-	 * Reset in-memory database.
+	 * Resets simulated tables.
+	 *
+	 * @return void
 	 */
 	public function reset(): void {
 		$this->groups           = array();
 		$this->group_elements   = array();
+		$this->mock_posts       = array();
+		$this->mock_terms       = array();
 		$this->auto_increment   = 0;
 		$this->last_error       = '';
 		$this->force_next_error = null;
@@ -61,8 +100,8 @@ class TestableWpdb extends wpdb {
 	 * Simulates insert.
 	 *
 	 * @param string               $table  Table name.
-	 * @param array<string, mixed> $data   Row data.
-	 * @param array<string>        $format Formats.
+	 * @param array<string, mixed> $data   Data array.
+	 * @param array<string>        $format Format array.
 	 * @return int|false
 	 */
 	public function insert( string $table, array $data, array $format = array() ): int|false {
@@ -73,49 +112,55 @@ class TestableWpdb extends wpdb {
 		}
 
 		++$this->auto_increment;
-		$id              = $this->auto_increment;
-		$data['id']      = $id;
-		$this->insert_id = $id;
+		$id = $this->auto_increment;
+
+		$row       = array_merge( array( 'id' => $id ), $data );
+		$row['id'] = $id;
 
 		if ( str_contains( $table, 'tfml_groups' ) ) {
-			$this->groups[ $id ] = $data;
+			$this->groups[ $id ] = $row;
+			$this->insert_id     = $id;
 			return 1;
 		}
 
 		if ( str_contains( $table, 'tfml_group_elements' ) ) {
-			// Check unique constraints.
+			// Enforce UNIQUE(element_type, element_id).
 			foreach ( $this->group_elements as $existing ) {
 				if (
-					$existing['element_type'] === $data['element_type'] &&
-					(int) $existing['element_id'] === (int) $data['element_id']
+					$existing['element_type'] === $row['element_type'] &&
+					(int) $existing['element_id'] === (int) $row['element_id']
 				) {
-					$this->last_error = "Duplicate entry '{$data['element_type']}-{$data['element_id']}' for key 'uq_element'";
-					return false;
-				}
-
-				if (
-					(int) $existing['group_id'] === (int) $data['group_id'] &&
-					$existing['language_code'] === $data['language_code']
-				) {
-					$this->last_error = "Duplicate entry '{$data['group_id']}-{$data['language_code']}' for key 'uq_group_language'";
+					$this->last_error = "Duplicate entry for key 'uq_element'";
 					return false;
 				}
 			}
 
-			$this->group_elements[ $id ] = $data;
+			// Enforce UNIQUE(group_id, language_code).
+			foreach ( $this->group_elements as $existing ) {
+				if (
+					(int) $existing['group_id'] === (int) $row['group_id'] &&
+					$existing['language_code'] === $row['language_code']
+				) {
+					$this->last_error = "Duplicate entry for key 'uq_group_language'";
+					return false;
+				}
+			}
+
+			$this->group_elements[ $id ] = $row;
+			$this->insert_id             = $id;
 			return 1;
 		}
 
-		return 1;
+		return 0;
 	}
 
 	/**
 	 * Simulates update.
 	 *
 	 * @param string               $table        Table name.
-	 * @param array<string, mixed> $data         Row data.
+	 * @param array<string, mixed> $data         Data array.
 	 * @param array<string, mixed> $where        Where clause.
-	 * @param array<string>        $format       Format.
+	 * @param array<string>        $format       Format array.
 	 * @param array<string>        $where_format Where format.
 	 * @return int|false
 	 */
@@ -198,6 +243,24 @@ class TestableWpdb extends wpdb {
 			}
 		}
 
+		if ( preg_match( '/WHERE `?post_name`? = \'([^\']+)\'/i', $query, $matches ) ) {
+			$slug = $matches[1];
+			foreach ( $this->mock_posts as $row ) {
+				if ( $row['post_name'] === $slug ) {
+					return $row;
+				}
+			}
+		}
+
+		if ( preg_match( '/WHERE t\.slug = \'([^\']+)\'/i', $query, $matches ) ) {
+			$slug = $matches[1];
+			foreach ( $this->mock_terms as $row ) {
+				if ( $row['slug'] === $slug ) {
+					return $row;
+				}
+			}
+		}
+
 		return null;
 	}
 
@@ -234,12 +297,22 @@ class TestableWpdb extends wpdb {
 			$results  = array();
 			foreach ( $this->group_elements as $row ) {
 				if ( (int) $row['group_id'] === $group_id ) {
-					$results[] = $row;
+					$results[] = ( 'OBJECT' === $output ) ? (object) $row : $row;
 				}
 			}
 			return $results;
 		}
 
 		return array();
+	}
+
+	/**
+	 * Simulates query execution.
+	 *
+	 * @param string $query SQL query.
+	 * @return int|bool
+	 */
+	public function query( string $query ): int|bool {
+		return true;
 	}
 }

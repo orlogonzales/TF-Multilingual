@@ -49,11 +49,32 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Objetos sin asignar a grupos devuelven `null` en `language_of` y `resolve` sin generar filas automáticas.
   - Manejo seguro de integridad física ante objetos eliminados en Core mediante `WordPressElementValidator::exists()`: degradación segura a `null` sin fatales ni autoreparaciones ambiguas.
   - Cache en memoria in-request por instancia para eliminación de consultas redundantes (pre-calentamiento O(1) de miembros del grupo) con método explícito `clear_cache()`.
+- **Resolución de Idioma y Arquitectura de URLs (Fase 1.5 + 1.5A Consolidada):**
+  - **Autoridad Lingüística de la URL:** La URL es consagrada como la fuente primaria y soberana de verdad lingüística del request, desacoplada de `get_locale()` y de cabeceras HTTP.
+  - **Estructura Canónica de URLs:** El idioma predeterminado se mantiene estrictamente sin prefijo (e.g. `/`, `/tours/`). Los idiomas secundarios activos reciben prefijo canónico de primer segmento (e.g. `/en/`, `/en/tours/`, `/pt-br/hotel/`).
+  - **Semántica Endurecida 1.5A ante Prefijos Inactivos:** Un prefijo correspondiente a un idioma registrado pero inactivo (e.g. `/fr/tours/` cuando `fr` está inactivo) **NUNCA** se degrada silenciosamente al idioma predeterminado (`es`). Devuelve el estado tipado `UrlLanguageResolution::STATUS_INACTIVE` en `resolve()` y `null` en `resolve_from_url()`.
+  - **Protección de Slugs Desconocidos:** Segmentos raíz que no coinciden con códigos de idioma TFML (e.g. `/hotel/`, `/blog/`) no son secuestrados ni considerados errores lingüísticos; resuelven con normalidad al idioma predeterminado (`es`).
+  - **Degradación Segura ante Default Inactivo:** Si el idioma predeterminado se encuentra inactivo o inconsistente, el sistema degrada de manera segura al estado tipado `STATUS_DEFAULT_INACTIVE` y devuelve `null` sin adivinar ni conjeturar otro idioma alternativo.
+  - **Exclusión de Rutas del Sistema:** Prefijos de administración y endpoints técnicos (`wp-admin`, `wp-login.php`, `wp-json`, `xmlrpc.php`, `wp-cron.php`, `wp-content`, `wp-includes`) quedan formalmente excluidos (`STATUS_EXCLUDED`, `resolve_from_url() = null`).
+  - **Value Object Tipado:** `TF\Multilingual\Routing\UrlLanguageResolution` para representar de forma inmutable y explícita el resultado de la resolución (`active`, `inactive`, `default_inactive`, `not_configured`, `excluded`).
+  - **Servicios de Enrutamiento y Resolución:**
+    - `TF\Multilingual\Routing\UrlLanguageResolver`: Servicio de análisis, normalización de rutas, extracción y saneamiento de prefijos (`strip_prefix`) con soporte transparente para instalaciones en subdirectorios.
+    - `TF\Multilingual\Routing\CurrentLanguageResolver`: Proveedor autoritativo del idioma del request actual, con capacidad de simulación manual controlada (`set_current_language`, `reset`).
+    - `TF\Multilingual\Routing\LocalizedUrlGenerator`: Generador lingüístico de URLs para portada (`home_url`), URLs arbitrarias (`localize_url`), posts (`get_post_translation_url`) y términos (`get_term_translation_url`).
+    - **WordPress Permalinks como Fuente Soberana:** Posts, páginas y CPTs obtienen su URL base exclusivamente de `get_permalink($translated_id)`. Los términos obtienen su URL de `get_term_link($translated_id, $taxonomy)`. TFML aplica únicamente la transformación lingüística (`localize_url`), sin routers paralelos ni reconstrucción artesanal de permalinks.
+    - **Endurecimiento de Transformación en `localize_url()`:** Preservación estricta de parámetros de consulta (`?search=andes&sort=asc`), fragmentos (`#section-itinerary`), puertos personalizados (`:8080`), prevención de doble prefijo, soporte de subdirectorios (`/cms/en/tours/`, nunca `/en/cms/tours/`) y política de seguridad de URLs externas (si el host difiere de `home_url()`, se devuelve inalterada).
+    - **Guard de Recursión:** Bandera reentrante `$is_resolving_link` en `get_post_translation_url` y `get_term_translation_url` para blindar contra bucles infinitos durante filtros recursivos de enlace.
+    - `TF\Multilingual\Routing\RewriteManager`: Inyector de reglas de reescritura en WordPress mediante filtrado dinámico de `rewrite_rules_array` y registro de query var `tfml_lang`. Genera reglas para la portada de idiomas secundarios (`^({lang})/?$`) y antepone prefijos a las reglas nativas desplazando apropiadamente los retro-capturas (`$matches[1] -> $matches[2]`). Excluye endpoints de sistema (`wp-json`, `wp-sitemap`). **Cero llamadas a `flush_rewrite_rules()` en `init`**.
+    - `TF\Multilingual\Routing\SlugCollisionDetector`: Detector preventivo de colisiones para verificar si un código de idioma coincide con slugs existentes en `wp_posts` (`post_name`) o taxonomías `wp_terms`/`wp_term_taxonomy` (`slug`), garantizando que la incorporación de idiomas no opaque rutas legítimas preexistentes.
 - **Pruebas y Verificación:**
-  - Suite de pruebas unitarias con PHPUnit: `ContentTranslationResolverTest`, `TranslationElementTest`, `TranslationGroupTest`, `TranslationGroupRepositoryTest`, `LanguageRegistryTest`, `LanguageTest`, `SettingsRepositoryTest`, `SchemaManagerTest` y `PluginTest` (115 tests, 359 assertions, 0 errores, 0 fallos).
-  - Test double `TestableWpdb` para pruebas unitarias de persistencia relacional y concurrencia sin arrancar Core.
-  - Stubs de Options API y funciones de Core en `tests/bootstrap.php`.
-  - Verificación controlada en WordPress 7.1.2 real (creación de posts y términos con validación estricta de `term_id + taxonomy`, resolución multilingüe, reversibilidad absoluta, restauración a 0-delta en WPML con 3,403 filas y hash criptográfico idéntico, y 3,995 posts).
+  - Suite de pruebas unitarias ampliada con 6 nuevos tests suites: `UrlLanguageResolutionTest`, `UrlLanguageResolverTest`, `CurrentLanguageResolverTest`, `LocalizedUrlGeneratorTest`, `RewriteManagerTest` y `SlugCollisionDetectorTest`. Total consolidado: **154 tests, 505 assertions, 0 errores, 0 fallos**.
+  - Doble `TestableWpdb` enriquecido con simulación de consultas sobre posts y términos para pruebas unitarias de colisión de slugs.
+  - Verificación en vivo sobre WordPress 7.1.2 real con centinela criptográfico de solo lectura: preservación absoluta de WPML en **3,403 filas** e identidad MD5 exacta `4241ca7e7ec6399a594537cb04790c10`, 3,995 posts, 80 términos y laboratorio terminado con `tfml_settings` limpio.
+- **Fronteras y Scope Respetados:**
+  - Cero intervención de `WP_Query`, `pre_get_posts` o el Loop (reservado para Fase 1.6).
+  - Cero escrituras directas sobre tablas externas.
+  - Cero llamadas a `flush_rewrite_rules()` en `init`.
 
 ### Nota de Estado
-- Esta versión incorpora el núcleo de resolución multilingüe de contenido y consulta de grupos de traducción. No incluye interfaces de usuario (UI), filtros de query globales, metaboxes ni enrutamiento de URLs, los cuales corresponden a fases posteriores.
+- Esta versión incorpora la resolución soberana de idioma en URL, el generador de URLs localizadas sobre permalinks nativos de Core, el gestor de rewrite rules y el detector de colisiones. La intervención de consultas globales (`WP_Query`), filtrado del Loop y taxonomías asociadas queda estrictamente reservada para la Fase 1.6.
+

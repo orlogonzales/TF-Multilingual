@@ -86,7 +86,7 @@ class LanguageRegistry {
 
 		if ( null !== $payload['default_language'] ) {
 			$canonical_default = Language::normalize_code( $payload['default_language'] );
-			if ( isset( $this->languages[ $canonical_default ] ) && $this->languages[ $canonical_default ]->is_active() ) {
+			if ( isset( $this->languages[ $canonical_default ] ) ) {
 				$this->default_language = $canonical_default;
 			}
 		}
