@@ -50,7 +50,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Manejo seguro de integridad física ante objetos eliminados en Core mediante `WordPressElementValidator::exists()`: degradación segura a `null` sin fatales ni autoreparaciones ambiguas.
   - Cache en memoria in-request por instancia para eliminación de consultas redundantes (pre-calentamiento O(1) de miembros del grupo) con método explícito `clear_cache()`.
 - **Pruebas y Verificación:**
-  - Suite de pruebas unitarias con PHPUnit: `ContentTranslationResolverTest`, `TranslationElementTest`, `TranslationGroupTest`, `TranslationGroupRepositoryTest`, `LanguageRegistryTest`, `LanguageTest`, `SettingsRepositoryTest`, `SchemaManagerTest` y `PluginTest` (121 tests, 353 assertions, 0 errores, 0 fallos).
+  - Suite de pruebas unitarias con PHPUnit: `ContentTranslationResolverTest`, `TranslationElementTest`, `TranslationGroupTest`, `TranslationGroupRepositoryTest`, `LanguageRegistryTest`, `LanguageTest`, `SettingsRepositoryTest`, `SchemaManagerTest` y `PluginTest` (115 tests, 359 assertions, 0 errores, 0 fallos).
   - Test double `TestableWpdb` para pruebas unitarias de persistencia relacional y concurrencia sin arrancar Core.
   - Stubs de Options API y funciones de Core en `tests/bootstrap.php`.
   - Verificación controlada en WordPress 7.1.2 real (creación de posts y términos con validación estricta de `term_id + taxonomy`, resolución multilingüe, reversibilidad absoluta, restauración a 0-delta en WPML con 3,403 filas y hash criptográfico idéntico, y 3,995 posts).
