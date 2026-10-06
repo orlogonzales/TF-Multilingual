@@ -11,6 +11,7 @@ namespace TF\Multilingual\Core;
 
 use TF\Multilingual\Domain\Language\LanguageRegistry;
 use TF\Multilingual\Query\QueryLanguageFilter;
+use TF\Multilingual\Query\TermQueryLanguageFilter;
 use TF\Multilingual\Routing\CurrentLanguageResolver;
 use TF\Multilingual\Routing\RewriteManager;
 use TF\Multilingual\Routing\UrlLanguageResolver;
@@ -80,6 +81,13 @@ class Plugin {
 	private ?QueryLanguageFilter $query_filter = null;
 
 	/**
+	 * Term query language filter.
+	 *
+	 * @var TermQueryLanguageFilter|null
+	 */
+	private ?TermQueryLanguageFilter $term_query_filter = null;
+
+	/**
 	 * Retrieves the singleton instance.
 	 *
 	 * @return self
@@ -127,9 +135,14 @@ class Plugin {
 			$this->language_registry,
 			$this->current_language_resolver
 		);
+		$this->term_query_filter         = new TermQueryLanguageFilter(
+			$this->language_registry,
+			$this->current_language_resolver
+		);
 
 		$this->rewrite_manager->init_hooks();
 		$this->query_filter->init_hooks();
+		$this->term_query_filter->init_hooks();
 
 		$this->initialized = true;
 	}
@@ -175,6 +188,22 @@ class Plugin {
 		}
 
 		return $this->query_filter;
+	}
+
+	/**
+	 * Gets the term query language filter instance.
+	 *
+	 * @return TermQueryLanguageFilter
+	 */
+	public function get_term_query_filter(): TermQueryLanguageFilter {
+		if ( null === $this->term_query_filter ) {
+			$this->term_query_filter = new TermQueryLanguageFilter(
+				$this->get_language_registry(),
+				$this->get_current_language_resolver()
+			);
+		}
+
+		return $this->term_query_filter;
 	}
 
 	/**

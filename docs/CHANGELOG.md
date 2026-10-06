@@ -96,11 +96,42 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Doble `TestableWpdb` y `tests/bootstrap.php` actualizados con soporte para propiedades de WordPress Core `$wpdb->posts` e instanciación global segura para tests unitarios aislados.
   - Verificación física en entorno WordPress 7.1.2 real con 14 baterías de pruebas (consultas por idioma default, secundario, secundario sin contenido, idioma inactivo, CPTs, páginas, exclusión de attachments, paginación con `found_posts` exacto, opt-out explícito y nativo, búsquedas filtradas, singular queries sin fallback, exclusiones de contexto, alternancia a política STRICT, e inspección de plan de ejecución `EXPLAIN`).
   - Preservación íntegra de WPML en **3,403 filas** e identidad MD5 exacta `4241ca7e7ec6399a594537cb04790c10`, 3,995 posts, 80 términos y tablas TFML limpias.
+- **Filtrado Multilingüe de Taxonomías y WP_Term_Query (Fase 1.7):**
+  - **Servicio Soberano de Filtrado `TF\Multilingual\Query\TermQueryLanguageFilter`:**
+    - Intervención limpia y no invasiva de consultas de términos en WordPress a través del hook oficial `terms_clauses` (`fields`, `join`, `where`, `distinct`, `orderby`, `order`, `limits`).
+    - WordPress Core se mantiene como el propietario absoluto del motor de taxonomías (`wp_terms`, `wp_term_taxonomy`, `WP_Term_Query`, `get_terms()`, `get_categories()`). Cero motores paralelos.
+    - **Identidad Canónica Rigurosa:**
+      - Asociación de elementos vinculada a `element_type = 'term'`, `element_id = term_id`, y `subtype = taxonomy`. Prohibición absoluta de utilizar `term_taxonomy_id` como `element_id`.
+      - Validación y acoplamiento estricto de subtipo: `tfml_groups.subtype = tt.taxonomy`, garantizando aislamiento absoluto entre taxonomías que compartan nombres o slugs coincidentes (e.g. `category` vs `post_tag` vs taxonomías personalizadas).
+    - **Política de Adopción Progresiva (Default-Language Ownership) para Términos:**
+      - Peticiones en idioma predeterminado (`es`): muestran términos gestionados en el idioma predeterminado con subtipo coincidente más términos históricos no gestionados en TFML (`((tfml_ge.language_code = '{$default}' AND tfml_g.subtype = tt.taxonomy) OR tfml_ge.id IS NULL)`).
+      - Peticiones en idioma secundario (`en`, `pt-br`): muestran exclusivamente términos traducidos y asignados al idioma secundario con subtipo coincidente (`(tfml_ge.language_code = '{$secondary}' AND tfml_g.subtype = tt.taxonomy)`).
+      - **Strict NO FALLBACK:** Un idioma secundario sin traducciones devuelve un conjunto vacío (0 términos), sin degradarse jamás al idioma default ni filtrar términos no gestionados.
+    - **Protección de Consultas Directas de Identidad:**
+      - Exención explícita en `is_query_eligible()` para búsquedas unívocas por identidad (`get_term($id)`, `get_term_by('slug', ...)` y `term_exists()` con `get => all` y parámetros de slug, nombre, term_taxonomy_id o include de ID único), permitiendo a WordPress Core resolver la existencia e integridad del término sin ser secuestrado por el contexto lingüístico del request.
+    - **Eficiencia y Cero DISTINCT en Términos:**
+      - Join estructurado mediante `LEFT JOIN {$elements} AS tfml_ge ON (tfml_ge.element_id = t.term_id AND tfml_ge.element_type = 'term') LEFT JOIN {$groups} AS tfml_g ON (tfml_g.id = tfml_ge.group_id)`.
+      - Cero alteración o inyección de `DISTINCT` en la cláusula SQL, aprovechando la unicidad determinista de `UNIQUE KEY uq_element (element_type, element_id)`.
+      - Verificación de plan de ejecución `EXPLAIN` confirmando accesos `eq_ref` sobre `uq_element` y `PRIMARY`.
+    - **Mecanismos de Opt-out:**
+      - Soporte para suprimir el filtrado mediante `'tfml_suppress_language_filter' => true`.
+      - Respeto total al parámetro nativo de `WP_Term_Query` `'suppress_filter' => true` y al defensivo plural `'suppress_filters' => true`.
+    - **Aislamiento de Contextos y Exclusiones:**
+      - Exclusión automática en administración (`is_admin()`), endpoints REST (`REST_REQUEST`, `wp_is_json_request()`), WP-CLI, WP-Cron y AJAX.
+    - **Idempotencia Robusta:**
+      - Verificación previa de la tabla `tfml_group_elements` en la cláusula `join` para prevenir doble inyección sobre la misma consulta.
+  - **Orquestación en `TF\Multilingual\Core\Plugin`:**
+    - Registro e instanciación de `TermQueryLanguageFilter` expuesto a través de `get_term_query_filter()`.
+    - Conexión de hooks (`init_hooks()`) durante la inicialización del plugin.
+- **Pruebas y Verificación:**
+  - Suite de pruebas unitarias ampliada con `TermQueryLanguageFilterTest` (16 pruebas exhaustivas). Total consolidado: **186 tests, 571 assertions, 0 errores, 0 fallos**.
+  - Verificación física en entorno WordPress 7.1.2 real con 18 baterías de pruebas completas (consultas de categorías en default, secundario, secundario sin contenido, idioma inactivo, etiquetas `post_tag`, taxonomía personalizada `lab_destination`, aislamiento de subtipos, helpers `get_categories`, relaciones post-term vía `get_the_terms`, consultas explícitas `get_term`/`get_term_by`, `hide_empty`, `include`/`exclude`, límites y offsets, `orderby`/`order`, variaciones de `fields`, opt-outs, transición a política STRICT, y verificación de no regresión sobre `WP_Query` de Fase 1.6).
+  - Preservación íntegra de WPML en **3,403 filas** e identidad MD5 exacta `4241ca7e7ec6399a594537cb04790c10`, 3,995 posts, 80 términos y tablas TFML limpias.
 - **Fronteras y Scope Respetados:**
-  - Cero filtrado de `WP_Term_Query` (reservado para fases posteriores).
-  - Cero filtrado de menús o attachments.
-  - Cero opciones de configuración o interfaz de usuario para contenido no gestionado en Fase 1.6 (encapsulado internamente).
-  - Cero escrituras directas sobre tablas externas.
+  - Cero intervención o alteración de tablas Core (`wp_terms`, `wp_term_taxonomy`, `wp_term_relationships`).
+  - Cero schema modifications (`SCHEMA_VERSION = 1.0.0`, 5 tablas relacionales intactas).
+  - Cero filtrado de menús, widgets o shortcodes (reservados para fases posteriores).
+  - Cero escrituras directas sobre tablas externas (`*_icl_*`).
 
 ### Nota de Estado
-- Esta versión incorpora el filtrado multilingüe de consultas y del Loop sobre `WP_Query`, la política de adopción progresiva para contenido no gestionado, mecanismos de opt-out, paginación exacta y aislamiento de contextos. El filtrado de consultas de taxonomías (`WP_Term_Query`) y la sincronización/traducción editorial quedan reservados para fases subsiguientes.
+- Esta versión incorpora el filtrado multilingüe de taxonomías y términos sobre `WP_Term_Query`, el aislamiento estricto de subtipos, la política de adopción progresiva para términos no gestionados, la protección de consultas explícitas de identidad, y la plena compatibilidad con las relaciones post-término (`get_the_terms`). Las fases subsiguientes abordarán la sincronización y traducción editorial, UI administrativa y conmutador de idiomas.
