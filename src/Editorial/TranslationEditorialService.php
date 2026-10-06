@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace TF\Multilingual\Editorial;
 
+use TF\Multilingual\Domain\CustomField\CustomFieldPolicy;
+use TF\Multilingual\Domain\CustomField\CustomFieldPolicyRegistry;
 use TF\Multilingual\Domain\Language\Language;
 use TF\Multilingual\Domain\Language\LanguageRegistry;
 use TF\Multilingual\Domain\Translation\ContentTranslationResolver;
@@ -104,28 +106,38 @@ class TranslationEditorialService {
 	private array $editorial_cache = array();
 
 	/**
+	 * Custom field policy registry.
+	 *
+	 * @var CustomFieldPolicyRegistry
+	 */
+	private CustomFieldPolicyRegistry $custom_field_policy_registry;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param LanguageRegistry|null           $language_registry    Language registry.
-	 * @param TranslationGroupRepository|null $group_repository     Translation group repository.
-	 * @param ContentTranslationResolver|null $translation_resolver Content translation resolver.
-	 * @param WordPressElementValidator|null  $element_validator    Element validator.
-	 * @param wpdb|null                       $db                   WordPress database instance.
+	 * @param LanguageRegistry|null           $language_registry             Language registry.
+	 * @param TranslationGroupRepository|null $group_repository              Translation group repository.
+	 * @param ContentTranslationResolver|null $translation_resolver          Content translation resolver.
+	 * @param WordPressElementValidator|null  $element_validator             Element validator.
+	 * @param wpdb|null                       $db                            WordPress database instance.
+	 * @param CustomFieldPolicyRegistry|null  $custom_field_policy_registry  Custom field policy registry.
 	 */
 	public function __construct(
 		?LanguageRegistry $language_registry = null,
 		?TranslationGroupRepository $group_repository = null,
 		?ContentTranslationResolver $translation_resolver = null,
 		?WordPressElementValidator $element_validator = null,
-		?wpdb $db = null
+		?wpdb $db = null,
+		?CustomFieldPolicyRegistry $custom_field_policy_registry = null
 	) {
 		global $wpdb;
 
-		$this->language_registry    = null !== $language_registry ? $language_registry : new LanguageRegistry();
-		$this->group_repository     = null !== $group_repository ? $group_repository : new TranslationGroupRepository();
-		$this->translation_resolver = null !== $translation_resolver ? $translation_resolver : new ContentTranslationResolver( $this->group_repository, $this->language_registry );
-		$this->element_validator    = null !== $element_validator ? $element_validator : new WordPressElementValidator();
-		$this->db                   = null !== $db ? $db : $wpdb;
+		$this->language_registry            = null !== $language_registry ? $language_registry : new LanguageRegistry();
+		$this->group_repository             = null !== $group_repository ? $group_repository : new TranslationGroupRepository();
+		$this->translation_resolver         = null !== $translation_resolver ? $translation_resolver : new ContentTranslationResolver( $this->group_repository, $this->language_registry );
+		$this->element_validator            = null !== $element_validator ? $element_validator : new WordPressElementValidator();
+		$this->db                           = null !== $db ? $db : $wpdb;
+		$this->custom_field_policy_registry = null !== $custom_field_policy_registry ? $custom_field_policy_registry : new CustomFieldPolicyRegistry();
 	}
 
 	/**
@@ -519,6 +531,9 @@ class TranslationEditorialService {
 		$group_id = (int) $group->get_id();
 		$this->group_repository->add_translation( $group_id, $new_post_id, $canonical_target );
 
+		// Initialize metadata configured with SHARE policy (Zero cloning: TRANSLATE/IGNORE remain uncopied).
+		$this->initialize_shared_meta( $source_post_id, $new_post_id );
+
 		$this->translation_resolver->flush_cache();
 		$this->clear_editorial_cache();
 
@@ -752,5 +767,79 @@ class TranslationEditorialService {
 
 		$GLOBALS['wp_test_terms'][ $new_id ] = $term;
 		return $new_id;
+	}
+
+	/**
+	 * Copies metadata configured with SHARE policy from source post to new post.
+	 *
+	 * Zero cloning: only explicitly SHARE keys are copied. All other keys remain uncopied.
+	 *
+	 * @param int $source_post_id Source post ID.
+	 * @param int $target_post_id Target post ID.
+	 * @return void
+	 */
+	protected function initialize_shared_meta( int $source_post_id, int $target_post_id ): void {
+		$policies = $this->custom_field_policy_registry->get_all_policies();
+		foreach ( $policies as $meta_key => $policy ) {
+			if ( CustomFieldPolicy::SHARE !== $policy ) {
+				continue;
+			}
+
+			if ( $this->post_meta_exists( $source_post_id, $meta_key ) ) {
+				$val = $this->get_post_meta_value( $source_post_id, $meta_key );
+				$this->update_post_meta_value( $target_post_id, $meta_key, $val );
+			}
+		}
+	}
+
+	/**
+	 * Checks if post meta exists.
+	 *
+	 * @param int    $post_id  Post ID.
+	 * @param string $meta_key Meta key.
+	 * @return bool
+	 */
+	protected function post_meta_exists( int $post_id, string $meta_key ): bool {
+		if ( function_exists( 'metadata_exists' ) ) {
+			return metadata_exists( 'post', $post_id, $meta_key );
+		}
+
+		return isset( $GLOBALS['wp_test_postmeta'][ $post_id ][ $meta_key ] );
+	}
+
+	/**
+	 * Gets post meta value.
+	 *
+	 * @param int    $post_id  Post ID.
+	 * @param string $meta_key Meta key.
+	 * @return mixed
+	 */
+	protected function get_post_meta_value( int $post_id, string $meta_key ): mixed {
+		if ( function_exists( 'get_post_meta' ) ) {
+			return get_post_meta( $post_id, $meta_key, true );
+		}
+
+		return $GLOBALS['wp_test_postmeta'][ $post_id ][ $meta_key ] ?? null;
+	}
+
+	/**
+	 * Updates post meta value.
+	 *
+	 * @param int    $post_id  Post ID.
+	 * @param string $meta_key Meta key.
+	 * @param mixed  $val      Meta value.
+	 * @return bool
+	 */
+	protected function update_post_meta_value( int $post_id, string $meta_key, mixed $val ): bool {
+		if ( function_exists( 'update_post_meta' ) ) {
+			$slashed = function_exists( 'wp_slash' ) ? wp_slash( $val ) : $val;
+			return (bool) update_post_meta( $post_id, $meta_key, $slashed );
+		}
+
+		if ( ! isset( $GLOBALS['wp_test_postmeta'] ) || ! is_array( $GLOBALS['wp_test_postmeta'] ) ) {
+			$GLOBALS['wp_test_postmeta'] = array();
+		}
+		$GLOBALS['wp_test_postmeta'][ $post_id ][ $meta_key ] = $val;
+		return true;
 	}
 }

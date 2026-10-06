@@ -195,11 +195,40 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Suite de pruebas unitarias ampliada con `AdminListColumnsUiTest` (14 pruebas exhaustivas). Total consolidado: **222 tests, 693 assertions, 0 errores, 0 fallos**.
     - Cobertura 100% limpia de PHPCS (WordPress Coding Standards) en todos los 60 archivos del proyecto (0 errores, 0 warnings).
     - Verificación física en entorno WordPress 7.1.2 real con batería completa end-to-end (`scratch/verify_fase_1_9.php`): pruebas de registro de columnas, unmanaged, managed posts, managed categories, prueba empírica O(1) 20 vs 50 rows, restricción por capabilities, no regresión de fases 1.6, 1.7 y 1.8, y preservación intacta de sentinelas de base de datos (WPML 3,403 filas, MD5 `4241ca7e7ec6399a594537cb04790c10`, 3,995 posts, 80 terms, 0 groups, 0 elements, settings NULL).
-  - **Fronteras y Scope Respetados:**
-    - Cero filtrado de consultas administrativas (las listas de administración siguen mostrando el universo completo).
-    - Cero ordenación por columna de idioma, cero dropdowns de filtrado y cero bulk actions (reservados para fases futuras).
-    - Cero dependencias externas CSS/JS.
-    - Cero alteración de tablas Core ni tablas externas (`*_icl_*`).
+- **Motor de Políticas para Custom Fields (Fase 2.0):**
+  - **Autoridad Lingüística Única sobre Custom Fields:**
+    - Establecimiento de la arquitectura agnóstica de políticas: `META KEY -> POLÍTICA TFML -> TRANSLATE | SHARE | IGNORE`.
+    - Cero dependencias de plugins externos de campos (ACF, Elementor, WPBakery, Yoast, Rank Math); el motor es soberano e independiente en el Core de TF Multilingual.
+    - Metadatos 100% nativos: persistencia exclusiva en `wp_postmeta`, sin tablas paralelas ni esquemas duplicados de valores meta.
+  - **Regla Soberana de Adopción Progresiva (Default IGNORE):**
+    - Cualquier meta key no configurada explícitamente aplica estrictamente la política por defecto: `CustomFieldPolicy::IGNORE`.
+    - Prohibición absoluta de heurísticas por nombre de campo (`price`, `sku`, etc.); ninguna clave asume sincronización sin configuración intencional.
+  - **Enumeración y Value Object `TF\Multilingual\Domain\CustomField\CustomFieldPolicy`:**
+    - Políticas normalizadas: `TRANSLATE` (`translate`), `SHARE` (`share`), `IGNORE` (`ignore`).
+    - Métodos canónicos: `all()`, `is_valid()`, `normalize()` y `default()`.
+  - **Servicio de Dominio `TF\Multilingual\Domain\CustomField\CustomFieldPolicyRegistry`:**
+    - Gestión de configuración y consulta de políticas por clave meta.
+    - Coexistencia en `SettingsRepository` (`tfml_settings['custom_fields']['policies']`), garantizando que la persistencia de idiomas no degrade las políticas y viceversa.
+    - Sanitización y tolerancia a corrupción ante datos inválidos en wp_options.
+  - **Servicio de Sincronización `TF\Multilingual\Domain\CustomField\SharedMetaSynchronizer`:**
+    - Escucha de mutaciones nativas de WordPress en `added_post_meta`, `updated_post_meta` y `deleted_post_meta`.
+    - **Protección contra Recursión Infinita (Recursion Guard):** Pila de reentrancia en memoria por meta key (`$syncing[$meta_key]`), impidiendo bucles o desbordamiento de pila durante la propagación.
+    - **Sincronización Bidireccional de Hermanos:** Propagación inmediata de mutaciones y eliminaciones a todos los miembros hermanos del grupo (`TranslationGroup`), incluidos borradores, elementos en papelera e idiomas inactivos para conservar la consistencia del grupo.
+    - **Filtros de Exclusión y Límites:** Exclusión total de revisiones (`wp_is_post_revision`), autosaves (`wp_is_post_autosave`), objetos no gestionados (unmanaged) y grupos de un solo miembro.
+    - Preservación de tipos de datos complejos y serializados, y correcta propagación de valores evaluados como falsey (`0`, `'0'`, `''`, `false`, `[]`).
+  - **Integración con Flujo Editorial y Respeto a Zero Auto-Cloning:**
+    - En `TranslationEditorialService::create_post_translation()`: solo las claves explícitamente configuradas con `SHARE` son inicializadas desde el post de origen hacia la nueva traducción borrador.
+    - Todas las claves `TRANSLATE`, `IGNORE` y no configuradas permanecen estrictamente vacías en la nueva traducción, preservando la regla soberana de no clonación automática.
+  - **Interfaz de Administración Nativa `TF\Multilingual\Admin\CustomFieldsSettingsUi`:**
+    - Pantalla de ajustes nativa bajo el menú de opciones (`options-general.php?page=tfml-custom-fields`).
+    - Control de capacidades `manage_options` y protección anti-CSRF vía nonces específicos.
+    - Listado de políticas activas, formulario de alta/edición y acciones de borrado con confirmación.
+    - Avisos informativos claros sobre la política soberana por defecto (Ignorar).
+  - **Pruebas y Verificación:**
+    - Suite de pruebas unitarias ampliada con `CustomFieldPolicyTest`, `CustomFieldPolicyRegistryTest`, `SharedMetaSynchronizerTest` y `CustomFieldsSettingsUiTest`. Total consolidado: **262 tests, 801 assertions, 0 errores, 0 fallos**.
+    - Cobertura 100% limpia de PHPCS (WordPress Coding Standards) en todos los 68 archivos del proyecto (0 errores, 0 warnings).
+    - Verificación física en entorno WordPress 7.1.2 real con batería completa end-to-end (`scratch/verify_fase_2_0.php`): pruebas de creación de traducciones con aislamiento de Zero Auto-Cloning, sincronización bidireccional forward y reverse en 3 idiomas (ES, EN, PT), aislamiento estricto de TRANSLATE e IGNORE, propagación de eliminación, inmunidad de posts unmanaged y solitarios, renderizado de UI, y preservación intacta de sentinelas de base de datos (WPML 3,403 filas, MD5 `4241ca7e7ec6399a594537cb04790c10`, 3,995 posts, 80 terms, 0 groups, 0 elements, settings NULL).
 
 ### Nota de Estado
-- Esta versión incorpora el estado de traducciones en listados administrativos (`edit.php`, `edit-tags.php`, `WP_List_Table`) con pre-fetching en lote O(1) (cero consultas N+1), acciones seguras de creación de traducciones faltantes con nonces individuales, badges de idioma actual y traducciones inactivas, y respeto estricto de capabilities. Las fases subsiguientes abordarán los filtros rápidos por idioma en administración y el conmutador de idiomas público.
+- Esta versión incorpora el motor agnóstico de políticas para campos personalizados (Custom Fields) con políticas `TRANSLATE`, `SHARE` e `IGNORE`, sincronización bidireccional de metadatos nativos en `wp_postmeta`, respeto estricto de la regla soberana de Zero Auto-Cloning (únicamente las claves SHARE son inicializadas en traducciones nuevas) y protección por omisión `IGNORE` para claves no configuradas. Las fases subsiguientes abordarán los adaptadores específicos para constructores visuales (ACF, Elementor, etc.).
+

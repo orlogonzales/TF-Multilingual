@@ -51,6 +51,9 @@ class SettingsRepositoryTest extends TestCase {
 			array(
 				'default_language' => null,
 				'languages'        => array(),
+				'custom_fields'    => array(
+					'policies' => array(),
+				),
 			),
 			$settings
 		);
@@ -95,6 +98,7 @@ class SettingsRepositoryTest extends TestCase {
 
 		$this->assertNull( $settings['default_language'] );
 		$this->assertSame( array(), $settings['languages'] );
+		$this->assertSame( array( 'policies' => array() ), $settings['custom_fields'] );
 	}
 
 	/**
@@ -132,6 +136,32 @@ class SettingsRepositoryTest extends TestCase {
 		$this->assertArrayHasKey( 'pt-br', $sanitized['languages'] ); // Key normalized.
 		$this->assertArrayNotHasKey( 'invalid', $sanitized['languages'] );
 		$this->assertArrayNotHasKey( '', $sanitized['languages'] );
+	}
+
+	/**
+	 * Tests payload sanitization filters out invalid custom field policies.
+	 */
+	public function test_sanitize_payload_custom_fields(): void {
+		$payload = array(
+			'custom_fields' => array(
+				'policies' => array(
+					'_price'       => 'share',
+					'description'  => 'TRANSLATE',
+					'tracking_id'  => 'ignore',
+					'invalid_prop' => 'unknown_policy',
+					''             => 'share',
+				),
+			),
+		);
+
+		$sanitized = $this->repository->sanitize_payload( $payload );
+
+		$this->assertArrayHasKey( '_price', $sanitized['custom_fields']['policies'] );
+		$this->assertSame( 'share', $sanitized['custom_fields']['policies']['_price'] );
+		$this->assertSame( 'translate', $sanitized['custom_fields']['policies']['description'] );
+		$this->assertSame( 'ignore', $sanitized['custom_fields']['policies']['tracking_id'] );
+		$this->assertArrayNotHasKey( 'invalid_prop', $sanitized['custom_fields']['policies'] );
+		$this->assertArrayNotHasKey( '', $sanitized['custom_fields']['policies'] );
 	}
 
 	/**

@@ -10,6 +10,8 @@ declare( strict_types=1 );
 namespace TF\Multilingual\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
+use TF\Multilingual\Domain\CustomField\CustomFieldPolicy;
+use TF\Multilingual\Domain\CustomField\CustomFieldPolicyRegistry;
 use TF\Multilingual\Domain\Language\Language;
 use TF\Multilingual\Domain\Language\LanguageRegistry;
 use TF\Multilingual\Domain\Language\SettingsRepository;
@@ -69,6 +71,13 @@ class TranslationEditorialServiceTest extends TestCase {
 	private TranslationEditorialService $service;
 
 	/**
+	 * Custom field policy registry.
+	 *
+	 * @var CustomFieldPolicyRegistry
+	 */
+	private CustomFieldPolicyRegistry $cf_registry;
+
+	/**
 	 * Set up test environment before each test.
 	 */
 	protected function setUp(): void {
@@ -81,12 +90,14 @@ class TranslationEditorialServiceTest extends TestCase {
 		$GLOBALS['wp_test_options']    = array();
 		$GLOBALS['wp_test_posts']      = array();
 		$GLOBALS['wp_test_terms']      = array();
+		$GLOBALS['wp_test_postmeta']   = array();
 		$GLOBALS['wp_test_post_types'] = array( 'post', 'page', 'tour' );
 		$GLOBALS['wp_test_taxonomies'] = array( 'category', 'post_tag', 'tour_type' );
 		$GLOBALS['wp_test_caps']       = array();
 
-		$settings_repo  = new SettingsRepository();
-		$this->registry = new LanguageRegistry( $settings_repo );
+		$settings_repo     = new SettingsRepository();
+		$this->registry    = new LanguageRegistry( $settings_repo );
+		$this->cf_registry = new CustomFieldPolicyRegistry( $settings_repo );
 
 		$es = Language::create( 'es', 'es_ES', 'Spanish', 'Español', true, 10 );
 		$en = Language::create( 'en', 'en_US', 'English', 'English', true, 20 );
@@ -105,7 +116,8 @@ class TranslationEditorialServiceTest extends TestCase {
 			$this->group_repo,
 			$this->resolver,
 			$validator,
-			$this->db
+			$this->db,
+			$this->cf_registry
 		);
 	}
 
@@ -116,6 +128,7 @@ class TranslationEditorialServiceTest extends TestCase {
 		$GLOBALS['wp_test_options']    = array();
 		$GLOBALS['wp_test_posts']      = array();
 		$GLOBALS['wp_test_terms']      = array();
+		$GLOBALS['wp_test_postmeta']   = array();
 		$GLOBALS['wp_test_post_types'] = array();
 		$GLOBALS['wp_test_taxonomies'] = array();
 		$GLOBALS['wp_test_caps']       = array();
@@ -457,5 +470,41 @@ class TranslationEditorialServiceTest extends TestCase {
 		$term_url = $this->service->get_edit_url( 'term', 201, 'category' );
 		$this->assertStringContainsString( 'term.php?taxonomy=category', $term_url );
 		$this->assertStringContainsString( 'tag_ID=201', $term_url );
+	}
+
+	/**
+	 * Tests create_post_translation initializes only metadata configured with SHARE policy.
+	 * TRANSLATE and IGNORE (and unconfigured) metadata remain uncopied (Zero Auto-Cloning).
+	 */
+	public function test_create_post_translation_initializes_only_shared_metadata(): void {
+		$this->create_test_post( 101, 'post', 'publish', 'Original Post' );
+		$this->group_repo->create_group( 'post', 'post', 101, 'es', true );
+
+		// Configure policies.
+		$this->cf_registry->set_policy( '_tour_price', CustomFieldPolicy::SHARE );
+		$this->cf_registry->set_policy( '_tour_capacity', CustomFieldPolicy::SHARE );
+		$this->cf_registry->set_policy( 'tour_notes', CustomFieldPolicy::TRANSLATE );
+		$this->cf_registry->set_policy( '_edit_lock', CustomFieldPolicy::IGNORE );
+
+		// Populate source post metadata.
+		$GLOBALS['wp_test_postmeta'][101] = array(
+			'_tour_price'        => 350,
+			'_tour_capacity'     => 12,
+			'tour_notes'         => 'Notas en español',
+			'_edit_lock'         => '1600000000:1',
+			'unconfigured_field' => 'should_not_copy',
+		);
+
+		// Create translation for 'en'.
+		$en_id = $this->service->create_post_translation( 101, 'en' );
+
+		// Verify SHARE fields were copied.
+		$this->assertSame( 350, $GLOBALS['wp_test_postmeta'][ $en_id ]['_tour_price'] );
+		$this->assertSame( 12, $GLOBALS['wp_test_postmeta'][ $en_id ]['_tour_capacity'] );
+
+		// Verify TRANSLATE and IGNORE and unconfigured fields were NOT copied (Zero Cloning).
+		$this->assertArrayNotHasKey( 'tour_notes', $GLOBALS['wp_test_postmeta'][ $en_id ] ?? array() );
+		$this->assertArrayNotHasKey( '_edit_lock', $GLOBALS['wp_test_postmeta'][ $en_id ] ?? array() );
+		$this->assertArrayNotHasKey( 'unconfigured_field', $GLOBALS['wp_test_postmeta'][ $en_id ] ?? array() );
 	}
 }

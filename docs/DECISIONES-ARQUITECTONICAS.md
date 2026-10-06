@@ -1,4 +1,4 @@
-﻿# REGISTRO DE DECISIONES ARQUITECTÃ“NICAS (ADR)
+# REGISTRO DE DECISIONES ARQUITECTÃ“NICAS (ADR)
 **Documento:** DECISIONES-ARQUITECTONICAS.md
 **Proyecto:** TF Multilingual
 **Estado:** **CONSOLIDADO Y APROBADO**
@@ -149,9 +149,19 @@
 
 ---
 
-### ADR-017: AdopciÃ³n Estricta de WordPress Coding Standards (WPCS)
-- **DECISIÃ“N:** El estilo de cÃ³digo y estÃ¡ndares de calidad se rigen por WordPress Coding Standards (WPCS) y compatibilidad PHP 8.1 - 8.3 mediante PHPCS.
+### ADR-017: Adopción Estricta de WordPress Coding Standards (WPCS)
+- **DECISIÓN:** El estilo de código y estándares de calidad se rigen por WordPress Coding Standards (WPCS) y compatibilidad PHP 8.1 - 8.3 mediante PHPCS.
 - **ESTADO:** **ACEPTADA**
-- **CONTEXTO:** Convenciones de cÃ³digo entre PSR-12 y estÃ¡ndares nativos de WordPress.
-- **JUSTIFICACIÃ“N:** TF Multilingual es un plugin para el ecosistema de WordPress. Seguir las convenciones oficiales de la comunidad garantiza legibilidad, seguridad y mantenibilidad.
-- **CONSECUENCIAS:** CÃ³digo homogÃ©neo, validado por linters automatizados y alineado con los estÃ¡ndares del directorio oficial de plugins de WordPress.
+- **CONTEXTO:** Convenciones de código entre PSR-12 y estándares nativos de WordPress.
+- **JUSTIFICACIÓN:** TF Multilingual es un plugin para el ecosistema de WordPress. Seguir las convenciones oficiales de la comunidad garantiza legibilidad, seguridad y mantenibilidad.
+- **CONSECUENCIAS:** Código homogéneo, validado por linters automatizados y alineado con los estándares del directorio oficial de plugins de WordPress.
+
+---
+
+### ADR-018: Motor Agnóstico de Políticas para Custom Fields con Adopción Progresiva (Default IGNORE) y Zero Auto-Cloning
+- **DECISIÓN:** Los campos personalizados se gestionan bajo una única autoridad (`META KEY -> POLÍTICA TFML -> TRANSLATE | SHARE | IGNORE`) sin crear tablas paralelas de metadatos. Toda clave desconocida o no configurada aplica estrictamente la política por defecto `IGNORE`. Al crear una traducción, únicamente las claves configuradas como `SHARE` se inicializan desde el objeto de origen (respetando Zero Auto-Cloning para `TRANSLATE` e `IGNORE`). La sincronización bidireccional de claves `SHARE` opera mediante hooks nativos de WordPress (`added_post_meta`, `updated_post_meta`, `deleted_post_meta`) con guardia de reentrancia en memoria.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Definición del modelo de campos personalizados independiente de constructores o suites de terceros (ACF, Elementor, WPBakery, Yoast, etc.).
+- **JUSTIFICACIÓN:** Mantener `wp_postmeta` como único origen soberano de datos evita fragmentación, mientras que la regla por defecto `IGNORE` previene mutaciones no intencionadas o corrupción en metadatos de terceros/constructores durante migraciones o instalaciones existentes.
+- **CONSECUENCIAS:** Motor desacoplado, metadatos nativos transparentes, sincronización bidireccional O(1) inmediata entre hermanos de grupo y protección total contra bucles recursivos.
+

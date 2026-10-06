@@ -447,15 +447,14 @@ class LanguageRegistry {
 	public function persist(): bool {
 		$this->ensure_loaded();
 
-		$data = array(
-			'default_language' => $this->default_language,
-			'languages'        => array(),
-		);
+		$current                     = $this->repository->load();
+		$current['default_language'] = $this->default_language;
+		$current['languages']        = array();
 
 		foreach ( $this->languages as $code => $lang ) {
-			$data['languages'][ $code ] = $lang->to_array();
+			$current['languages'][ $code ] = $lang->to_array();
 		}
 
-		return $this->repository->save( $data );
+		return $this->repository->save( $current );
 	}
 }

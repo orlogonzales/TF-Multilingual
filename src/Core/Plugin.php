@@ -10,8 +10,11 @@ declare( strict_types=1 );
 namespace TF\Multilingual\Core;
 
 use TF\Multilingual\Admin\AdminListColumnsUi;
+use TF\Multilingual\Admin\CustomFieldsSettingsUi;
 use TF\Multilingual\Admin\PostEditorialUi;
 use TF\Multilingual\Admin\TermEditorialUi;
+use TF\Multilingual\Domain\CustomField\CustomFieldPolicyRegistry;
+use TF\Multilingual\Domain\CustomField\SharedMetaSynchronizer;
 use TF\Multilingual\Domain\Language\LanguageRegistry;
 use TF\Multilingual\Domain\Translation\ContentTranslationResolver;
 use TF\Multilingual\Domain\Translation\TranslationGroupRepository;
@@ -122,6 +125,27 @@ class Plugin {
 	private ?AdminListColumnsUi $admin_list_columns_ui = null;
 
 	/**
+	 * Custom field policy registry.
+	 *
+	 * @var CustomFieldPolicyRegistry|null
+	 */
+	private ?CustomFieldPolicyRegistry $custom_field_policy_registry = null;
+
+	/**
+	 * Shared meta synchronizer.
+	 *
+	 * @var SharedMetaSynchronizer|null
+	 */
+	private ?SharedMetaSynchronizer $shared_meta_synchronizer = null;
+
+	/**
+	 * Custom fields settings UI component.
+	 *
+	 * @var CustomFieldsSettingsUi|null
+	 */
+	private ?CustomFieldsSettingsUi $custom_fields_settings_ui = null;
+
+	/**
 	 * Retrieves the singleton instance.
 	 *
 	 * @return self
@@ -174,22 +198,33 @@ class Plugin {
 			$this->current_language_resolver
 		);
 
-		$group_repo                  = new TranslationGroupRepository();
-		$translation_resolver        = new ContentTranslationResolver( $group_repo, $this->language_registry );
-		$this->editorial_service     = new TranslationEditorialService(
+		$group_repo                         = new TranslationGroupRepository();
+		$translation_resolver               = new ContentTranslationResolver( $group_repo, $this->language_registry );
+		$this->custom_field_policy_registry = new CustomFieldPolicyRegistry();
+		$this->editorial_service            = new TranslationEditorialService(
 			$this->language_registry,
 			$group_repo,
+			$translation_resolver,
+			null,
+			null,
+			$this->custom_field_policy_registry
+		);
+		$this->shared_meta_synchronizer     = new SharedMetaSynchronizer(
+			$this->custom_field_policy_registry,
 			$translation_resolver
 		);
-		$this->post_editorial_ui     = new PostEditorialUi(
+		$this->custom_fields_settings_ui    = new CustomFieldsSettingsUi(
+			$this->custom_field_policy_registry
+		);
+		$this->post_editorial_ui            = new PostEditorialUi(
 			$this->editorial_service,
 			$this->language_registry
 		);
-		$this->term_editorial_ui     = new TermEditorialUi(
+		$this->term_editorial_ui            = new TermEditorialUi(
 			$this->editorial_service,
 			$this->language_registry
 		);
-		$this->admin_list_columns_ui = new AdminListColumnsUi(
+		$this->admin_list_columns_ui        = new AdminListColumnsUi(
 			$this->language_registry,
 			$this->editorial_service
 		);
@@ -197,9 +232,11 @@ class Plugin {
 		$this->rewrite_manager->init_hooks();
 		$this->query_filter->init_hooks();
 		$this->term_query_filter->init_hooks();
+		$this->shared_meta_synchronizer->init_hooks();
 		$this->post_editorial_ui->init_hooks();
 		$this->term_editorial_ui->init_hooks();
 		$this->admin_list_columns_ui->register_hooks();
+		$this->custom_fields_settings_ui->register_hooks();
 
 		$this->initialized = true;
 	}
@@ -328,6 +365,52 @@ class Plugin {
 		}
 
 		return $this->admin_list_columns_ui;
+	}
+
+	/**
+	 * Gets the custom field policy registry instance.
+	 *
+	 * @return CustomFieldPolicyRegistry
+	 */
+	public function get_custom_field_policy_registry(): CustomFieldPolicyRegistry {
+		if ( null === $this->custom_field_policy_registry ) {
+			$this->custom_field_policy_registry = new CustomFieldPolicyRegistry();
+		}
+
+		return $this->custom_field_policy_registry;
+	}
+
+	/**
+	 * Gets the shared meta synchronizer instance.
+	 *
+	 * @return SharedMetaSynchronizer
+	 */
+	public function get_shared_meta_synchronizer(): SharedMetaSynchronizer {
+		if ( null === $this->shared_meta_synchronizer ) {
+			$group_repo                     = new TranslationGroupRepository();
+			$translation_resolver           = new ContentTranslationResolver( $group_repo, $this->get_language_registry() );
+			$this->shared_meta_synchronizer = new SharedMetaSynchronizer(
+				$this->get_custom_field_policy_registry(),
+				$translation_resolver
+			);
+		}
+
+		return $this->shared_meta_synchronizer;
+	}
+
+	/**
+	 * Gets the custom fields settings UI instance.
+	 *
+	 * @return CustomFieldsSettingsUi
+	 */
+	public function get_custom_fields_settings_ui(): CustomFieldsSettingsUi {
+		if ( null === $this->custom_fields_settings_ui ) {
+			$this->custom_fields_settings_ui = new CustomFieldsSettingsUi(
+				$this->get_custom_field_policy_registry()
+			);
+		}
+
+		return $this->custom_fields_settings_ui;
 	}
 
 	/**

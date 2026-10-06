@@ -27,6 +27,9 @@ class SettingsRepository {
 	public const EMPTY_SETTINGS = array(
 		'default_language' => null,
 		'languages'        => array(),
+		'custom_fields'    => array(
+			'policies' => array(),
+		),
 	);
 
 	/**
@@ -35,7 +38,7 @@ class SettingsRepository {
 	 * If the option is non-existent, malformed or corrupted, returns the safe default
 	 * empty structure without raising fatals or warnings.
 	 *
-	 * @return array{default_language: ?string, languages: array<string, array<string, mixed>>}
+	 * @return array{default_language: ?string, languages: array<string, array<string, mixed>>, custom_fields: array{policies: array<string, string>}}
 	 */
 	public function load(): array {
 		$raw = get_option( self::OPTION_NAME, null );
@@ -82,7 +85,7 @@ class SettingsRepository {
 	 * Sanitizes raw settings payload into predictable canonical structure.
 	 *
 	 * @param mixed $raw Raw input.
-	 * @return array{default_language: ?string, languages: array<string, array<string, mixed>>}
+	 * @return array{default_language: ?string, languages: array<string, array<string, mixed>>, custom_fields: array{policies: array<string, string>}}
 	 */
 	public function sanitize_payload( mixed $raw ): array {
 		if ( ! is_array( $raw ) ) {
@@ -106,9 +109,26 @@ class SettingsRepository {
 			}
 		}
 
+		$custom_fields = array(
+			'policies' => array(),
+		);
+		if ( isset( $raw['custom_fields'] ) && is_array( $raw['custom_fields'] ) ) {
+			if ( isset( $raw['custom_fields']['policies'] ) && is_array( $raw['custom_fields']['policies'] ) ) {
+				foreach ( $raw['custom_fields']['policies'] as $meta_key => $policy ) {
+					if ( is_string( $meta_key ) && '' !== trim( $meta_key ) && is_string( $policy ) ) {
+						$trimmed_policy = strtolower( trim( $policy ) );
+						if ( in_array( $trimmed_policy, array( 'translate', 'share', 'ignore' ), true ) ) {
+							$custom_fields['policies'][ trim( $meta_key ) ] = $trimmed_policy;
+						}
+					}
+				}
+			}
+		}
+
 		return array(
 			'default_language' => $default,
 			'languages'        => $languages,
+			'custom_fields'    => $custom_fields,
 		);
 	}
 }
