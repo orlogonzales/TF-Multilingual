@@ -98,6 +98,14 @@ class ContentTranslationResolverTest extends TestCase {
 	}
 
 	/**
+	 * Clean up test environment after each test.
+	 */
+	protected function tearDown(): void {
+		$GLOBALS['wp_test_options'] = array();
+		parent::tearDown();
+	}
+
+	/**
 	 * Tests resolving posts bidirectionally between ES and EN.
 	 */
 	public function test_resolves_posts_bidirectionally(): void {

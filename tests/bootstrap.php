@@ -461,3 +461,96 @@ if ( ! function_exists( 'esc_sql' ) ) {
 		return addslashes( $data );
 	}
 }
+
+if ( ! class_exists( 'WP_Post' ) ) {
+	/**
+	 * Minimal stub for WP_Post class.
+	 */
+	// phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound,PEAR.NamingConventions.ValidClassName.StartWithCapital
+	class WP_Post {
+		/**
+		 * Post ID.
+		 *
+		 * @var int
+		 */
+		public int $ID = 0;
+
+		/**
+		 * Post type.
+		 *
+		 * @var string
+		 */
+		public string $post_type = 'post';
+
+		/**
+		 * Post status.
+		 *
+		 * @var string
+		 */
+		public string $post_status = 'publish';
+
+		/**
+		 * Post title.
+		 *
+		 * @var string
+		 */
+		public string $post_title = '';
+
+		/**
+		 * Post content.
+		 *
+		 * @var string
+		 */
+		public string $post_content = '';
+
+		/**
+		 * Post author.
+		 *
+		 * @var int
+		 */
+		public int $post_author = 1;
+	}
+}
+
+if ( ! class_exists( 'WP_Term' ) ) {
+	/**
+	 * Minimal stub for WP_Term class.
+	 */
+	// phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound,PEAR.NamingConventions.ValidClassName.StartWithCapital
+	class WP_Term {
+		/**
+		 * Term ID.
+		 *
+		 * @var int
+		 */
+		public int $term_id = 0;
+
+		/**
+		 * Taxonomy name.
+		 *
+		 * @var string
+		 */
+		public string $taxonomy = 'category';
+
+		/**
+		 * Term name.
+		 *
+		 * @var string
+		 */
+		public string $name = '';
+
+		/**
+		 * Term slug.
+		 *
+		 * @var string
+		 */
+		public string $slug = '';
+
+		/**
+		 * Term parent ID.
+		 *
+		 * @var int
+		 */
+		public int $parent = 0;
+	}
+}

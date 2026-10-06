@@ -9,7 +9,12 @@ declare( strict_types=1 );
 
 namespace TF\Multilingual\Core;
 
+use TF\Multilingual\Admin\PostEditorialUi;
+use TF\Multilingual\Admin\TermEditorialUi;
 use TF\Multilingual\Domain\Language\LanguageRegistry;
+use TF\Multilingual\Domain\Translation\ContentTranslationResolver;
+use TF\Multilingual\Domain\Translation\TranslationGroupRepository;
+use TF\Multilingual\Editorial\TranslationEditorialService;
 use TF\Multilingual\Query\QueryLanguageFilter;
 use TF\Multilingual\Query\TermQueryLanguageFilter;
 use TF\Multilingual\Routing\CurrentLanguageResolver;
@@ -88,6 +93,27 @@ class Plugin {
 	private ?TermQueryLanguageFilter $term_query_filter = null;
 
 	/**
+	 * Translation editorial service.
+	 *
+	 * @var TranslationEditorialService|null
+	 */
+	private ?TranslationEditorialService $editorial_service = null;
+
+	/**
+	 * Post editorial UI component.
+	 *
+	 * @var PostEditorialUi|null
+	 */
+	private ?PostEditorialUi $post_editorial_ui = null;
+
+	/**
+	 * Term editorial UI component.
+	 *
+	 * @var TermEditorialUi|null
+	 */
+	private ?TermEditorialUi $term_editorial_ui = null;
+
+	/**
 	 * Retrieves the singleton instance.
 	 *
 	 * @return self
@@ -140,9 +166,27 @@ class Plugin {
 			$this->current_language_resolver
 		);
 
+		$group_repo              = new TranslationGroupRepository();
+		$translation_resolver    = new ContentTranslationResolver( $group_repo, $this->language_registry );
+		$this->editorial_service = new TranslationEditorialService(
+			$this->language_registry,
+			$group_repo,
+			$translation_resolver
+		);
+		$this->post_editorial_ui = new PostEditorialUi(
+			$this->editorial_service,
+			$this->language_registry
+		);
+		$this->term_editorial_ui = new TermEditorialUi(
+			$this->editorial_service,
+			$this->language_registry
+		);
+
 		$this->rewrite_manager->init_hooks();
 		$this->query_filter->init_hooks();
 		$this->term_query_filter->init_hooks();
+		$this->post_editorial_ui->init_hooks();
+		$this->term_editorial_ui->init_hooks();
 
 		$this->initialized = true;
 	}
@@ -204,6 +248,57 @@ class Plugin {
 		}
 
 		return $this->term_query_filter;
+	}
+
+	/**
+	 * Gets the translation editorial service instance.
+	 *
+	 * @return TranslationEditorialService
+	 */
+	public function get_editorial_service(): TranslationEditorialService {
+		if ( null === $this->editorial_service ) {
+			$group_repo              = new TranslationGroupRepository();
+			$translation_resolver    = new ContentTranslationResolver( $group_repo, $this->get_language_registry() );
+			$this->editorial_service = new TranslationEditorialService(
+				$this->get_language_registry(),
+				$group_repo,
+				$translation_resolver
+			);
+		}
+
+		return $this->editorial_service;
+	}
+
+	/**
+	 * Gets the post editorial UI component instance.
+	 *
+	 * @return PostEditorialUi
+	 */
+	public function get_post_editorial_ui(): PostEditorialUi {
+		if ( null === $this->post_editorial_ui ) {
+			$this->post_editorial_ui = new PostEditorialUi(
+				$this->get_editorial_service(),
+				$this->get_language_registry()
+			);
+		}
+
+		return $this->post_editorial_ui;
+	}
+
+	/**
+	 * Gets the term editorial UI component instance.
+	 *
+	 * @return TermEditorialUi
+	 */
+	public function get_term_editorial_ui(): TermEditorialUi {
+		if ( null === $this->term_editorial_ui ) {
+			$this->term_editorial_ui = new TermEditorialUi(
+				$this->get_editorial_service(),
+				$this->get_language_registry()
+			);
+		}
+
+		return $this->term_editorial_ui;
 	}
 
 	/**

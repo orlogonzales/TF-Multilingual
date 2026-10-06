@@ -133,5 +133,42 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Cero filtrado de menús, widgets o shortcodes (reservados para fases posteriores).
   - Cero escrituras directas sobre tablas externas (`*_icl_*`).
 
+- **Flujo Editorial Multilingüe Base (Fase 1.8):**
+  - **Filosofía "WordPress sigue siendo WordPress":**
+    - Integración directa y no disruptiva en las pantallas nativas de WordPress (`post.php`, `post-new.php`, `edit.php`, `term.php`, `edit-tags.php`).
+    - Cero CMS paralelo, cero SPA React invasiva, cero router administrativo artificial.
+  - **Servicio de Aplicación Editorial `TF\Multilingual\Editorial\TranslationEditorialService`:**
+    - Orquestación centralizada de estados y acciones editoriales: asignación inicial de idioma para contenido legacy/unmanaged, creación de traducciones vinculadas al grupo original, agregación de datos de estado editorial multilingüe (`get_editorial_data`).
+    - **Invariante Soberana de Creación: Estado Estricto DRAFT:**
+      - Toda traducción recién creada nace estrictamente con `post_status = 'draft'`. Prohibición absoluta de publicar automáticamente traducciones derivadas.
+    - **Política de No Clonación Automática (Zero Auto-Cloning):**
+      - Prohibición estricta de copiar automáticamente `post_title`, `post_content`, `post_excerpt`, `postmeta`, términos taxonómicos (`wp_term_relationships`) o imagen destacada (`_thumbnail_id`). El editor humano mantiene el control editorial total.
+      - Uso seguro del filtro oficial de WordPress `wp_insert_post_empty_content` para permitir la instanciación de drafts vacíos sin violar las validaciones nativas de Core.
+    - **Asignación Explícita de Idioma para Contenido No Gestionado:**
+      - Contenidos históricos no gestionados no infieren mágicamente su idioma; requieren una acción editorial explícita (`assign_initial_language`) que valida permisos y crea el `TranslationGroup`.
+    - **Aislamiento Estricto de Subtipos y Taxonomías:**
+      - Traducciones de posts preservan la invariante de `post_type`.
+      - Traducciones de términos preservan la invariante de taxonomía (`category`, `post_tag`, etc.). Cero copia automática de jerarquía parental de términos.
+    - **Seguridad Robusta, Verificación de Permisos y Prevención de Concurrencia:**
+      - Comprobación rigurosa de capacidades de usuario mediante Core APIs (`edit_post`, `create_posts`/`edit_posts`, `edit_terms`).
+      - Prevención de duplicación y carreras concurrentes respaldada por la clave única `UNIQUE(group_id, language_code)`.
+      - Prevención de reasignación sobre elementos ya gestionados (`EditorialConflictException`).
+      - Tratamiento informativo de idiomas inactivos: se visualizan en la interfaz pero se bloquea la creación hacia idiomas desactivados (`EditorialValidationException`).
+    - **Jerarquía de Excepciones Editoriales (`TF\Multilingual\Editorial\Exceptions\`):**
+      - `EditorialException`, `EditorialValidationException`, `EditorialPermissionException`, `EditorialConflictException`.
+  - **Componentes de Interfaz Administrativa Nativa:**
+    - `TF\Multilingual\Admin\PostEditorialUi`: Meta box lateral (`side`, `high`) compatible tanto con el Editor Clásico como con Gutenberg (Block Editor), conmutador de idioma actual para objetos unmanaged, matriz de traducciones existentes con enlaces directos a sus pantallas de edición, y acciones seguras para creación de traducciones faltantes con protección anti-CSRF vía nonces específicos.
+    - `TF\Multilingual\Admin\TermEditorialUi`: Integración nativa en formularios de edición (`{$taxonomy}_edit_form_fields`) y creación (`{$taxonomy}_add_form_fields`) de términos taxonómicos, selectores de idioma y tabla de estado de traducciones.
+    - Endpoints de procesamiento seguro mediante `admin-post.php` (`admin_post_tfml_create_post_translation`, `admin_post_tfml_create_term_translation`) con redirección segura a las pantallas nativas del editor.
+  - **Integración en `TF\Multilingual\Core\Plugin`:**
+    - Instanciación de `TranslationEditorialService`, `PostEditorialUi` y `TermEditorialUi`, y conexión de hooks en `init_hooks()`.
+  - **Pruebas y Verificación:**
+    - Suite de pruebas unitarias ampliada con `TranslationEditorialServiceTest` (21 pruebas exhaustivas). Total consolidado: **207 tests, 637 assertions, 0 errores, 0 fallos**.
+    - Verificación física en entorno WordPress 7.1.2 real con batería completa end-to-end (`scratch/verify_fase_1_8.php`): pruebas de posts, páginas, CPTs (`lab_tour`), categorías, rechazo de idiomas inactivos, prevención de duplicados, barreras de autorización para usuarios sin privilegios (suscriptor), resoluciones bidireccionales y preservación íntegra de WPML en **3,403 filas** e identidad MD5 exacta `4241ca7e7ec6399a594537cb04790c10`, 3,995 posts, 80 términos y tablas TFML limpias.
+  - **Fronteras y Scope Respetados:**
+    - Cero SPA o React invasivo.
+    - Cero routers administrativos paralelos.
+    - Cero alteración de tablas Core ni tablas externas (`*_icl_*`).
+
 ### Nota de Estado
-- Esta versión incorpora el filtrado multilingüe de taxonomías y términos sobre `WP_Term_Query`, el aislamiento estricto de subtipos, la política de adopción progresiva para términos no gestionados, la protección de consultas explícitas de identidad, y la plena compatibilidad con las relaciones post-término (`get_the_terms`). Las fases subsiguientes abordarán la sincronización y traducción editorial, UI administrativa y conmutador de idiomas.
+- Esta versión incorpora el flujo editorial multilingüe base para posts, páginas, CPTs y taxonomías en WordPress Admin, la asignación explícita de idioma para contenido legacy, la creación de traducciones en estado estrictamente DRAFT con política de no clonación automática (zero auto-cloning), y los meta boxes y campos nativos de administración. Las fases subsiguientes abordarán las columnas lingüísticas en los listados administrativos (`WP_List_Table`), filtros rápidos por idioma en administración, y el conmutador de idiomas público.
