@@ -66,15 +66,41 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - **Guard de Recursión:** Bandera reentrante `$is_resolving_link` en `get_post_translation_url` y `get_term_translation_url` para blindar contra bucles infinitos durante filtros recursivos de enlace.
     - `TF\Multilingual\Routing\RewriteManager`: Inyector de reglas de reescritura en WordPress mediante filtrado dinámico de `rewrite_rules_array` y registro de query var `tfml_lang`. Genera reglas para la portada de idiomas secundarios (`^({lang})/?$`) y antepone prefijos a las reglas nativas desplazando apropiadamente los retro-capturas (`$matches[1] -> $matches[2]`). Excluye endpoints de sistema (`wp-json`, `wp-sitemap`). **Cero llamadas a `flush_rewrite_rules()` en `init`**.
     - `TF\Multilingual\Routing\SlugCollisionDetector`: Detector preventivo de colisiones para verificar si un código de idioma coincide con slugs existentes en `wp_posts` (`post_name`) o taxonomías `wp_terms`/`wp_term_taxonomy` (`slug`), garantizando que la incorporación de idiomas no opaque rutas legítimas preexistentes.
+- **Filtrado Multilingüe de Consultas y Loop (Fase 1.6):**
+  - **Servicio Soberano de Filtrado `TF\Multilingual\Query\QueryLanguageFilter`:**
+    - Intervención limpia y no invasiva de consultas WordPress sin secuestrar ni alterar el ciclo de ejecución de `WP_Query`.
+    - Calificación de elegibilidad en `pre_get_posts` (marca query var interna de control `_tfml_target_language`).
+    - Inyección SQL quirúrgica en `posts_clauses` (`join` y `where`), preservando el cálculo nativo de paginación (`found_posts`, `max_num_pages`). Prohibición absoluta de filtrado posterior vía `the_posts` o `posts_results`.
+    - **Política Aprobada de Adopción Progresiva (Default-Language Ownership):**
+      - Contenido gestionado en TFML (`tfml_group_elements`): filtrado estrictamente por `language_code`.
+      - Contenido histórico no gestionado en TFML (`tfml_group_elements.id IS NULL`): visible exclusivamente en el idioma predeterminado (`es`). Prohibición estricta de fuga o visibilidad en idiomas secundarios.
+      - Peticiones en idioma predeterminado: incluyen contenido gestionado en predeterminado + contenido no gestionado (`AND (tfml_ge.language_code = '{$default}' OR tfml_ge.id IS NULL)`).
+      - Peticiones en idioma secundario: muestran exclusivamente contenido traducido al idioma secundario (`AND tfml_ge.language_code = '{$secondary}'`, Strict NO FALLBACK).
+    - **Eficiencia y Cero DISTINCT:**
+      - Consulta estructurada con `LEFT JOIN {$table} AS tfml_ge ON (tfml_ge.element_id = {$posts}.ID AND tfml_ge.element_type = 'post')`.
+      - Omisión intencional de `DISTINCT` por diseño garantizado por el índice `UNIQUE uq_element (element_type, element_id)` que previene duplicados.
+      - Optimización de rendimiento demostrada en `EXPLAIN`: resolución `ref` sobre `idx_lookup` y `eq_ref` sobre `PRIMARY`.
+    - **Mecanismos de Opt-out:**
+      - Soporte para deshabilitar el filtro explícitamente mediante `'tfml_suppress_language_filter' => true`.
+      - Respeto total al parámetro estándar de WordPress `'suppress_filters' => true`.
+    - **Aislamiento de Contextos y Exclusiones:**
+      - Exclusión automática en pantallas y listados administrativos (`is_admin()`), endpoints de la API REST (`REST_REQUEST`, `wp_is_json_request()`), WP-CLI, WP-Cron, peticiones AJAX y vista previa editorial (`$query->is_preview()`).
+      - Exclusión automática de post types internos (`attachment`, `revision`, `nav_menu_item`, etc.).
+    - **Idempotencia Robusta:**
+      - Marcado interno con `_tfml_clauses_applied => true` y detección textual previa de `tfml_group_elements` en la cláusula `join` para blindar contra doble inyección de SQL.
+  - **Orquestación en `TF\Multilingual\Core\Plugin`:**
+    - Integración e instanciación de `QueryLanguageFilter` coordinada con `LanguageRegistry` y `CurrentLanguageResolver`.
+    - Conexión formal de hooks (`init_hooks()`) durante la inicialización del plugin.
 - **Pruebas y Verificación:**
-  - Suite de pruebas unitarias ampliada con 6 nuevos tests suites: `UrlLanguageResolutionTest`, `UrlLanguageResolverTest`, `CurrentLanguageResolverTest`, `LocalizedUrlGeneratorTest`, `RewriteManagerTest` y `SlugCollisionDetectorTest`. Total consolidado: **154 tests, 505 assertions, 0 errores, 0 fallos**.
-  - Doble `TestableWpdb` enriquecido con simulación de consultas sobre posts y términos para pruebas unitarias de colisión de slugs.
-  - Verificación en vivo sobre WordPress 7.1.2 real con centinela criptográfico de solo lectura: preservación absoluta de WPML en **3,403 filas** e identidad MD5 exacta `4241ca7e7ec6399a594537cb04790c10`, 3,995 posts, 80 términos y laboratorio terminado con `tfml_settings` limpio.
+  - Suite de pruebas unitarias ampliada con `QueryLanguageFilterTest` (16 pruebas exhaustivas). Total consolidado: **170 tests, 536 assertions, 0 errores, 0 fallos**.
+  - Doble `TestableWpdb` y `tests/bootstrap.php` actualizados con soporte para propiedades de WordPress Core `$wpdb->posts` e instanciación global segura para tests unitarios aislados.
+  - Verificación física en entorno WordPress 7.1.2 real con 14 baterías de pruebas (consultas por idioma default, secundario, secundario sin contenido, idioma inactivo, CPTs, páginas, exclusión de attachments, paginación con `found_posts` exacto, opt-out explícito y nativo, búsquedas filtradas, singular queries sin fallback, exclusiones de contexto, alternancia a política STRICT, e inspección de plan de ejecución `EXPLAIN`).
+  - Preservación íntegra de WPML en **3,403 filas** e identidad MD5 exacta `4241ca7e7ec6399a594537cb04790c10`, 3,995 posts, 80 términos y tablas TFML limpias.
 - **Fronteras y Scope Respetados:**
-  - Cero intervención de `WP_Query`, `pre_get_posts` o el Loop (reservado para Fase 1.6).
+  - Cero filtrado de `WP_Term_Query` (reservado para fases posteriores).
+  - Cero filtrado de menús o attachments.
+  - Cero opciones de configuración o interfaz de usuario para contenido no gestionado en Fase 1.6 (encapsulado internamente).
   - Cero escrituras directas sobre tablas externas.
-  - Cero llamadas a `flush_rewrite_rules()` en `init`.
 
 ### Nota de Estado
-- Esta versión incorpora la resolución soberana de idioma en URL, el generador de URLs localizadas sobre permalinks nativos de Core, el gestor de rewrite rules y el detector de colisiones. La intervención de consultas globales (`WP_Query`), filtrado del Loop y taxonomías asociadas queda estrictamente reservada para la Fase 1.6.
-
+- Esta versión incorpora el filtrado multilingüe de consultas y del Loop sobre `WP_Query`, la política de adopción progresiva para contenido no gestionado, mecanismos de opt-out, paginación exacta y aislamiento de contextos. El filtrado de consultas de taxonomías (`WP_Term_Query`) y la sincronización/traducción editorial quedan reservados para fases subsiguientes.

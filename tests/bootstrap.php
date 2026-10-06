@@ -29,6 +29,13 @@ if ( ! class_exists( 'wpdb' ) ) {
 		public string $prefix = 'wp_';
 
 		/**
+		 * Posts table name.
+		 *
+		 * @var string
+		 */
+		public string $posts = 'wp_posts';
+
+		/**
 		 * Last insert ID.
 		 *
 		 * @var int
@@ -174,6 +181,10 @@ if ( ! class_exists( 'wpdb' ) ) {
 	}
 }
 
+if ( ! isset( $GLOBALS['wpdb'] ) ) {
+	$GLOBALS['wpdb'] = new wpdb();
+}
+
 // In-memory options storage for unit tests.
 $GLOBALS['wp_test_options'] = array();
 
@@ -231,5 +242,222 @@ if ( ! function_exists( 'current_time' ) ) {
 	 */
 	function current_time( string $type, mixed $gmt = 0 ): string {
 		return gmdate( 'Y-m-d H:i:s' );
+	}
+}
+
+if ( ! class_exists( 'WP_Query' ) ) {
+	/**
+	 * Minimal stub for WP_Query.
+	 */
+	// phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound,PEAR.NamingConventions.ValidClassName.StartWithCapital
+	class WP_Query {
+
+		/**
+		 * Query variables array.
+		 *
+		 * @var array<string, mixed>
+		 */
+		public array $query_vars = array();
+
+		/**
+		 * Whether this is the main query.
+		 *
+		 * @var bool
+		 */
+		public bool $is_main_query = false;
+
+		/**
+		 * Whether this is a preview query.
+		 *
+		 * @var bool
+		 */
+		public bool $is_preview = false;
+
+		/**
+		 * Whether this is a search query.
+		 *
+		 * @var bool
+		 */
+		public bool $is_search = false;
+
+		/**
+		 * Whether this is a singular query.
+		 *
+		 * @var bool
+		 */
+		public bool $is_singular = false;
+
+		/**
+		 * Whether this is an archive query.
+		 *
+		 * @var bool
+		 */
+		public bool $is_archive = false;
+
+		/**
+		 * Constructor.
+		 *
+		 * @param array<string, mixed> $args Query variables.
+		 */
+		public function __construct( array $args = array() ) {
+			$this->query_vars = $args;
+		}
+
+		/**
+		 * Retrieves a query variable.
+		 *
+		 * @param string $query_var     Variable name.
+		 * @param mixed  $default_value Default value.
+		 * @return mixed
+		 */
+		public function get( string $query_var, mixed $default_value = '' ): mixed {
+			return $this->query_vars[ $query_var ] ?? $default_value;
+		}
+
+		/**
+		 * Sets a query variable.
+		 *
+		 * @param string $query_var Variable name.
+		 * @param mixed  $value     Variable value.
+		 * @return void
+		 */
+		public function set( string $query_var, mixed $value ): void {
+			$this->query_vars[ $query_var ] = $value;
+		}
+
+
+		/**
+		 * Checks if main query.
+		 *
+		 * @return bool
+		 */
+		public function is_main_query(): bool {
+			return $this->is_main_query;
+		}
+
+		/**
+		 * Checks if preview query.
+		 *
+		 * @return bool
+		 */
+		public function is_preview(): bool {
+			return $this->is_preview;
+		}
+
+		/**
+		 * Checks if search query.
+		 *
+		 * @return bool
+		 */
+		public function is_search(): bool {
+			return $this->is_search;
+		}
+
+		/**
+		 * Checks if singular query.
+		 *
+		 * @return bool
+		 */
+		public function is_singular(): bool {
+			return $this->is_singular;
+		}
+
+		/**
+		 * Checks if archive query.
+		 *
+		 * @return bool
+		 */
+		public function is_archive(): bool {
+			return $this->is_archive;
+		}
+	}
+}
+
+if ( ! function_exists( 'add_action' ) ) {
+	/**
+	 * Stub for add_action.
+	 *
+	 * @param string   $hook_name     Hook name.
+	 * @param callable $callback      Callback.
+	 * @param int      $priority      Priority.
+	 * @param int      $accepted_args Accepted args.
+	 * @return true
+	 */
+	function add_action( string $hook_name, callable $callback, int $priority = 10, int $accepted_args = 1 ): true {
+		return true;
+	}
+}
+
+if ( ! function_exists( 'add_filter' ) ) {
+	/**
+	 * Stub for add_filter.
+	 *
+	 * @param string   $hook_name     Hook name.
+	 * @param callable $callback      Callback.
+	 * @param int      $priority      Priority.
+	 * @param int      $accepted_args Accepted args.
+	 * @return true
+	 */
+	function add_filter( string $hook_name, callable $callback, int $priority = 10, int $accepted_args = 1 ): true {
+		return true;
+	}
+}
+
+if ( ! function_exists( 'is_admin' ) ) {
+	/**
+	 * Stub for is_admin.
+	 *
+	 * @return bool
+	 */
+	function is_admin(): bool {
+		return false;
+	}
+}
+
+if ( ! function_exists( 'wp_doing_cron' ) ) {
+	/**
+	 * Stub for wp_doing_cron.
+	 *
+	 * @return bool
+	 */
+	function wp_doing_cron(): bool {
+		return false;
+	}
+}
+
+if ( ! function_exists( 'wp_doing_ajax' ) ) {
+	/**
+	 * Stub for wp_doing_ajax.
+	 *
+	 * @return bool
+	 */
+	function wp_doing_ajax(): bool {
+		return false;
+	}
+}
+
+if ( ! function_exists( 'wp_is_json_request' ) ) {
+	/**
+	 * Stub for wp_is_json_request.
+	 *
+	 * @return bool
+	 */
+	function wp_is_json_request(): bool {
+		return false;
+	}
+}
+
+if ( ! function_exists( 'esc_sql' ) ) {
+	/**
+	 * Stub for esc_sql.
+	 *
+	 * @param string|array<mixed> $data Data to escape.
+	 * @return string|array<mixed>
+	 */
+	function esc_sql( string|array $data ): string|array {
+		if ( is_array( $data ) ) {
+			return array_map( 'addslashes', $data );
+		}
+		return addslashes( $data );
 	}
 }

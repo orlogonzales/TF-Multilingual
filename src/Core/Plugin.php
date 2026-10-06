@@ -9,6 +9,12 @@ declare( strict_types=1 );
 
 namespace TF\Multilingual\Core;
 
+use TF\Multilingual\Domain\Language\LanguageRegistry;
+use TF\Multilingual\Query\QueryLanguageFilter;
+use TF\Multilingual\Routing\CurrentLanguageResolver;
+use TF\Multilingual\Routing\RewriteManager;
+use TF\Multilingual\Routing\UrlLanguageResolver;
+
 /**
  * Class Plugin
  *
@@ -44,6 +50,34 @@ class Plugin {
 	 * @var bool
 	 */
 	private bool $initialized = false;
+
+	/**
+	 * Language registry.
+	 *
+	 * @var LanguageRegistry|null
+	 */
+	private ?LanguageRegistry $language_registry = null;
+
+	/**
+	 * Current language resolver.
+	 *
+	 * @var CurrentLanguageResolver|null
+	 */
+	private ?CurrentLanguageResolver $current_language_resolver = null;
+
+	/**
+	 * Rewrite manager.
+	 *
+	 * @var RewriteManager|null
+	 */
+	private ?RewriteManager $rewrite_manager = null;
+
+	/**
+	 * Query language filter.
+	 *
+	 * @var QueryLanguageFilter|null
+	 */
+	private ?QueryLanguageFilter $query_filter = null;
 
 	/**
 	 * Retrieves the singleton instance.
@@ -82,7 +116,65 @@ class Plugin {
 			return;
 		}
 
+		$this->language_registry         = new LanguageRegistry();
+		$url_resolver                    = new UrlLanguageResolver( $this->language_registry );
+		$this->current_language_resolver = new CurrentLanguageResolver( $url_resolver );
+		$this->rewrite_manager           = new RewriteManager(
+			$this->language_registry,
+			$this->current_language_resolver
+		);
+		$this->query_filter              = new QueryLanguageFilter(
+			$this->language_registry,
+			$this->current_language_resolver
+		);
+
+		$this->rewrite_manager->init_hooks();
+		$this->query_filter->init_hooks();
+
 		$this->initialized = true;
+	}
+
+	/**
+	 * Gets the language registry instance.
+	 *
+	 * @return LanguageRegistry
+	 */
+	public function get_language_registry(): LanguageRegistry {
+		if ( null === $this->language_registry ) {
+			$this->language_registry = new LanguageRegistry();
+		}
+
+		return $this->language_registry;
+	}
+
+	/**
+	 * Gets the current language resolver instance.
+	 *
+	 * @return CurrentLanguageResolver
+	 */
+	public function get_current_language_resolver(): CurrentLanguageResolver {
+		if ( null === $this->current_language_resolver ) {
+			$url_resolver                    = new UrlLanguageResolver( $this->get_language_registry() );
+			$this->current_language_resolver = new CurrentLanguageResolver( $url_resolver );
+		}
+
+		return $this->current_language_resolver;
+	}
+
+	/**
+	 * Gets the query language filter instance.
+	 *
+	 * @return QueryLanguageFilter
+	 */
+	public function get_query_filter(): QueryLanguageFilter {
+		if ( null === $this->query_filter ) {
+			$this->query_filter = new QueryLanguageFilter(
+				$this->get_language_registry(),
+				$this->get_current_language_resolver()
+			);
+		}
+
+		return $this->query_filter;
 	}
 
 	/**
@@ -93,6 +185,7 @@ class Plugin {
 	public function is_initialized(): bool {
 		return $this->initialized;
 	}
+
 
 	/**
 	 * Gets the current technical plugin version.
