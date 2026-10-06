@@ -292,8 +292,27 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Suite de pruebas unitarias ampliada con 5 nuevas clases (`MediaTranslationTest`, `MediaTranslationRepositoryTest`, `MediaTranslationResolverTest`, `MediaFrontendFilterTest`, `MediaEditorialUiTest`). Total consolidado: **310 tests, 993 assertions, 0 errores, 0 fallos**.
     - Cobertura 100% limpia de PHPCS (WordPress Coding Standards) en todos los 82 archivos del proyecto (0 errores, 0 warnings).
     - Verificación física exhaustiva en WordPress 7.1.2 real (`scratch/verify_fase_2_2.php`): **69 aserciones pasadas (100%)**, validando archivo y attachment únicos, adopción explícita, variantes ES/EN, fallback estricto a Core en PT, hooks frontend, imágenes destacadas compartidas, UI nativa, Zero N+1 probado (1 query en lote de 20, 1 query en lote de 50, 0 en lectura), cascada de eliminación, no-regresión de ACF y políticas de campos, y preservación criptográfica idéntica de sentinelas de base de datos (WPML 3,403 filas, MD5 `4241ca7e7ec6399a594537cb04790c10`, 3,995 posts, 80 terms, 0 groups, 0 elements, 0 media rows).
+- **Hardening de Verificación Media / Aislamiento Total de Plugins Externos (Fase 2.2A):**
+  - **Inviolabilidad Cero Escrituras de Tablas Externas (`*_icl_*`):**
+    - Prohibición absoluta de sentencias SQL directas de escritura (`DELETE`, `INSERT`, `UPDATE`, `REPLACE`) contra tablas de WPML tanto en código productivo como en scripts de verificación, pruebas y helpers.
+    - Eliminación de la mutación temporal en laboratorio (`3403 -> 3474 -> 3403`) mediante aislamiento preventivo de callbacks de WPML (`ExternalPluginIsolationGuard`) durante la inserción de fixtures en el entorno.
+    - Invariabilidad absoluta de sentinelas demostrada en vivo: WPML permanece en exactamente 3,403 filas (DELTA: 0) y MD5 `4241ca7e7ec6399a594537cb04790c10` constante antes, durante y después de la suite de pruebas.
+  - **Limpieza Determinista Basada en APIs de Core y Bloque `try/finally`:**
+    - Todas las entidades temporales de prueba (attachments, posts, archivos físicos en uploads) son rastreadas y eliminadas de forma determinista mediante `wp_delete_attachment( $id, true )` y `wp_delete_post( $id, true )` dentro de bloques `finally`.
+    - Cero consultas `DELETE FROM posts WHERE ID > ...` o `DELETE FROM postmeta WHERE post_id > ...`.
+    - Restauración obligatoria y verificada de todos los callbacks externos desenganchados en el bloque `finally`.
+  - **Test de Fallo Controlado Premeditado (`scratch/test_controlled_failure_2_2a.php`):**
+    - Demostración de robustez ante excepciones catastróficas simuladas a mitad de la ejecución: el bloque `finally` rescata y destruye todas las entidades creadas hasta el momento del fallo, restaura todos los hooks externos y preserva íntegramente las tablas anfitrionas sin corrupción.
+  - **Auditoría Repositorio-Wide:**
+    - Inspección exhaustiva de todo el repositorio confirmando **0 sentencias SQL de escritura** sobre tablas `*_icl_*` en la totalidad del código fuente, pruebas y scripts auxiliares.
+  - **Verificación Física:**
+    - `scratch/verify_fase_2_2.php`: 72 aserciones pasadas (100%).
+    - `scratch/test_controlled_failure_2_2a.php`: 13 aserciones pasadas (100%).
+    - `scratch/verify_fase_2_1.php`: 60 aserciones pasadas (100%).
+    - PHPUnit: 310 tests, 993 assertions (100% pass).
+    - PHPCS: 82 files clean (100% clean).
 
 ### Nota de Estado
-- Esta versión incorpora el sistema base de medios multilingües de TF Multilingual (Fase 2.2), respetando la directriz de archivo físico único y attachment único en WordPress Core, almacenando variantes de metadatos editoriales (ALT, título, leyenda, descripción) en la tabla dedicada `tfml_media_translations` sin crear grupos de traducción, implementando fallback estricto a metadatos de WordPress Core sin contaminación entre idiomas secundarios, filtrando los hooks nativos de renderizado frontend (`wp_get_attachment_image`, `wp_get_attachment_caption`), integrando la imagen destacada compartida (`_thumbnail_id`), proveyendo una metabox nativa en el editor de medios y asegurando un rendimiento de Zero N+1 con resolución batch en una sola consulta.
+- Esta versión consolida el sistema base de medios multilingües de TF Multilingual (Fase 2.2) y el protocolo endurecido de verificación externa (Fase 2.2A). Respeta la directriz de archivo físico único y attachment único en WordPress Core, almacena variantes de metadatos editoriales (ALT, título, leyenda, descripción) en la tabla dedicada `tfml_media_translations` sin crear grupos de traducción, implementa fallback estricto a metadatos de WordPress Core sin contaminación entre idiomas secundarios, filtra los hooks nativos de renderizado frontend (`wp_get_attachment_image`, `wp_get_attachment_caption`), integra la imagen destacada compartida (`_thumbnail_id`), provee una metabox nativa en el editor de medios, asegura un rendimiento de Zero N+1 con resolución batch en una sola consulta, y garantiza cero escrituras directas sobre tablas externas anfitrionas.
 
 
