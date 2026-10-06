@@ -554,3 +554,91 @@ if ( ! class_exists( 'WP_Term' ) ) {
 		public int $parent = 0;
 	}
 }
+
+if ( ! function_exists( '__' ) ) {
+	/**
+	 * Stub for __.
+	 *
+	 * @param string $text   Text.
+	 * @param string $domain Domain.
+	 * @return string
+	 */
+	function __( string $text, string $domain = 'default' ): string {
+		return $text;
+	}
+}
+
+if ( ! function_exists( 'esc_attr__' ) ) {
+	/**
+	 * Stub for esc_attr__.
+	 *
+	 * @param string $text   Text.
+	 * @param string $domain Domain.
+	 * @return string
+	 */
+	function esc_attr__( string $text, string $domain = 'default' ): string {
+		return $text;
+	}
+}
+
+if ( ! function_exists( 'esc_html__' ) ) {
+	/**
+	 * Stub for esc_html__.
+	 *
+	 * @param string $text   Text.
+	 * @param string $domain Domain.
+	 * @return string
+	 */
+	function esc_html__( string $text, string $domain = 'default' ): string {
+		return $text;
+	}
+}
+
+if ( ! function_exists( 'esc_attr' ) ) {
+	/**
+	 * Stub for esc_attr.
+	 *
+	 * @param string $text Text.
+	 * @return string
+	 */
+	function esc_attr( string $text ): string {
+		return htmlspecialchars( $text, ENT_QUOTES );
+	}
+}
+
+if ( ! function_exists( 'esc_html' ) ) {
+	/**
+	 * Stub for esc_html.
+	 *
+	 * @param string $text Text.
+	 * @return string
+	 */
+	function esc_html( string $text ): string {
+		return htmlspecialchars( $text, ENT_QUOTES );
+	}
+}
+
+if ( ! function_exists( 'esc_url' ) ) {
+	/**
+	 * Stub for esc_url.
+	 *
+	 * @param string $url URL.
+	 * @return string
+	 */
+	function esc_url( string $url ): string {
+		return $url;
+	}
+}
+
+if ( ! function_exists( 'admin_url' ) ) {
+	/**
+	 * Stub for admin_url.
+	 *
+	 * @param string $path   Path.
+	 * @param string $scheme Scheme.
+	 * @return string
+	 */
+	function admin_url( string $path = '', string $scheme = 'admin' ): string {
+		return 'https://example.com/wp-admin/' . ltrim( $path, '/' );
+	}
+}

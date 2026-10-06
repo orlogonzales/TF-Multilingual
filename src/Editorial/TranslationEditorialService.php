@@ -97,6 +97,13 @@ class TranslationEditorialService {
 	private wpdb $db;
 
 	/**
+	 * In-memory runtime cache for aggregated editorial data.
+	 *
+	 * @var array<string, array<string, mixed>>
+	 */
+	private array $editorial_cache = array();
+
+	/**
 	 * Constructor.
 	 *
 	 * @param LanguageRegistry|null           $language_registry    Language registry.
@@ -176,8 +183,13 @@ class TranslationEditorialService {
 	 * @return array<string, mixed> Structured editorial data.
 	 */
 	public function get_editorial_data( string $element_type, int $element_id, string $subtype ): array {
+		$cache_key = "{$element_type}:{$element_id}:{$subtype}";
+		if ( array_key_exists( $cache_key, $this->editorial_cache ) ) {
+			return $this->editorial_cache[ $cache_key ];
+		}
+
 		if ( ! $this->language_registry->is_configured() ) {
-			return array(
+			$unconfigured                        = array(
 				'is_configured'         => false,
 				'is_managed'            => false,
 				'current_language'      => null,
@@ -188,6 +200,8 @@ class TranslationEditorialService {
 				'missing_languages'     => array(),
 				'inactive_translations' => array(),
 			);
+			$this->editorial_cache[ $cache_key ] = $unconfigured;
+			return $unconfigured;
 		}
 
 		$active_langs = $this->language_registry->active();
@@ -249,7 +263,7 @@ class TranslationEditorialService {
 			}
 		}
 
-		return array(
+		$data = array(
 			'is_configured'         => true,
 			'is_managed'            => $is_managed,
 			'current_language'      => $current_language,
@@ -260,6 +274,84 @@ class TranslationEditorialService {
 			'missing_languages'     => $missing_languages,
 			'inactive_translations' => $inactive_translations,
 		);
+
+		$this->editorial_cache[ $cache_key ] = $data;
+
+		return $data;
+	}
+
+	/**
+	 * Retrieves editorial data for multiple elements in batch.
+	 *
+	 * Pre-warms both the database resolver cache and the editorial data cache in O(1) queries.
+	 *
+	 * @param string     $element_type Element type ('post' or 'term').
+	 * @param array<int> $element_ids  Array of WordPress object IDs.
+	 * @param string     $subtype      Subtype (post_type or taxonomy).
+	 * @return array<int, array<string, mixed>> Map of element_id => editorial data array.
+	 */
+	public function get_editorial_data_for_elements( string $element_type, array $element_ids, string $subtype ): array {
+		$valid_ids = array_values( array_unique( array_filter( array_map( 'intval', $element_ids ), static fn( int $id ): bool => $id > 0 ) ) );
+		if ( empty( $valid_ids ) ) {
+			return array();
+		}
+
+		if ( ! $this->language_registry->is_configured() ) {
+			$unconfigured = array();
+			foreach ( $valid_ids as $id ) {
+				$unconfigured[ $id ] = $this->get_editorial_data( $element_type, $id, $subtype );
+			}
+			return $unconfigured;
+		}
+
+		// Find which IDs are not yet in editorial cache.
+		$uncached_ids = array();
+		foreach ( $valid_ids as $id ) {
+			$key = "{$element_type}:{$id}:{$subtype}";
+			if ( ! array_key_exists( $key, $this->editorial_cache ) ) {
+				$uncached_ids[] = $id;
+			}
+		}
+
+		if ( ! empty( $uncached_ids ) ) {
+			// Batch fetch groups for uncached elements.
+			$groups_by_element = $this->group_repository->find_by_elements( $element_type, $uncached_ids );
+
+			// Prime the resolver cache with groups found.
+			foreach ( $groups_by_element as $el_id => $group ) {
+				$this->translation_resolver->prime_cache( $group );
+			}
+
+			// For elements not having a group, prime resolver cache as empty.
+			foreach ( $uncached_ids as $el_id ) {
+				if ( ! isset( $groups_by_element[ $el_id ] ) ) {
+					$this->translation_resolver->prime_empty( $element_type, $el_id );
+				}
+			}
+
+			// Populate editorial cache for each uncached element.
+			foreach ( $uncached_ids as $el_id ) {
+				$this->get_editorial_data( $element_type, $el_id, $subtype );
+			}
+		}
+
+		// Collect results.
+		$result = array();
+		foreach ( $valid_ids as $id ) {
+			$key           = "{$element_type}:{$id}:{$subtype}";
+			$result[ $id ] = $this->editorial_cache[ $key ];
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Clears the in-memory editorial data cache.
+	 *
+	 * @return void
+	 */
+	public function clear_editorial_cache(): void {
+		$this->editorial_cache = array();
 	}
 
 	/**
@@ -342,6 +434,7 @@ class TranslationEditorialService {
 		);
 
 		$this->translation_resolver->flush_cache();
+		$this->clear_editorial_cache();
 
 		return $group;
 	}
@@ -427,6 +520,7 @@ class TranslationEditorialService {
 		$this->group_repository->add_translation( $group_id, $new_post_id, $canonical_target );
 
 		$this->translation_resolver->flush_cache();
+		$this->clear_editorial_cache();
 
 		return $new_post_id;
 	}
@@ -513,6 +607,7 @@ class TranslationEditorialService {
 		$this->group_repository->add_translation( $group_id, $new_term_id, $canonical_target );
 
 		$this->translation_resolver->flush_cache();
+		$this->clear_editorial_cache();
 
 		return $new_term_id;
 	}
@@ -527,18 +622,10 @@ class TranslationEditorialService {
 	 */
 	public function get_edit_url( string $element_type, int $element_id, string $subtype = '' ): string {
 		if ( 'post' === $element_type ) {
-			if ( function_exists( 'get_edit_post_link' ) ) {
-				$url = get_edit_post_link( $element_id, 'raw' );
-				return null !== $url ? $url : '';
-			}
 			return 'post.php?post=' . $element_id . '&action=edit';
 		}
 
 		if ( 'term' === $element_type && '' !== $subtype ) {
-			if ( function_exists( 'get_edit_term_link' ) ) {
-				$url = get_edit_term_link( $element_id, $subtype );
-				return is_string( $url ) ? $url : '';
-			}
 			return 'term.php?taxonomy=' . rawurlencode( $subtype ) . '&tag_ID=' . $element_id;
 		}
 

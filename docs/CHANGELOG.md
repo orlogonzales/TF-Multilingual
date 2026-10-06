@@ -170,5 +170,36 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Cero routers administrativos paralelos.
     - Cero alteración de tablas Core ni tablas externas (`*_icl_*`).
 
+- **Estado de Traducciones en Listados Administrativos & Zero N+1 (Fase 1.9):**
+  - **Componente de UI Nativa `TF\Multilingual\Admin\AdminListColumnsUi`:**
+    - Registro de columna conceptual "Idiomas" (`tfml_languages`) en listados nativos de WordPress (`edit.php`, `edit-tags.php`, `WP_List_Table`).
+    - Soporte completo para entradas estándar (`post`), páginas (`page`), CPTs públicos (e.g. `tour`), y taxonomías públicas (`category`, `post_tag`, custom taxonomies).
+    - Inserción elegante y contextual de la columna inmediatamente antes de la columna 'date' en posts y antes de 'posts' en taxonomías.
+    - **Visualización Completa de Estados Lingüísticos:**
+      1. Idioma actual del objeto: badge distinguido con código en mayúsculas (`ES`, `EN`).
+      2. Traducciones existentes: enlace nativo a la pantalla de edición (`post.php?post={id}&action=edit`, `term.php?taxonomy={tax}&tag_ID={id}`) acompañado del icono de verificación nativo Dashicons (`dashicons-yes`).
+      3. Traducciones faltantes: formulario POST seguro e inline hacia `admin-post.php` reutilizando los endpoints de creación de la Fase 1.8 (`tfml_create_post_translation`, `tfml_create_term_translation`) con token CSRF/nonce individual por objeto (`tfml_create_nonce`, `tfml_create_term_nonce`).
+      4. Estado no gestionado (unmanaged/legacy): badge informativo "Sin idioma" (`tfml-badge--unmanaged`), sin auto-asignación y sin creación automática de grupos.
+      5. Traducciones inactivas: badge informativo solo lectura (`tfml-badge--inactive`, `dashicons-hidden`), sin botón de acción de creación `+`.
+    - **Accesibilidad Neta y Respeto de Estándares WordPress:**
+      - Atributos `aria-label`, títulos explicativos contextuales (`title`), etiquetas para lectores de pantalla (`screen-reader-text`), y uso de códigos ISO en mayúsculas (`ES`, `EN`, `PT`). Prohibición de banderas nacionales como único indicador.
+      - Comprobación estricta de capacidades (`edit_posts`, `create_posts`, `edit_others_posts`, `edit_terms`): si el usuario carece de permisos de creación/edición, se oculta el formulario y se despliega un indicador inactivo accesible (`tfml-missing--forbidden`).
+  - **Garantía Crítica de Cero N+1 / Batch Loading:**
+    - Método en repositorio `TF\Multilingual\Domain\Translation\TranslationGroupRepository::find_by_elements()`: recupera en lote todos los grupos y miembros asociados a un conjunto de elementos en **exactamente 3 consultas SQL** (complejidad O(1) con respecto al número de filas).
+    - Pre-calentamiento O(1) en `TF\Multilingual\Domain\Translation\ContentTranslationResolver::prime_cache()` y `prime_empty()`.
+    - Servicio editorial `TF\Multilingual\Editorial\TranslationEditorialService::get_editorial_data_for_elements()` con memoización en memoria in-request (`$editorial_cache`) y método `clear_editorial_cache()`.
+    - Generación ultra-rápida y determinista de URLs nativas de edición (`get_edit_url()`) eliminando roundtrips redundantes y blindando contra hooks de plugins de terceros.
+    - Pre-fetching en lote de posts mediante el filtro nativo `the_posts` y de términos mediante inspección única de `$GLOBALS['wp_list_table']->items`.
+    - **Demostración Empírica:** Ejecución idéntica de 3 queries SQL totales para 20 posts vs 50 posts, con CERO queries ejecutadas durante el renderizado fila por fila.
+  - **Pruebas y Verificación:**
+    - Suite de pruebas unitarias ampliada con `AdminListColumnsUiTest` (14 pruebas exhaustivas). Total consolidado: **222 tests, 693 assertions, 0 errores, 0 fallos**.
+    - Cobertura 100% limpia de PHPCS (WordPress Coding Standards) en todos los 60 archivos del proyecto (0 errores, 0 warnings).
+    - Verificación física en entorno WordPress 7.1.2 real con batería completa end-to-end (`scratch/verify_fase_1_9.php`): pruebas de registro de columnas, unmanaged, managed posts, managed categories, prueba empírica O(1) 20 vs 50 rows, restricción por capabilities, no regresión de fases 1.6, 1.7 y 1.8, y preservación intacta de sentinelas de base de datos (WPML 3,403 filas, MD5 `4241ca7e7ec6399a594537cb04790c10`, 3,995 posts, 80 terms, 0 groups, 0 elements, settings NULL).
+  - **Fronteras y Scope Respetados:**
+    - Cero filtrado de consultas administrativas (las listas de administración siguen mostrando el universo completo).
+    - Cero ordenación por columna de idioma, cero dropdowns de filtrado y cero bulk actions (reservados para fases futuras).
+    - Cero dependencias externas CSS/JS.
+    - Cero alteración de tablas Core ni tablas externas (`*_icl_*`).
+
 ### Nota de Estado
-- Esta versión incorpora el flujo editorial multilingüe base para posts, páginas, CPTs y taxonomías en WordPress Admin, la asignación explícita de idioma para contenido legacy, la creación de traducciones en estado estrictamente DRAFT con política de no clonación automática (zero auto-cloning), y los meta boxes y campos nativos de administración. Las fases subsiguientes abordarán las columnas lingüísticas en los listados administrativos (`WP_List_Table`), filtros rápidos por idioma en administración, y el conmutador de idiomas público.
+- Esta versión incorpora el estado de traducciones en listados administrativos (`edit.php`, `edit-tags.php`, `WP_List_Table`) con pre-fetching en lote O(1) (cero consultas N+1), acciones seguras de creación de traducciones faltantes con nonces individuales, badges de idioma actual y traducciones inactivas, y respeto estricto de capabilities. Las fases subsiguientes abordarán los filtros rápidos por idioma en administración y el conmutador de idiomas público.

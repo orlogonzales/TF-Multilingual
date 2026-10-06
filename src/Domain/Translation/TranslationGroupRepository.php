@@ -254,6 +254,84 @@ class TranslationGroupRepository {
 	}
 
 	/**
+	 * Finds TranslationGroups for multiple WordPress elements in batch.
+	 *
+	 * Guarantees O(1) query complexity (at most 3 SQL queries) regardless of element count,
+	 * completely eliminating N+1 query patterns in admin list tables.
+	 *
+	 * @param string     $element_type Element type ('post' or 'term').
+	 * @param array<int> $element_ids  Array of WordPress object IDs.
+	 * @return array<int, TranslationGroup> Map of element_id => TranslationGroup. Unassigned elements are omitted.
+	 */
+	public function find_by_elements( string $element_type, array $element_ids ): array {
+		$valid_ids = array_values( array_unique( array_filter( array_map( 'intval', $element_ids ), static fn( int $id ): bool => $id > 0 ) ) );
+		if ( empty( $valid_ids ) ) {
+			return array();
+		}
+
+		$placeholders = implode( ', ', array_fill( 0, count( $valid_ids ), '%d' ) );
+		$query        = $this->db->prepare(
+			"SELECT `element_id`, `group_id` FROM `{$this->table_group_elements}` WHERE `element_type` = %s AND `element_id` IN ($placeholders)", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+			array_merge( array( $element_type ), $valid_ids )
+		);
+
+		$pairs = $this->db->get_results( $query, ARRAY_A );
+		if ( empty( $pairs ) || ! is_array( $pairs ) ) {
+			return array();
+		}
+
+		$group_ids = array_values( array_unique( array_map( 'intval', array_column( $pairs, 'group_id' ) ) ) );
+		if ( empty( $group_ids ) ) {
+			return array();
+		}
+
+		$group_placeholders = implode( ', ', array_fill( 0, count( $group_ids ), '%d' ) );
+		$groups_query       = $this->db->prepare(
+			"SELECT * FROM `{$this->table_groups}` WHERE `id` IN ($group_placeholders)", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+			$group_ids
+		);
+
+		$group_rows = $this->db->get_results( $groups_query, ARRAY_A );
+		if ( empty( $group_rows ) || ! is_array( $group_rows ) ) {
+			return array();
+		}
+
+		$groups_by_id = array();
+		foreach ( $group_rows as $row ) {
+			$group                            = TranslationGroup::from_row( $row );
+			$groups_by_id[ (int) $row['id'] ] = $group;
+		}
+
+		$elements_query = $this->db->prepare(
+			"SELECT * FROM `{$this->table_group_elements}` WHERE `group_id` IN ($group_placeholders) ORDER BY `id` ASC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+			$group_ids
+		);
+
+		$element_rows = $this->db->get_results( $elements_query, ARRAY_A );
+		if ( is_array( $element_rows ) ) {
+			foreach ( $element_rows as $row ) {
+				$element = TranslationElement::from_row( $row );
+				$g_id    = (int) $row['group_id'];
+				if ( isset( $groups_by_id[ $g_id ] ) ) {
+					$is_canonical = ( $element->get_element_id() === $groups_by_id[ $g_id ]->get_canonical_element_id() );
+					$groups_by_id[ $g_id ]->add_element( $element, $is_canonical );
+				}
+			}
+		}
+
+		$result = array();
+		foreach ( $pairs as $pair ) {
+			$el_id = (int) $pair['element_id'];
+			$g_id  = (int) $pair['group_id'];
+			if ( isset( $groups_by_id[ $g_id ] ) ) {
+				$result[ $el_id ] = $groups_by_id[ $g_id ];
+			}
+		}
+
+		return $result;
+	}
+
+	/**
 	 * Adds a translation element to an existing translation group.
 	 *
 	 * @param int    $group_id      Group ID.

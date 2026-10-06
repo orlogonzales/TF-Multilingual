@@ -292,6 +292,40 @@ class TestableWpdb extends wpdb {
 	 * @return mixed
 	 */
 	public function get_results( string $query, string $output = 'OBJECT' ): mixed {
+		if ( preg_match( '/FROM `?[^` ]*tfml_group_elements`? WHERE `?element_type`? = \'([^\']+)\' AND `?element_id`? IN \(([^)]+)\)/i', $query, $matches ) ) {
+			$type    = $matches[1];
+			$ids     = array_map( 'intval', explode( ',', $matches[2] ) );
+			$results = array();
+			foreach ( $this->group_elements as $row ) {
+				if ( $row['element_type'] === $type && in_array( (int) $row['element_id'], $ids, true ) ) {
+					$results[] = ( 'OBJECT' === $output ) ? (object) $row : $row;
+				}
+			}
+			return $results;
+		}
+
+		if ( preg_match( '/FROM `?[^` ]*tfml_groups`? WHERE `?id`? IN \(([^)]+)\)/i', $query, $matches ) ) {
+			$ids     = array_map( 'intval', explode( ',', $matches[1] ) );
+			$results = array();
+			foreach ( $this->groups as $id => $row ) {
+				if ( in_array( (int) $id, $ids, true ) ) {
+					$results[] = ( 'OBJECT' === $output ) ? (object) $row : $row;
+				}
+			}
+			return $results;
+		}
+
+		if ( preg_match( '/FROM `?[^` ]*tfml_group_elements`? WHERE `?group_id`? IN \(([^)]+)\)/i', $query, $matches ) ) {
+			$ids     = array_map( 'intval', explode( ',', $matches[1] ) );
+			$results = array();
+			foreach ( $this->group_elements as $row ) {
+				if ( in_array( (int) $row['group_id'], $ids, true ) ) {
+					$results[] = ( 'OBJECT' === $output ) ? (object) $row : $row;
+				}
+			}
+			return $results;
+		}
+
 		if ( preg_match( '/FROM `?[^` ]*tfml_group_elements`? WHERE `?group_id`? = (\d+)/i', $query, $matches ) ) {
 			$group_id = (int) $matches[1];
 			$results  = array();

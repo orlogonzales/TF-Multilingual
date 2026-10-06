@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace TF\Multilingual\Core;
 
+use TF\Multilingual\Admin\AdminListColumnsUi;
 use TF\Multilingual\Admin\PostEditorialUi;
 use TF\Multilingual\Admin\TermEditorialUi;
 use TF\Multilingual\Domain\Language\LanguageRegistry;
@@ -114,6 +115,13 @@ class Plugin {
 	private ?TermEditorialUi $term_editorial_ui = null;
 
 	/**
+	 * Admin list columns UI component.
+	 *
+	 * @var AdminListColumnsUi|null
+	 */
+	private ?AdminListColumnsUi $admin_list_columns_ui = null;
+
+	/**
 	 * Retrieves the singleton instance.
 	 *
 	 * @return self
@@ -166,20 +174,24 @@ class Plugin {
 			$this->current_language_resolver
 		);
 
-		$group_repo              = new TranslationGroupRepository();
-		$translation_resolver    = new ContentTranslationResolver( $group_repo, $this->language_registry );
-		$this->editorial_service = new TranslationEditorialService(
+		$group_repo                  = new TranslationGroupRepository();
+		$translation_resolver        = new ContentTranslationResolver( $group_repo, $this->language_registry );
+		$this->editorial_service     = new TranslationEditorialService(
 			$this->language_registry,
 			$group_repo,
 			$translation_resolver
 		);
-		$this->post_editorial_ui = new PostEditorialUi(
+		$this->post_editorial_ui     = new PostEditorialUi(
 			$this->editorial_service,
 			$this->language_registry
 		);
-		$this->term_editorial_ui = new TermEditorialUi(
+		$this->term_editorial_ui     = new TermEditorialUi(
 			$this->editorial_service,
 			$this->language_registry
+		);
+		$this->admin_list_columns_ui = new AdminListColumnsUi(
+			$this->language_registry,
+			$this->editorial_service
 		);
 
 		$this->rewrite_manager->init_hooks();
@@ -187,6 +199,7 @@ class Plugin {
 		$this->term_query_filter->init_hooks();
 		$this->post_editorial_ui->init_hooks();
 		$this->term_editorial_ui->init_hooks();
+		$this->admin_list_columns_ui->register_hooks();
 
 		$this->initialized = true;
 	}
@@ -299,6 +312,22 @@ class Plugin {
 		}
 
 		return $this->term_editorial_ui;
+	}
+
+	/**
+	 * Gets the admin list columns UI instance.
+	 *
+	 * @return AdminListColumnsUi
+	 */
+	public function get_admin_list_columns_ui(): AdminListColumnsUi {
+		if ( null === $this->admin_list_columns_ui ) {
+			$this->admin_list_columns_ui = new AdminListColumnsUi(
+				$this->get_language_registry(),
+				$this->get_editorial_service()
+			);
+		}
+
+		return $this->admin_list_columns_ui;
 	}
 
 	/**

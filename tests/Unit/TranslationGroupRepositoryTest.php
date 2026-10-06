@@ -304,4 +304,46 @@ class TranslationGroupRepositoryTest extends TestCase {
 		$this->expectException( TranslationConflictException::class );
 		$this->repository->add_translation( $group->get_id(), 205, 'en' );
 	}
+
+	/**
+	 * Tests find_by_elements with empty or invalid input.
+	 */
+	public function test_find_by_elements_with_empty_or_invalid_ids(): void {
+		$this->assertSame( array(), $this->repository->find_by_elements( 'post', array() ) );
+		$this->assertSame( array(), $this->repository->find_by_elements( 'post', array( 0, -1, -5 ) ) );
+	}
+
+	/**
+	 * Tests find_by_elements when elements are not managed.
+	 */
+	public function test_find_by_elements_when_elements_not_managed(): void {
+		$result = $this->repository->find_by_elements( 'post', array( 991, 992 ) );
+		$this->assertSame( array(), $result );
+	}
+
+	/**
+	 * Tests find_by_elements returns hydrated groups mapped by element_id.
+	 */
+	public function test_find_by_elements_batch_hydrates_groups_and_members(): void {
+		$group1 = $this->repository->create_group( 'post', 'post', 101, 'es', true );
+		$this->repository->add_translation( $group1->get_id(), 102, 'en' );
+
+		$group2 = $this->repository->create_group( 'post', 'post', 201, 'es', true );
+		$this->repository->add_translation( $group2->get_id(), 202, 'en' );
+
+		$results = $this->repository->find_by_elements( 'post', array( 101, 202, 999 ) );
+
+		$this->assertCount( 2, $results );
+		$this->assertArrayHasKey( 101, $results );
+		$this->assertArrayHasKey( 202, $results );
+		$this->assertArrayNotHasKey( 999, $results );
+
+		$this->assertSame( $group1->get_id(), $results[101]->get_id() );
+		$this->assertTrue( $results[101]->has_translation( 'es' ) );
+		$this->assertTrue( $results[101]->has_translation( 'en' ) );
+
+		$this->assertSame( $group2->get_id(), $results[202]->get_id() );
+		$this->assertTrue( $results[202]->has_translation( 'es' ) );
+		$this->assertTrue( $results[202]->has_translation( 'en' ) );
+	}
 }

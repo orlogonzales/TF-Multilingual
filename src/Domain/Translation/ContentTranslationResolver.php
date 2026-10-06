@@ -281,6 +281,31 @@ class ContentTranslationResolver {
 	}
 
 	/**
+	 * Pre-warms the in-memory runtime cache for a group and all its member elements.
+	 *
+	 * @param TranslationGroup $group Translation group to cache.
+	 * @return void
+	 */
+	public function prime_cache( TranslationGroup $group ): void {
+		foreach ( $group->get_elements() as $member ) {
+			$member_key                       = "{$member->get_element_type()}:{$member->get_element_id()}";
+			$this->group_cache[ $member_key ] = $group;
+		}
+	}
+
+	/**
+	 * Pre-warms the in-memory runtime cache explicitly marking an element as unmanaged (no group).
+	 *
+	 * @param string $element_type Element type ('post' or 'term').
+	 * @param int    $element_id   WordPress object ID.
+	 * @return void
+	 */
+	public function prime_empty( string $element_type, int $element_id ): void {
+		$cache_key                       = "{$element_type}:{$element_id}";
+		$this->group_cache[ $cache_key ] = null;
+	}
+
+	/**
 	 * Alias of get_group_for_element().
 	 *
 	 * @param string $element_type Element type ('post' or 'term').
