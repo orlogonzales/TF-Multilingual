@@ -33,6 +33,13 @@ class TestableWpdb extends wpdb {
 	public array $group_elements = array();
 
 	/**
+	 * Simulated table data for tfml_media_translations.
+	 *
+	 * @var array<int, array<string, mixed>>
+	 */
+	public array $media_translations = array();
+
+	/**
 	 * Posts table name.
 	 *
 	 * @var string
@@ -87,13 +94,14 @@ class TestableWpdb extends wpdb {
 	 * @return void
 	 */
 	public function reset(): void {
-		$this->groups           = array();
-		$this->group_elements   = array();
-		$this->mock_posts       = array();
-		$this->mock_terms       = array();
-		$this->auto_increment   = 0;
-		$this->last_error       = '';
-		$this->force_next_error = null;
+		$this->groups             = array();
+		$this->group_elements     = array();
+		$this->media_translations = array();
+		$this->mock_posts         = array();
+		$this->mock_terms         = array();
+		$this->auto_increment     = 0;
+		$this->last_error         = '';
+		$this->force_next_error   = null;
 	}
 
 	/**
@@ -151,6 +159,23 @@ class TestableWpdb extends wpdb {
 			return 1;
 		}
 
+		if ( str_contains( $table, 'tfml_media_translations' ) ) {
+			// Enforce UNIQUE(attachment_id, language_code).
+			foreach ( $this->media_translations as $existing ) {
+				if (
+					(int) $existing['attachment_id'] === (int) $row['attachment_id'] &&
+					$existing['language_code'] === $row['language_code']
+				) {
+					$this->last_error = "Duplicate entry for key 'uq_attachment_language'";
+					return false;
+				}
+			}
+
+			$this->media_translations[ $id ] = $row;
+			$this->insert_id                 = $id;
+			return 1;
+		}
+
 		return 0;
 	}
 
@@ -175,6 +200,14 @@ class TestableWpdb extends wpdb {
 			$id = (int) $where['id'];
 			if ( isset( $this->groups[ $id ] ) ) {
 				$this->groups[ $id ] = array_merge( $this->groups[ $id ], $data );
+				return 1;
+			}
+		}
+
+		if ( str_contains( $table, 'tfml_media_translations' ) && isset( $where['id'] ) ) {
+			$id = (int) $where['id'];
+			if ( isset( $this->media_translations[ $id ] ) ) {
+				$this->media_translations[ $id ] = array_merge( $this->media_translations[ $id ], $data );
 				return 1;
 			}
 		}
@@ -217,6 +250,24 @@ class TestableWpdb extends wpdb {
 			return $deleted;
 		}
 
+		if ( str_contains( $table, 'tfml_media_translations' ) ) {
+			$deleted = 0;
+			foreach ( $this->media_translations as $id => $row ) {
+				$match = true;
+				if ( isset( $where['attachment_id'] ) && (int) $row['attachment_id'] !== (int) $where['attachment_id'] ) {
+					$match = false;
+				}
+				if ( isset( $where['language_code'] ) && $row['language_code'] !== $where['language_code'] ) {
+					$match = false;
+				}
+				if ( $match ) {
+					unset( $this->media_translations[ $id ] );
+					++$deleted;
+				}
+			}
+			return $deleted;
+		}
+
 		return 0;
 	}
 
@@ -239,6 +290,16 @@ class TestableWpdb extends wpdb {
 			foreach ( $this->group_elements as $row ) {
 				if ( (int) $row['group_id'] === $group_id && $row['language_code'] === $lang ) {
 					return $row;
+				}
+			}
+		}
+
+		if ( preg_match( '/FROM `?[^` ]*tfml_media_translations`? WHERE `?attachment_id`? = (\d+) AND `?language_code`? = \'([^\']+)\'/i', $query, $matches ) ) {
+			$attachment_id = (int) $matches[1];
+			$lang          = $matches[2];
+			foreach ( $this->media_translations as $row ) {
+				if ( (int) $row['attachment_id'] === $attachment_id && $row['language_code'] === $lang ) {
+					return ( 'OBJECT' === $output ) ? (object) $row : $row;
 				}
 			}
 		}
@@ -279,6 +340,18 @@ class TestableWpdb extends wpdb {
 					return $row['group_id'];
 				}
 			}
+		}
+
+		if ( preg_match( '/SELECT COUNT\(\*\) FROM `?[^` ]*tfml_media_translations`? WHERE `?attachment_id`? = (\d+) AND `?language_code`? = \'([^\']+)\'/i', $query, $matches ) ) {
+			$attachment_id = (int) $matches[1];
+			$lang          = $matches[2];
+			$count         = 0;
+			foreach ( $this->media_translations as $row ) {
+				if ( (int) $row['attachment_id'] === $attachment_id && $row['language_code'] === $lang ) {
+					++$count;
+				}
+			}
+			return $count;
 		}
 
 		return null;
@@ -331,6 +404,28 @@ class TestableWpdb extends wpdb {
 			$results  = array();
 			foreach ( $this->group_elements as $row ) {
 				if ( (int) $row['group_id'] === $group_id ) {
+					$results[] = ( 'OBJECT' === $output ) ? (object) $row : $row;
+				}
+			}
+			return $results;
+		}
+
+		if ( preg_match( '/FROM `?[^` ]*tfml_media_translations`? WHERE `?attachment_id`? IN \(([^)]+)\)/i', $query, $matches ) ) {
+			$ids     = array_map( 'intval', explode( ',', $matches[1] ) );
+			$results = array();
+			foreach ( $this->media_translations as $row ) {
+				if ( in_array( (int) $row['attachment_id'], $ids, true ) ) {
+					$results[] = ( 'OBJECT' === $output ) ? (object) $row : $row;
+				}
+			}
+			return $results;
+		}
+
+		if ( preg_match( '/FROM `?[^` ]*tfml_media_translations`? WHERE `?attachment_id`? = (\d+)/i', $query, $matches ) ) {
+			$attachment_id = (int) $matches[1];
+			$results       = array();
+			foreach ( $this->media_translations as $row ) {
+				if ( (int) $row['attachment_id'] === $attachment_id ) {
 					$results[] = ( 'OBJECT' === $output ) ? (object) $row : $row;
 				}
 			}

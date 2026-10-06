@@ -11,11 +11,15 @@ namespace TF\Multilingual\Core;
 
 use TF\Multilingual\Admin\AdminListColumnsUi;
 use TF\Multilingual\Admin\CustomFieldsSettingsUi;
+use TF\Multilingual\Admin\MediaEditorialUi;
 use TF\Multilingual\Admin\PostEditorialUi;
 use TF\Multilingual\Admin\TermEditorialUi;
 use TF\Multilingual\Domain\CustomField\CustomFieldPolicyRegistry;
 use TF\Multilingual\Domain\CustomField\SharedMetaSynchronizer;
 use TF\Multilingual\Domain\Language\LanguageRegistry;
+use TF\Multilingual\Domain\Media\MediaFrontendFilter;
+use TF\Multilingual\Domain\Media\MediaTranslationRepository;
+use TF\Multilingual\Domain\Media\MediaTranslationResolver;
 use TF\Multilingual\Domain\Translation\ContentTranslationResolver;
 use TF\Multilingual\Domain\Translation\TranslationGroupRepository;
 use TF\Multilingual\Editorial\TranslationEditorialService;
@@ -154,6 +158,34 @@ class Plugin {
 	private ?IntegrationManager $integration_manager = null;
 
 	/**
+	 * Media translation repository.
+	 *
+	 * @var MediaTranslationRepository|null
+	 */
+	private ?MediaTranslationRepository $media_repository = null;
+
+	/**
+	 * Media translation resolver.
+	 *
+	 * @var MediaTranslationResolver|null
+	 */
+	private ?MediaTranslationResolver $media_resolver = null;
+
+	/**
+	 * Media frontend filter.
+	 *
+	 * @var MediaFrontendFilter|null
+	 */
+	private ?MediaFrontendFilter $media_frontend_filter = null;
+
+	/**
+	 * Media editorial UI component.
+	 *
+	 * @var MediaEditorialUi|null
+	 */
+	private ?MediaEditorialUi $media_editorial_ui = null;
+
+	/**
 	 * Retrieves the singleton instance.
 	 *
 	 * @return self
@@ -239,6 +271,24 @@ class Plugin {
 		$this->integration_manager          = new IntegrationManager(
 			$this->custom_field_policy_registry
 		);
+		$this->media_repository             = new MediaTranslationRepository(
+			null,
+			$this->language_registry
+		);
+		$this->media_resolver               = new MediaTranslationResolver(
+			$this->media_repository,
+			$this->language_registry
+		);
+		$this->media_frontend_filter        = new MediaFrontendFilter(
+			$this->media_resolver,
+			$this->current_language_resolver,
+			$this->media_repository
+		);
+		$this->media_editorial_ui           = new MediaEditorialUi(
+			$this->media_repository,
+			$this->media_resolver,
+			$this->language_registry
+		);
 
 		$this->rewrite_manager->init_hooks();
 		$this->query_filter->init_hooks();
@@ -249,6 +299,8 @@ class Plugin {
 		$this->admin_list_columns_ui->register_hooks();
 		$this->custom_fields_settings_ui->register_hooks();
 		$this->integration_manager->init();
+		$this->media_frontend_filter->init_hooks();
+		$this->media_editorial_ui->register_hooks();
 
 		$this->initialized = true;
 	}
@@ -438,6 +490,72 @@ class Plugin {
 		}
 
 		return $this->integration_manager;
+	}
+
+	/**
+	 * Gets the media translation repository instance.
+	 *
+	 * @return MediaTranslationRepository
+	 */
+	public function get_media_repository(): MediaTranslationRepository {
+		if ( null === $this->media_repository ) {
+			$this->media_repository = new MediaTranslationRepository(
+				null,
+				$this->get_language_registry()
+			);
+		}
+
+		return $this->media_repository;
+	}
+
+	/**
+	 * Gets the media translation resolver instance.
+	 *
+	 * @return MediaTranslationResolver
+	 */
+	public function get_media_resolver(): MediaTranslationResolver {
+		if ( null === $this->media_resolver ) {
+			$this->media_resolver = new MediaTranslationResolver(
+				$this->get_media_repository(),
+				$this->get_language_registry()
+			);
+		}
+
+		return $this->media_resolver;
+	}
+
+	/**
+	 * Gets the media frontend filter instance.
+	 *
+	 * @return MediaFrontendFilter
+	 */
+	public function get_media_frontend_filter(): MediaFrontendFilter {
+		if ( null === $this->media_frontend_filter ) {
+			$this->media_frontend_filter = new MediaFrontendFilter(
+				$this->get_media_resolver(),
+				$this->get_current_language_resolver(),
+				$this->get_media_repository()
+			);
+		}
+
+		return $this->media_frontend_filter;
+	}
+
+	/**
+	 * Gets the media editorial UI instance.
+	 *
+	 * @return MediaEditorialUi
+	 */
+	public function get_media_editorial_ui(): MediaEditorialUi {
+		if ( null === $this->media_editorial_ui ) {
+			$this->media_editorial_ui = new MediaEditorialUi(
+				$this->get_media_repository(),
+				$this->get_media_resolver(),
+				$this->get_language_registry()
+			);
+		}
+
+		return $this->media_editorial_ui;
 	}
 
 	/**

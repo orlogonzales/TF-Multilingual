@@ -654,6 +654,42 @@ if ( ! function_exists( 'sanitize_text_field' ) ) {
 	}
 }
 
+if ( ! function_exists( 'sanitize_textarea_field' ) ) {
+	/**
+	 * Stub for sanitize_textarea_field.
+	 *
+	 * @param string $str String to sanitize.
+	 * @return string
+	 */
+	function sanitize_textarea_field( string $str ): string {
+		return trim( strip_tags( $str ) );
+	}
+}
+
+if ( ! function_exists( 'esc_textarea' ) ) {
+	/**
+	 * Stub for esc_textarea.
+	 *
+	 * @param string $text Text to escape.
+	 * @return string
+	 */
+	function esc_textarea( string $text ): string {
+		return htmlspecialchars( $text, ENT_QUOTES );
+	}
+}
+
+if ( ! function_exists( 'wp_kses_post' ) ) {
+	/**
+	 * Stub for wp_kses_post.
+	 *
+	 * @param string $data Content to filter.
+	 * @return string
+	 */
+	function wp_kses_post( string $data ): string {
+		return $data;
+	}
+}
+
 if ( ! function_exists( 'check_admin_referer' ) ) {
 	/**
 	 * Stub for check_admin_referer.
@@ -676,6 +712,25 @@ if ( ! function_exists( 'wp_create_nonce' ) ) {
 	 */
 	function wp_create_nonce( string $action = '-1' ): string {
 		return substr( md5( 'nonce_' . $action ), 0, 10 );
+	}
+}
+
+if ( ! function_exists( 'wp_verify_nonce' ) ) {
+	/**
+	 * Stub for wp_verify_nonce.
+	 *
+	 * @param string $nonce  Nonce value.
+	 * @param string $action Action name.
+	 * @return int|false
+	 */
+	function wp_verify_nonce( string $nonce, string $action = '-1' ): int|false {
+		if ( '' !== $nonce && wp_create_nonce( $action ) === $nonce ) {
+			return 1;
+		}
+		if ( isset( $GLOBALS['wp_test_valid_nonces'][ $action ] ) && $GLOBALS['wp_test_valid_nonces'][ $action ] === $nonce ) {
+			return 1;
+		}
+		return false;
 	}
 }
 
@@ -893,6 +948,13 @@ if ( ! class_exists( 'WP_Post' ) ) {
 		public string $post_content = '';
 
 		/**
+		 * Post excerpt.
+		 *
+		 * @var string
+		 */
+		public string $post_excerpt = '';
+
+		/**
 		 * Post author.
 		 *
 		 * @var int
@@ -1041,5 +1103,43 @@ if ( ! function_exists( 'esc_js' ) ) {
 	 */
 	function esc_js( string $text ): string {
 		return addslashes( $text );
+	}
+}
+
+if ( ! isset( $GLOBALS['wp_test_meta_boxes'] ) ) {
+	$GLOBALS['wp_test_meta_boxes'] = array();
+}
+
+if ( ! function_exists( 'add_meta_box' ) ) {
+	/**
+	 * Stub for add_meta_box.
+	 *
+	 * @param string          $id            Meta box ID.
+	 * @param string          $title         Title.
+	 * @param callable        $callback      Callback.
+	 * @param mixed           $screen        Screen.
+	 * @param string          $context       Context.
+	 * @param string          $priority      Priority.
+	 * @param array|null      $callback_args Callback args.
+	 * @return void
+	 */
+	function add_meta_box(
+		string $id,
+		string $title,
+		callable $callback,
+		mixed $screen = null,
+		string $context = 'advanced',
+		string $priority = 'default',
+		?array $callback_args = null
+	): void {
+		$GLOBALS['wp_test_meta_boxes'][ $id ] = array(
+			'id'       => $id,
+			'title'    => $title,
+			'callback' => $callback,
+			'screen'   => $screen,
+			'context'  => $context,
+			'priority' => $priority,
+			'args'     => $callback_args,
+		);
 	}
 }

@@ -257,7 +257,43 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Cobertura 100% limpia de PHPCS (WordPress Coding Standards) en todos los 72 archivos del proyecto (0 errores, 0 warnings).
     - Verificación física en entorno WordPress 7.1.2 real con ACF Free 6.8.10 activo (`scratch/verify_fase_2_1.php`): 60 aserciones pasadas (100%), validando matriz de tipos de campo (text, textarea, number, email, url, select, checkbox, true_false, group anidado), valores falsey (`0`, `'0'`, `''`, `false`, `[]`), sincronización bidireccional inmediata ES↔EN↔PT, aislamiento estricto de TRANSLATE e IGNORE, eliminación de campos, encapsulación en UI, y preservación criptográfica absoluta de sentinelas de base de datos (WPML 3,403 filas, MD5 `4241ca7e7ec6399a594537cb04790c10`, 3,995 posts, 80 terms, 0 groups, 0 elements, settings NULL).
 
+- **Media Multilingüe Base (Fase 2.2):**
+  - **Principio Fundamental de Identidad y Archivo Único:**
+    - Arquitectura de un único archivo físico en disco y un único attachment post en WordPress Core compartido transparentemente entre todos los idiomas.
+    - Prohibición absoluta de clonar adjuntos (e.g. Attachment #100 no se clona en #101) o duplicar archivos en uploads (`img-es.jpg`, `img-en.jpg`).
+    - Desacoplamiento de `tfml_groups` y `tfml_group_elements`: los adjuntos NO son grupos de traducción, manteniendo el sistema ligero y con cero contaminación del grafo de posts.
+  - **Persistencia Aislada en Tabla Dedicada (`tfml_media_translations`):**
+    - Almacenamiento físico de variantes editoriales multilingües (ALT, Título, Leyenda, Descripción) en la 3ra tabla de la suite creada en Fase 1.1 (`etk_t_tfml_media_translations`).
+    - Clave única `uq_attachment_language (attachment_id, language_code)` con índices optimizados.
+  - **Entidad / Value Object `TF\Multilingual\Domain\Media\MediaTranslation`:**
+    - Representación inmutable de metadatos editoriales de un medio por idioma.
+    - Factory methods canónicos: `create()`, `create_fallback()`, `from_row()`, `to_array()`.
+    - Flag explícito `is_fallback()` para distinguir variantes persistidas en TFML de metadatos heredados de WordPress Core.
+  - **Repositorio de Datos `TF\Multilingual\Domain\Media\MediaTranslationRepository`:**
+    - Operaciones CRUD atómicas: `find()`, `find_by_attachment()`, `find_by_attachments()`, `exists()`, `save()`, `delete()`, `delete_all_for_attachment()`.
+    - Soporte nativo para recuperación por lotes en una única consulta SQL (`SELECT ... WHERE attachment_id IN (...)`).
+  - **Servicio de Dominio `TF\Multilingual\Domain\Media\MediaTranslationResolver`:**
+    - Resolución bajo demanda de metadatos con caché de memoria in-request (`$cache[$attachment_id][$language]`).
+    - **Regla Soberana de Fallback Estricto:** Si existe variante TFML para el idioma actual, se retorna dicha variante. Si no existe, se retorna el metadato nativo de WordPress Core marcado como fallback. **NUNCA** se degrada a otro idioma secundario (e.g. PT no recibe ES ni EN).
+    - Pre-calentamiento por lotes `prime_cache( array $attachment_ids, ?string $language_code )` con Zero N+1 garantizado (1 sola consulta SQL para 20 o 50 attachments, 0 consultas en lectura de memoria).
+    - Adopción progresiva `adopt_core_metadata()` sin migraciones masivas automáticas.
+    - Método explícito `flush_cache()`.
+  - **Filtro de Frontend `TF\Multilingual\Domain\Media\MediaFrontendFilter`:**
+    - Enganche en `wp_get_attachment_image_attributes` para sustitución contextual de `$attr['alt']`.
+    - Cumplimiento de accesibilidad WCAG: soporte explícito para imágenes decorativas (`alt=""` en traducción TFML no cae erróneamente en el Core alt).
+    - Enganche en `wp_get_attachment_caption` para filtrado contextual de leyendas.
+    - Enganche en `delete_attachment` para cascada automática de eliminación en `tfml_media_translations`.
+  - **Interfaz Editorial Nativa `TF\Multilingual\Admin\MediaEditorialUi`:**
+    - Meta box nativo en pantalla de edición de adjuntos (`post_type = 'attachment'`) con ID `tfml_media_translations_meta_box`.
+    - Pestañas dinámicas para idiomas activos, insignias de estado (Guardado TFML vs Heredado de Core), sanitización contextual según Section 26 (`sanitize_text_field`, `sanitize_textarea_field`, `wp_kses_post`), verificación de nonces y capabilities (`edit_post`).
+  - **Integración con Imagen Destacada (`_thumbnail_id`):**
+    - Compatible con la política `SHARE` de Fase 2.0: posts en múltiples idiomas comparten el mismo `_thumbnail_id`, y cada idioma renderiza su ALT correspondiente al llamar `get_the_post_thumbnail()`.
+  - **Pruebas y Verificación:**
+    - Suite de pruebas unitarias ampliada con 5 nuevas clases (`MediaTranslationTest`, `MediaTranslationRepositoryTest`, `MediaTranslationResolverTest`, `MediaFrontendFilterTest`, `MediaEditorialUiTest`). Total consolidado: **310 tests, 993 assertions, 0 errores, 0 fallos**.
+    - Cobertura 100% limpia de PHPCS (WordPress Coding Standards) en todos los 82 archivos del proyecto (0 errores, 0 warnings).
+    - Verificación física exhaustiva en WordPress 7.1.2 real (`scratch/verify_fase_2_2.php`): **69 aserciones pasadas (100%)**, validando archivo y attachment únicos, adopción explícita, variantes ES/EN, fallback estricto a Core en PT, hooks frontend, imágenes destacadas compartidas, UI nativa, Zero N+1 probado (1 query en lote de 20, 1 query en lote de 50, 0 en lectura), cascada de eliminación, no-regresión de ACF y políticas de campos, y preservación criptográfica idéntica de sentinelas de base de datos (WPML 3,403 filas, MD5 `4241ca7e7ec6399a594537cb04790c10`, 3,995 posts, 80 terms, 0 groups, 0 elements, 0 media rows).
+
 ### Nota de Estado
-- Esta versión incorpora el adaptador desacoplado para Advanced Custom Fields (ACF Free 6.8.x), permitiendo la configuración de políticas multilingües directamente desde el editor de campos de ACF, la persistencia en el registro soberano de TFML, el emparejamiento transparente de reference keys (`_{field_name}`), la invalidación en tiempo real de la caché de valores de ACF (`acf_flush_value_cache`), el soporte para campos simples, serializados y anidados en grupos, y la encapsulación de claves internas en la interfaz administrativa.
+- Esta versión incorpora el sistema base de medios multilingües de TF Multilingual (Fase 2.2), respetando la directriz de archivo físico único y attachment único en WordPress Core, almacenando variantes de metadatos editoriales (ALT, título, leyenda, descripción) en la tabla dedicada `tfml_media_translations` sin crear grupos de traducción, implementando fallback estricto a metadatos de WordPress Core sin contaminación entre idiomas secundarios, filtrando los hooks nativos de renderizado frontend (`wp_get_attachment_image`, `wp_get_attachment_caption`), integrando la imagen destacada compartida (`_thumbnail_id`), proveyendo una metabox nativa en el editor de medios y asegurando un rendimiento de Zero N+1 con resolución batch en una sola consulta.
 
 
