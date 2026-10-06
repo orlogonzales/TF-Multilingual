@@ -419,6 +419,30 @@ if ( ! function_exists( 'remove_action' ) ) {
 	}
 }
 
+if ( ! function_exists( 'has_action' ) ) {
+	/**
+	 * Stub for has_action.
+	 *
+	 * @param string $hook_name Hook name.
+	 * @param mixed  $callback  Callback.
+	 * @return bool|int
+	 */
+	function has_action( string $hook_name, mixed $callback = false ): bool|int {
+		if ( ! isset( $GLOBALS['wp_test_actions'][ $hook_name ] ) || empty( $GLOBALS['wp_test_actions'][ $hook_name ] ) ) {
+			return false;
+		}
+		if ( false === $callback ) {
+			return true;
+		}
+		foreach ( $GLOBALS['wp_test_actions'][ $hook_name ] as $entry ) {
+			if ( $entry['callback'] === $callback ) {
+				return $entry['priority'];
+			}
+		}
+		return false;
+	}
+}
+
 if ( ! function_exists( 'do_action' ) ) {
 	/**
 	 * Stub for do_action.
@@ -698,6 +722,10 @@ if ( ! function_exists( 'add_query_arg' ) ) {
 	}
 }
 
+if ( ! isset( $GLOBALS['wp_test_filters'] ) ) {
+	$GLOBALS['wp_test_filters'] = array();
+}
+
 if ( ! function_exists( 'add_filter' ) ) {
 	/**
 	 * Stub for add_filter.
@@ -709,7 +737,58 @@ if ( ! function_exists( 'add_filter' ) ) {
 	 * @return true
 	 */
 	function add_filter( string $hook_name, callable $callback, int $priority = 10, int $accepted_args = 1 ): true {
+		$GLOBALS['wp_test_filters'][ $hook_name ][] = array(
+			'callback'      => $callback,
+			'priority'      => $priority,
+			'accepted_args' => $accepted_args,
+		);
 		return true;
+	}
+}
+
+if ( ! function_exists( 'remove_filter' ) ) {
+	/**
+	 * Stub for remove_filter.
+	 *
+	 * @param string   $hook_name Hook name.
+	 * @param callable $callback  Callback.
+	 * @param int      $priority  Priority.
+	 * @return bool
+	 */
+	function remove_filter( string $hook_name, callable $callback, int $priority = 10 ): bool {
+		if ( isset( $GLOBALS['wp_test_filters'][ $hook_name ] ) ) {
+			foreach ( $GLOBALS['wp_test_filters'][ $hook_name ] as $idx => $entry ) {
+				if ( $entry['callback'] === $callback ) {
+					unset( $GLOBALS['wp_test_filters'][ $hook_name ][ $idx ] );
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+}
+
+if ( ! function_exists( 'has_filter' ) ) {
+	/**
+	 * Stub for has_filter.
+	 *
+	 * @param string $hook_name Hook name.
+	 * @param mixed  $callback  Callback.
+	 * @return bool|int
+	 */
+	function has_filter( string $hook_name, mixed $callback = false ): bool|int {
+		if ( ! isset( $GLOBALS['wp_test_filters'][ $hook_name ] ) || empty( $GLOBALS['wp_test_filters'][ $hook_name ] ) ) {
+			return false;
+		}
+		if ( false === $callback ) {
+			return true;
+		}
+		foreach ( $GLOBALS['wp_test_filters'][ $hook_name ] as $entry ) {
+			if ( $entry['callback'] === $callback ) {
+				return $entry['priority'];
+			}
+		}
+		return false;
 	}
 }
 

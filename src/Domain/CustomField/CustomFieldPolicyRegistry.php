@@ -105,6 +105,19 @@ class CustomFieldPolicyRegistry {
 	}
 
 	/**
+	 * Checks whether a policy has been explicitly configured for a meta key.
+	 *
+	 * @param string $meta_key Meta key name.
+	 * @return bool True if explicitly configured in the registry.
+	 */
+	public function has_policy( string $meta_key ): bool {
+		$this->ensure_loaded();
+
+		$trimmed = trim( $meta_key );
+		return '' !== $trimmed && isset( $this->policies[ $trimmed ] );
+	}
+
+	/**
 	 * Retrieves all configured policies indexed by meta key.
 	 *
 	 * @return array<string, string>

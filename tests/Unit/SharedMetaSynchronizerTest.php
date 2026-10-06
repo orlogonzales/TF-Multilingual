@@ -327,4 +327,36 @@ class SharedMetaSynchronizerTest extends TestCase {
 		$this->assertSame( $array_data, get_post_meta( 20, '_complex_data', true ) );
 		$this->assertSame( $array_data, get_post_meta( 30, '_complex_data', true ) );
 	}
+
+	/**
+	 * Tests is_meta_shared recognizes both direct keys and paired reference keys starting with underscore.
+	 */
+	public function test_is_meta_shared_recognizes_direct_and_reference_keys(): void {
+		$this->policy_registry->set_policy( 'tour_city', CustomFieldPolicy::SHARE );
+
+		$this->assertTrue( $this->synchronizer->is_meta_shared( 'tour_city' ) );
+		$this->assertTrue( $this->synchronizer->is_meta_shared( '_tour_city' ) );
+		$this->assertFalse( $this->synchronizer->is_meta_shared( 'unknown_field' ) );
+		$this->assertFalse( $this->synchronizer->is_meta_shared( '_unknown_field' ) );
+	}
+
+	/**
+	 * Tests that updating paired reference key propagates to siblings.
+	 */
+	public function test_paired_reference_key_propagates_to_siblings(): void {
+		$this->create_three_language_group( 10, 20, 30 );
+		$this->policy_registry->set_policy( 'tour_city', CustomFieldPolicy::SHARE );
+
+		// Update both value and reference on post 10
+		update_post_meta( 10, 'tour_city', 'Arequipa' );
+		update_post_meta( 10, '_tour_city', 'field_city_123' );
+
+		// Sibling 20 should have both
+		$this->assertSame( 'Arequipa', get_post_meta( 20, 'tour_city', true ) );
+		$this->assertSame( 'field_city_123', get_post_meta( 20, '_tour_city', true ) );
+
+		// Sibling 30 should have both
+		$this->assertSame( 'Arequipa', get_post_meta( 30, 'tour_city', true ) );
+		$this->assertSame( 'field_city_123', get_post_meta( 30, '_tour_city', true ) );
+	}
 }

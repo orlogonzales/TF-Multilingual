@@ -110,6 +110,9 @@ class CustomFieldsSettingsUi {
 			}
 
 			$this->registry->remove_policy( $raw_key );
+			if ( ! str_starts_with( $raw_key, '_' ) ) {
+				$this->registry->remove_policy( '_' . $raw_key );
+			}
 			$this->registry->persist();
 
 			$this->notice = array(
@@ -139,6 +142,13 @@ class CustomFieldsSettingsUi {
 
 			try {
 				$this->registry->set_policy( $meta_key, $policy );
+				if ( ! str_starts_with( $meta_key, '_' ) ) {
+					if ( CustomFieldPolicy::SHARE === $policy ) {
+						$this->registry->set_policy( '_' . $meta_key, CustomFieldPolicy::SHARE );
+					} else {
+						$this->registry->remove_policy( '_' . $meta_key );
+					}
+				}
 				$this->registry->persist();
 
 				$this->notice = array(
@@ -168,7 +178,16 @@ class CustomFieldsSettingsUi {
 			return;
 		}
 
-		$policies     = $this->registry->get_all_policies();
+		$policies         = $this->registry->get_all_policies();
+		$display_policies = array();
+		foreach ( $policies as $key => $pol ) {
+			// Encapsulate ACF internal reference keys (e.g. _field_name).
+			if ( str_starts_with( $key, '_' ) && isset( $policies[ substr( $key, 1 ) ] ) ) {
+				continue;
+			}
+			$display_policies[ $key ] = $pol;
+		}
+
 		$policy_names = array(
 			CustomFieldPolicy::TRANSLATE => __( 'Traducir (independiente)', 'tf-multilingual' ),
 			CustomFieldPolicy::SHARE     => __( 'Compartir (sincronizar)', 'tf-multilingual' ),
@@ -244,12 +263,12 @@ class CustomFieldsSettingsUi {
 					</tr>
 				</thead>
 				<tbody>
-					<?php if ( empty( $policies ) ) : ?>
+					<?php if ( empty( $display_policies ) ) : ?>
 						<tr>
 							<td colspan="3"><?php echo esc_html__( 'No hay campos personalizados configurados explícitamente. Todos aplican la política por defecto: Ignorar.', 'tf-multilingual' ); ?></td>
 						</tr>
 					<?php else : ?>
-						<?php foreach ( $policies as $key => $pol ) : ?>
+						<?php foreach ( $display_policies as $key => $pol ) : ?>
 							<tr>
 								<td><code><?php echo esc_html( $key ); ?></code></td>
 								<td>

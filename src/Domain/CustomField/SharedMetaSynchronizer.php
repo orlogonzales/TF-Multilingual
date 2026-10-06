@@ -100,8 +100,8 @@ class SharedMetaSynchronizer {
 			return;
 		}
 
-		// Only synchronize fields explicitly configured with SHARE policy.
-		if ( ! $this->policy_registry->is_shared( $meta_key ) ) {
+		// Only synchronize fields explicitly configured with SHARE policy (or paired ACF reference keys).
+		if ( ! $this->is_meta_shared( $meta_key ) ) {
 			return;
 		}
 
@@ -132,6 +132,12 @@ class SharedMetaSynchronizer {
 				if ( function_exists( 'update_post_meta' ) ) {
 					update_post_meta( $sibling_id, $meta_key, $slashed );
 				}
+				if ( function_exists( 'acf_flush_value_cache' ) ) {
+					acf_flush_value_cache( $sibling_id, $meta_key );
+					if ( str_starts_with( $meta_key, '_' ) && strlen( $meta_key ) > 1 ) {
+						acf_flush_value_cache( $sibling_id, substr( $meta_key, 1 ) );
+					}
+				}
 			}
 		} finally {
 			unset( $this->syncing[ $meta_key ] );
@@ -158,8 +164,8 @@ class SharedMetaSynchronizer {
 			return;
 		}
 
-		// Only synchronize fields explicitly configured with SHARE policy.
-		if ( ! $this->policy_registry->is_shared( $meta_key ) ) {
+		// Only synchronize fields explicitly configured with SHARE policy (or paired ACF reference keys).
+		if ( ! $this->is_meta_shared( $meta_key ) ) {
 			return;
 		}
 
@@ -189,10 +195,36 @@ class SharedMetaSynchronizer {
 				if ( function_exists( 'delete_post_meta' ) ) {
 					delete_post_meta( $sibling_id, $meta_key );
 				}
+				if ( function_exists( 'acf_flush_value_cache' ) ) {
+					acf_flush_value_cache( $sibling_id, $meta_key );
+					if ( str_starts_with( $meta_key, '_' ) && strlen( $meta_key ) > 1 ) {
+						acf_flush_value_cache( $sibling_id, substr( $meta_key, 1 ) );
+					}
+				}
 			}
 		} finally {
 			unset( $this->syncing[ $meta_key ] );
 		}
+	}
+
+	/**
+	 * Determines whether a meta key is configured for shared synchronization.
+	 *
+	 * Supports both direct keys and paired reference keys (e.g. ACF keys starting with '_').
+	 *
+	 * @param string $meta_key Meta key.
+	 * @return bool True if configured with SHARE policy.
+	 */
+	public function is_meta_shared( string $meta_key ): bool {
+		if ( $this->policy_registry->is_shared( $meta_key ) ) {
+			return true;
+		}
+
+		if ( str_starts_with( $meta_key, '_' ) && strlen( $meta_key ) > 1 ) {
+			return $this->policy_registry->is_shared( substr( $meta_key, 1 ) );
+		}
+
+		return false;
 	}
 
 	/**

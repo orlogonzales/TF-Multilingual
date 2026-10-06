@@ -789,6 +789,13 @@ class TranslationEditorialService {
 				$val = $this->get_post_meta_value( $source_post_id, $meta_key );
 				$this->update_post_meta_value( $target_post_id, $meta_key, $val );
 			}
+
+			// If this is an ACF field, also copy its paired reference key if present.
+			$ref_key = '_' . $meta_key;
+			if ( ! str_starts_with( $meta_key, '_' ) && $this->post_meta_exists( $source_post_id, $ref_key ) ) {
+				$ref_val = $this->get_post_meta_value( $source_post_id, $ref_key );
+				$this->update_post_meta_value( $target_post_id, $ref_key, $ref_val );
+			}
 		}
 	}
 

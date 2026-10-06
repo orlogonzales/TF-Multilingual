@@ -19,6 +19,7 @@ use TF\Multilingual\Domain\Language\LanguageRegistry;
 use TF\Multilingual\Domain\Translation\ContentTranslationResolver;
 use TF\Multilingual\Domain\Translation\TranslationGroupRepository;
 use TF\Multilingual\Editorial\TranslationEditorialService;
+use TF\Multilingual\Integration\IntegrationManager;
 use TF\Multilingual\Query\QueryLanguageFilter;
 use TF\Multilingual\Query\TermQueryLanguageFilter;
 use TF\Multilingual\Routing\CurrentLanguageResolver;
@@ -146,6 +147,13 @@ class Plugin {
 	private ?CustomFieldsSettingsUi $custom_fields_settings_ui = null;
 
 	/**
+	 * Third-party integrations manager.
+	 *
+	 * @var IntegrationManager|null
+	 */
+	private ?IntegrationManager $integration_manager = null;
+
+	/**
 	 * Retrieves the singleton instance.
 	 *
 	 * @return self
@@ -228,6 +236,9 @@ class Plugin {
 			$this->language_registry,
 			$this->editorial_service
 		);
+		$this->integration_manager          = new IntegrationManager(
+			$this->custom_field_policy_registry
+		);
 
 		$this->rewrite_manager->init_hooks();
 		$this->query_filter->init_hooks();
@@ -237,6 +248,7 @@ class Plugin {
 		$this->term_editorial_ui->init_hooks();
 		$this->admin_list_columns_ui->register_hooks();
 		$this->custom_fields_settings_ui->register_hooks();
+		$this->integration_manager->init();
 
 		$this->initialized = true;
 	}
@@ -411,6 +423,21 @@ class Plugin {
 		}
 
 		return $this->custom_fields_settings_ui;
+	}
+
+	/**
+	 * Gets the integration manager instance.
+	 *
+	 * @return IntegrationManager
+	 */
+	public function get_integration_manager(): IntegrationManager {
+		if ( null === $this->integration_manager ) {
+			$this->integration_manager = new IntegrationManager(
+				$this->get_custom_field_policy_registry()
+			);
+		}
+
+		return $this->integration_manager;
 	}
 
 	/**

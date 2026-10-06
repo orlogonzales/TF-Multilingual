@@ -229,6 +229,35 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Cobertura 100% limpia de PHPCS (WordPress Coding Standards) en todos los 68 archivos del proyecto (0 errores, 0 warnings).
     - Verificación física en entorno WordPress 7.1.2 real con batería completa end-to-end (`scratch/verify_fase_2_0.php`): pruebas de creación de traducciones con aislamiento de Zero Auto-Cloning, sincronización bidireccional forward y reverse en 3 idiomas (ES, EN, PT), aislamiento estricto de TRANSLATE e IGNORE, propagación de eliminación, inmunidad de posts unmanaged y solitarios, renderizado de UI, y preservación intacta de sentinelas de base de datos (WPML 3,403 filas, MD5 `4241ca7e7ec6399a594537cb04790c10`, 3,995 posts, 80 terms, 0 groups, 0 elements, settings NULL).
 
+- **Adaptador para Advanced Custom Fields — ACF (Fase 2.1):**
+  - **Arquitectura de Integración Desacoplada (`IntegrationManager`):**
+    - Componente gestor en `TF\Multilingual\Integration\IntegrationManager` que detecta la presencia de ACF Free en tiempo de ejecución (`class_exists('ACF') || function_exists('acf')`) sin imponer dependencias estructurales duras hacia paquetes externos.
+    - Cero dependencias hacia versiones comerciales: ACF Free (6.8.10) exclusivamente. Si ACF no está activo, TFML no ejecuta código ni consume recursos de integración.
+  - **Componente de Integración ACF (`AcfIntegration`):**
+    - Clase en `TF\Multilingual\Integration\Acf\AcfIntegration` que interactúa con el ecosistema de hooks y filtros de ACF.
+    - **Inyección de Ajustes en Editor de ACF:** Enganche en `acf/render_field_settings` mediante `acf_render_field_setting()` para ofrecer la selección de política multilingüe (`tfml_policy`): `Traducir (independiente)`, `Compartir (sincronizar)`, `Ignorar (sin gestión)`, con valor por defecto `Ignorar`.
+    - **Carga Dinámica de Políticas:** Filtro en `acf/load_field` que inicializa el valor de `tfml_policy` desde el registro soberano `CustomFieldPolicyRegistry` para campos existentes.
+    - **Persistencia en Registro Soberano:** Filtro en `acf/update_field` que persiste la política directamente en `CustomFieldPolicyRegistry` usando la clave física de almacenamiento de WordPress (`wp_postmeta`).
+    - **Mapeo Recursivo de Claves para Campos Anidados (Group Fields):** Método `get_field_storage_key()` con guardia de reentrancia (`$resolving`) y discriminación estricta de prefijos `field_`, resolviendo claves compuestas físicas (`hero_section_title`) para subcampos de grupos ACF.
+    - **Emparejamiento Transparente de Reference Keys (`_{field_name}`):**
+      - Cuando un campo se configura como `SHARE`, su clave interna de referencia ACF (`_{field_name}`) se registra y sincroniza automáticamente como `SHARE` en el motor soberano.
+      - Al cambiar a `TRANSLATE` o `IGNORE`, la clave de referencia se elimina del registro compartido.
+      - Al eliminar un campo en ACF (`acf/delete_field`), se eliminan tanto la clave de valor como la clave de referencia del registro soberano.
+  - **Invalidación Inmediata de Caché de Runtime (`acf_flush_value_cache`):**
+    - En `SharedMetaSynchronizer::on_meta_changed` y `on_meta_deleted`, tras propagar cambios a los posts hermanos en el grupo, se invoca `acf_flush_value_cache( $sibling_id, $meta_key )` (y para la clave desprovista de guion bajo si es de referencia).
+    - Garantiza que cualquier lectura subsecuente vía `get_field()` en el mismo ciclo de petición PHP reciba los datos frescos y sincronizados sin lecturas estancadas en memoria.
+  - **Integración con Creación Editorial (Zero Auto-Cloning + ACF):**
+    - En `TranslationEditorialService::initialize_shared_meta()`, al crear un nuevo borrador de traducción, tanto la clave de valor (`field_name`) como su clave de referencia emparejada (`_{field_name}`) se copian al nuevo post, permitiendo que `get_field()` resuelva el campo inmediatamente en la nueva traducción.
+    - Los campos `TRANSLATE` e `IGNORE` permanecen estrictamente vacíos (Zero Cloning).
+  - **Encapsulación en `CustomFieldsSettingsUi`:**
+    - La pantalla de configuración nativa de campos personalizados encapsula y oculta automáticamente las claves de referencia internas que inician con guion bajo (`_{field_name}`) cuando el campo base está configurado.
+    - El usuario interactúa únicamente con el nombre amigable del campo, sin confusión con claves internas de ACF.
+  - **Pruebas y Verificación:**
+    - Suite de pruebas unitarias ampliada con `IntegrationManagerTest` y `AcfIntegrationTest`, más tests adicionales en `SharedMetaSynchronizerTest` y `CustomFieldsSettingsUiTest`. Total consolidado: **277 tests, 839 assertions, 0 errores, 0 fallos**.
+    - Cobertura 100% limpia de PHPCS (WordPress Coding Standards) en todos los 72 archivos del proyecto (0 errores, 0 warnings).
+    - Verificación física en entorno WordPress 7.1.2 real con ACF Free 6.8.10 activo (`scratch/verify_fase_2_1.php`): 60 aserciones pasadas (100%), validando matriz de tipos de campo (text, textarea, number, email, url, select, checkbox, true_false, group anidado), valores falsey (`0`, `'0'`, `''`, `false`, `[]`), sincronización bidireccional inmediata ES↔EN↔PT, aislamiento estricto de TRANSLATE e IGNORE, eliminación de campos, encapsulación en UI, y preservación criptográfica absoluta de sentinelas de base de datos (WPML 3,403 filas, MD5 `4241ca7e7ec6399a594537cb04790c10`, 3,995 posts, 80 terms, 0 groups, 0 elements, settings NULL).
+
 ### Nota de Estado
-- Esta versión incorpora el motor agnóstico de políticas para campos personalizados (Custom Fields) con políticas `TRANSLATE`, `SHARE` e `IGNORE`, sincronización bidireccional de metadatos nativos en `wp_postmeta`, respeto estricto de la regla soberana de Zero Auto-Cloning (únicamente las claves SHARE son inicializadas en traducciones nuevas) y protección por omisión `IGNORE` para claves no configuradas. Las fases subsiguientes abordarán los adaptadores específicos para constructores visuales (ACF, Elementor, etc.).
+- Esta versión incorpora el adaptador desacoplado para Advanced Custom Fields (ACF Free 6.8.x), permitiendo la configuración de políticas multilingües directamente desde el editor de campos de ACF, la persistencia en el registro soberano de TFML, el emparejamiento transparente de reference keys (`_{field_name}`), la invalidación en tiempo real de la caché de valores de ACF (`acf_flush_value_cache`), el soporte para campos simples, serializados y anidados en grupos, y la encapsulación de claves internas en la interfaz administrativa.
+
 

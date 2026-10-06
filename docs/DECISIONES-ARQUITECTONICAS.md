@@ -165,3 +165,13 @@
 - **JUSTIFICACIÓN:** Mantener `wp_postmeta` como único origen soberano de datos evita fragmentación, mientras que la regla por defecto `IGNORE` previene mutaciones no intencionadas o corrupción en metadatos de terceros/constructores durante migraciones o instalaciones existentes.
 - **CONSECUENCIAS:** Motor desacoplado, metadatos nativos transparentes, sincronización bidireccional O(1) inmediata entre hermanos de grupo y protección total contra bucles recursivos.
 
+---
+
+### ADR-019: Adaptador Desacoplado para Advanced Custom Fields (ACF) con Mapeo de Claves de Referencia y Limpieza de Caché de Runtime
+- **DECISIÓN:** La integración con Advanced Custom Fields (ACF) se implementa mediante un adaptador satélite opcional y desacoplado (`IntegrationManager` y `AcfIntegration`), sin introducir dependencias duras hacia ACF. En la interfaz de edición de campos de ACF se añade la opción de configuración de política multilingüe (`tfml_policy`), la cual persiste directamente en el registro soberano `CustomFieldPolicyRegistry` usando la clave física de almacenamiento (`wp_postmeta`). Para cualquier campo configurado como `SHARE`, su metadato de referencia emparejado (`_{field_name}`) se sincroniza e inicializa automáticamente como `SHARE`, manteniéndose estrictamente encapsulado y oculto de la vista del usuario en las pantallas de configuración de campos personalizados. Durante las mutaciones de metadatos compartidos, el sincronizador invalida de forma inmediata la memoria de valores de ACF (`acf_flush_value_cache`) en los posts hermanos, garantizando lecturas frescas en el mismo ciclo de petición sin inconsistencias de estado.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Integración con ACF Free (versión 6.8.x) sin alterar la arquitectura soberana de TFML ni forzar dependencias si ACF no está instalado.
+- **JUSTIFICACIÓN:** ACF almacena internamente la referencia del campo bajo el prefijo `_{name}` para resolver formateadores complejos y opciones de campo. Al emparejar transparentemente la clave de referencia con la clave de valor, `get_field()` funciona idénticamente en todas las traducciones hermanas, mientras que la invalidación explícita de `acf_flush_value_cache()` elimina lecturas estancadas en memoria.
+- **CONSECUENCIAS:** Integración 100% transparente para el usuario de ACF, desacoplamiento estricto cuando ACF no está activo, soporte completo de campos simples, compuestos y anidados en grupos, y compatibilidad total con el motor soberano de políticas de TFML.
+
+
