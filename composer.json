@@ -21,7 +21,10 @@
     "autoload": {
         "psr-4": {
             "TF\\Multilingual\\": "src/"
-        }
+        },
+        "files": [
+            "src/Domain/Strings/functions.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {

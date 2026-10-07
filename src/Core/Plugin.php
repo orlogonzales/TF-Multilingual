@@ -14,6 +14,7 @@ use TF\Multilingual\Admin\CustomFieldsSettingsUi;
 use TF\Multilingual\Admin\MediaEditorialUi;
 use TF\Multilingual\Admin\NavMenuEditorialUi;
 use TF\Multilingual\Admin\PostEditorialUi;
+use TF\Multilingual\Admin\StringEditorialUi;
 use TF\Multilingual\Admin\TermEditorialUi;
 use TF\Multilingual\Domain\CustomField\CustomFieldPolicyRegistry;
 use TF\Multilingual\Domain\CustomField\SharedMetaSynchronizer;
@@ -25,6 +26,8 @@ use TF\Multilingual\Domain\Media\MediaTranslationResolver;
 use TF\Multilingual\Domain\Navigation\BlockNavigationFrontendFilter;
 use TF\Multilingual\Domain\Navigation\NavMenuFrontendFilter;
 use TF\Multilingual\Domain\Navigation\NavMenuLocationRepository;
+use TF\Multilingual\Domain\Strings\StringRepository;
+use TF\Multilingual\Domain\Strings\StringTranslationService;
 use TF\Multilingual\Domain\Translation\ContentTranslationResolver;
 use TF\Multilingual\Domain\Translation\TranslationGroupRepository;
 use TF\Multilingual\Editorial\TranslationEditorialService;
@@ -220,6 +223,27 @@ class Plugin {
 	private ?NavMenuEditorialUi $nav_menu_editorial_ui = null;
 
 	/**
+	 * String repository.
+	 *
+	 * @var StringRepository|null
+	 */
+	private ?StringRepository $string_repository = null;
+
+	/**
+	 * String translation service.
+	 *
+	 * @var StringTranslationService|null
+	 */
+	private ?StringTranslationService $string_translation_service = null;
+
+	/**
+	 * String editorial UI component.
+	 *
+	 * @var StringEditorialUi|null
+	 */
+	private ?StringEditorialUi $string_editorial_ui = null;
+
+	/**
 	 * Retrieves the singleton instance.
 	 *
 	 * @return self
@@ -353,6 +377,16 @@ class Plugin {
 			$translation_resolver,
 			$group_repo
 		);
+		$this->string_repository                = new StringRepository();
+		$this->string_translation_service       = new StringTranslationService(
+			$this->string_repository,
+			$this->language_registry,
+			$this->current_language_resolver
+		);
+		$this->string_editorial_ui              = new StringEditorialUi(
+			$this->string_repository,
+			$this->language_registry
+		);
 
 		$this->rewrite_manager->init_hooks();
 		$this->query_filter->init_hooks();
@@ -369,6 +403,10 @@ class Plugin {
 		$this->nav_menu_frontend_filter->init_hooks();
 		$this->block_navigation_frontend_filter->init_hooks();
 		$this->nav_menu_editorial_ui->init_hooks();
+		$this->string_editorial_ui->init_hooks();
+		if ( function_exists( 'add_action' ) ) {
+			add_action( 'shutdown', array( $this->string_translation_service, 'flush_observed_strings' ) );
+		}
 
 		$this->initialized = true;
 	}
@@ -710,6 +748,53 @@ class Plugin {
 
 		return $this->nav_menu_editorial_ui;
 	}
+
+	/**
+	 * Gets the string repository instance.
+	 *
+	 * @return StringRepository
+	 */
+	public function get_string_repository(): StringRepository {
+		if ( null === $this->string_repository ) {
+			$this->string_repository = new StringRepository();
+		}
+
+		return $this->string_repository;
+	}
+
+	/**
+	 * Gets the string translation service instance.
+	 *
+	 * @return StringTranslationService
+	 */
+	public function get_string_translation_service(): StringTranslationService {
+		if ( null === $this->string_translation_service ) {
+			$this->string_translation_service = new StringTranslationService(
+				$this->get_string_repository(),
+				$this->get_language_registry(),
+				$this->get_current_language_resolver()
+			);
+		}
+
+		return $this->string_translation_service;
+	}
+
+	/**
+	 * Gets the string editorial UI instance.
+	 *
+	 * @return StringEditorialUi
+	 */
+	public function get_string_editorial_ui(): StringEditorialUi {
+		if ( null === $this->string_editorial_ui ) {
+			$this->string_editorial_ui = new StringEditorialUi(
+				$this->get_string_repository(),
+				$this->get_language_registry()
+			);
+		}
+
+		return $this->string_editorial_ui;
+	}
+
 
 	/**
 	 * Returns whether the plugin has been initialized.

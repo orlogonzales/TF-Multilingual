@@ -396,3 +396,39 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Estándares WPCS / PHPCS: **95/95 archivos analizados, 0 errors, 0 warnings**.
   - Verificación en laboratorio real WordPress (`scratch/verify_fase_2_4.php`): **32/32 assertions passed**.
   - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+
+---
+
+## [Fase 2.5] - 2026-10-07
+
+### Strings Multilingües (Cadenas de Interfaz)
+- **Activación del Esquema Soberano y Modelo de Dominio (`tfml_strings` y `tfml_string_translations`):**
+  - Implementación de entidades `TranslatableString`, `StringTranslation` y value object `StringStatus`.
+  - Mapeo bidireccional y paridad conceptual con el modelo de versionado de Fase 2.3: `untranslated` ↔ `UNTRANSLATED`, `up_to_date` ↔ `UPDATED`, `needs_review` ↔ `REVIEW`.
+  - Identidad semántica inmutable `domain + string_key` bajo ADR-013.
+- **Versionado Lógico de Cadenas y Democión Determinista:**
+  - `StringRepository::register` implementa registro explícito y seguro ante concurrencia.
+  - El texto fuente no es la identidad: mutaciones en el texto fuente incrementan `string_version: N -> N+1` y degradan automáticamente todas las traducciones dependientes a `needs_review` (REVIEW) sin destruirlas ni sobreescribirlas.
+  - Re-registros con idéntico texto fuente son estrictamente idempotentes ($0$ incremento de versión).
+  - Detección explícita de conflictos de contexto (`has_conflict = 1`).
+- **Política Estricta de Fallback y Cero Fallback Lateral:**
+  - En idioma predeterminado se devuelve directamente el texto fuente sin sobrecarga en base de datos.
+  - En idiomas secundarios, traducciones en estado `needs_review` (REVIEW) continúan sirviéndose en frontend para garantizar continuidad visual.
+  - Ausencia de traducción (`UNTRANSLATED`) o idiomas inactivos degradan estrictamente al texto fuente por defecto.
+  - Cero degradación lateral entre idiomas secundarios.
+- **Rendimiento Zero N+1 con Pre-calentamiento por Dominio (`preload_domain`):**
+  - Pre-calentamiento en $O(1)$ consultas fijas (1-2 consultas SQL por dominio).
+  - Bucle de resolución de 100 cadenas verificado en laboratorio real con exactamente **0 consultas SQL**.
+  - Actualización diferida de `last_seen_at` para prevenir sobrecarga de escritura en frontend.
+- **Helpers Globales de Localización (`src/Domain/Strings/functions.php`):**
+  - `tfml__()`, `tfml_e()`, `tfml_x()`, `tfml_esc_html__()`, `tfml_esc_attr__()`, `tfml_translate()`.
+  - `tfml_n()`: contrato formal para selección singular/plural forward-compatible con motores de plurales futuros.
+  - Validación de compatibilidad de tokens y placeholders (`has_matching_placeholders`).
+- **Interfaz Administrativa (`StringEditorialUi`):**
+  - Ubicada bajo *TF Multilingual > Cadenas de texto* en WordPress Admin nativo.
+  - Filtro por dominio, búsqueda en tiempo real, registro manual, tabla de listado con distintivos de estado y edición protegida con `manage_options` y nonces.
+- **Verificación Integral y Calidad:**
+  - Suite de pruebas unitarias ampliada: **381 tests, 1,162 assertions, 0 errors, 0 failures, 0 warnings, 0 deprecations**.
+  - Estándares WPCS / PHPCS: **111/111 archivos analizados, 0 errors, 0 warnings**.
+  - Verificación en laboratorio real WordPress (`scratch/verify_fase_2_5.php`): **44/44 assertions passed (100%)**.
+  - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
