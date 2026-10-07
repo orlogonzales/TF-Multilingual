@@ -910,6 +910,7 @@ if ( ! class_exists( 'WP_Post' ) ) {
 	/**
 	 * Minimal stub for WP_Post class.
 	 */
+	#[\AllowDynamicProperties]
 	// phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound,PEAR.NamingConventions.ValidClassName.StartWithCapital
 	class WP_Post {
 		/**
@@ -1076,6 +1077,32 @@ if ( ! function_exists( 'esc_html' ) ) {
 	}
 }
 
+if ( ! function_exists( 'esc_html_e' ) ) {
+	/**
+	 * Stub for esc_html_e.
+	 *
+	 * @param string $text   Text.
+	 * @param string $domain Domain.
+	 * @return void
+	 */
+	function esc_html_e( string $text, string $domain = 'default' ): void {
+		echo htmlspecialchars( $text, ENT_QUOTES );
+	}
+}
+
+if ( ! function_exists( 'esc_attr_e' ) ) {
+	/**
+	 * Stub for esc_attr_e.
+	 *
+	 * @param string $text   Text.
+	 * @param string $domain Domain.
+	 * @return void
+	 */
+	function esc_attr_e( string $text, string $domain = 'default' ): void {
+		echo htmlspecialchars( $text, ENT_QUOTES );
+	}
+}
+
 if ( ! function_exists( 'esc_url' ) ) {
 	/**
 	 * Stub for esc_url.
@@ -1148,5 +1175,151 @@ if ( ! function_exists( 'add_meta_box' ) ) {
 			'priority' => $priority,
 			'args'     => $callback_args,
 		);
+	}
+}
+
+if ( ! function_exists( 'get_nav_menu_locations' ) ) {
+	/**
+	 * Stub for get_nav_menu_locations.
+	 *
+	 * @return array<string, int>
+	 */
+	function get_nav_menu_locations(): array {
+		return $GLOBALS['wp_test_nav_menu_locations'] ?? array();
+	}
+}
+
+if ( ! function_exists( 'get_registered_nav_menus' ) ) {
+	/**
+	 * Stub for get_registered_nav_menus.
+	 *
+	 * @return array<string, string>
+	 */
+	function get_registered_nav_menus(): array {
+		return $GLOBALS['wp_test_registered_nav_menus'] ?? array();
+	}
+}
+
+if ( ! function_exists( 'wp_get_nav_menus' ) ) {
+	/**
+	 * Stub for wp_get_nav_menus.
+	 *
+	 * @param array $args Query arguments.
+	 * @return array
+	 */
+	function wp_get_nav_menus( array $args = array() ): array {
+		return $GLOBALS['wp_test_nav_menus'] ?? array();
+	}
+}
+
+if ( ! function_exists( 'wp_get_nav_menu_object' ) ) {
+	/**
+	 * Stub for wp_get_nav_menu_object.
+	 *
+	 * @param mixed $menu Menu ID, slug, or object.
+	 * @return object|false
+	 */
+	function wp_get_nav_menu_object( mixed $menu ): mixed {
+		if ( is_object( $menu ) ) {
+			return $menu;
+		}
+		if ( is_numeric( $menu ) && isset( $GLOBALS['wp_test_terms'][ (int) $menu ] ) ) {
+			return $GLOBALS['wp_test_terms'][ (int) $menu ];
+		}
+		if ( is_string( $menu ) ) {
+			foreach ( ( $GLOBALS['wp_test_terms'] ?? array() ) as $term ) {
+				if ( is_object( $term ) && ( $term->slug === $menu || $term->name === $menu ) ) {
+					return $term;
+				}
+			}
+		}
+		return false;
+	}
+}
+
+if ( ! function_exists( 'wp_get_nav_menu_items' ) ) {
+	/**
+	 * Stub for wp_get_nav_menu_items.
+	 *
+	 * @param mixed $menu Menu ID, slug, or object.
+	 * @param array $args Query arguments.
+	 * @return array
+	 */
+	function wp_get_nav_menu_items( mixed $menu, array $args = array() ): array {
+		$id = is_object( $menu ) ? ( $menu->term_id ?? 0 ) : (int) $menu;
+		return $GLOBALS['wp_test_nav_menu_items'][ $id ] ?? array();
+	}
+}
+
+if ( ! function_exists( 'get_permalink' ) ) {
+	/**
+	 * Stub for get_permalink.
+	 *
+	 * @param mixed $post      Post ID or object.
+	 * @param bool  $leavename Whether to leave name.
+	 * @return string|false
+	 */
+	function get_permalink( mixed $post = 0, bool $leavename = false ): string|false {
+		$id = is_object( $post ) ? (int) $post->ID : (int) $post;
+		return $GLOBALS['wp_test_permalinks'][ $id ] ?? ( 'http://example.com/?p=' . $id );
+	}
+}
+
+if ( ! function_exists( 'get_term_link' ) ) {
+	/**
+	 * Stub for get_term_link.
+	 *
+	 * @param mixed  $term     Term ID or object.
+	 * @param string $taxonomy Taxonomy name.
+	 * @return string
+	 */
+	function get_term_link( mixed $term, string $taxonomy = '' ): string {
+		$id = is_object( $term ) ? (int) $term->term_id : (int) $term;
+		return $GLOBALS['wp_test_term_links'][ $id ] ?? ( 'http://example.com/?tag_id=' . $id );
+	}
+}
+
+if ( ! function_exists( 'selected' ) ) {
+	/**
+	 * Stub for selected.
+	 *
+	 * @param mixed $selected Selected value.
+	 * @param mixed $current  Current value.
+	 * @param bool  $display  Whether to echo.
+	 * @return string
+	 */
+	function selected( mixed $selected, mixed $current = true, bool $display = true ): string {
+		$out = (string) $selected === (string) $current ? ' selected="selected"' : '';
+		if ( $display ) {
+			echo $out;
+		}
+		return $out;
+	}
+}
+
+if ( ! function_exists( 'sanitize_key' ) ) {
+	/**
+	 * Stub for sanitize_key.
+	 *
+	 * @param string $key Key.
+	 * @return string
+	 */
+	function sanitize_key( string $key ): string {
+		$key = strtolower( $key );
+		return preg_replace( '/[^a-z0-9_\-]/', '', $key ) ?? '';
+	}
+}
+
+if ( ! function_exists( 'home_url' ) ) {
+	/**
+	 * Stub for home_url.
+	 *
+	 * @param string      $path   Relative path.
+	 * @param string|null $scheme Scheme.
+	 * @return string
+	 */
+	function home_url( string $path = '', ?string $scheme = null ): string {
+		$base = $GLOBALS['wp_test_home_url'] ?? 'http://example.com';
+		return rtrim( $base, '/' ) . ( '' !== $path ? '/' . ltrim( $path, '/' ) : '' );
 	}
 }

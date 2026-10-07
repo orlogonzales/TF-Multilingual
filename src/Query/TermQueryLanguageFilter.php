@@ -150,6 +150,11 @@ class TermQueryLanguageFilter {
 			}
 		}
 
+		// 7. Structural taxonomies exclusion (e.g. nav_menu).
+		if ( in_array( 'nav_menu', $taxonomies, true ) || ( isset( $args['taxonomy'] ) && 'nav_menu' === $args['taxonomy'] ) ) {
+			return false;
+		}
+
 		return true;
 	}
 

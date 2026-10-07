@@ -306,6 +306,45 @@ class ContentTranslationResolver {
 	}
 
 	/**
+	 * Pre-warms the in-memory cache for multiple elements in batch.
+	 *
+	 * Uses TranslationGroupRepository::find_by_elements to guarantee O(1) query complexity (zero N+1).
+	 *
+	 * @param string     $element_type Element type ('post' or 'term').
+	 * @param array<int> $element_ids  Array of WordPress object IDs.
+	 * @return void
+	 */
+	public function prefetch( string $element_type, array $element_ids ): void {
+		$normalized_type = 'post' === $element_type ? 'post' : ( 'term' === $element_type ? 'term' : '' );
+		if ( '' === $normalized_type || empty( $element_ids ) ) {
+			return;
+		}
+
+		$uncached_ids = array();
+		foreach ( $element_ids as $id ) {
+			$int_id = (int) $id;
+			if ( $int_id > 0 && ! array_key_exists( "{$normalized_type}:{$int_id}", $this->group_cache ) ) {
+				$uncached_ids[] = $int_id;
+			}
+		}
+
+		if ( empty( $uncached_ids ) ) {
+			return;
+		}
+
+		$groups_by_id = $this->group_repository->find_by_elements( $normalized_type, $uncached_ids );
+		foreach ( $groups_by_id as $group ) {
+			$this->prime_cache( $group );
+		}
+
+		foreach ( $uncached_ids as $id ) {
+			if ( ! isset( $groups_by_id[ $id ] ) && ! array_key_exists( "{$normalized_type}:{$id}", $this->group_cache ) ) {
+				$this->prime_empty( $normalized_type, $id );
+			}
+		}
+	}
+
+	/**
 	 * Alias of get_group_for_element().
 	 *
 	 * @param string $element_type Element type ('post' or 'term').

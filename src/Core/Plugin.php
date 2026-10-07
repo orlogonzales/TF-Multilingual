@@ -12,14 +12,19 @@ namespace TF\Multilingual\Core;
 use TF\Multilingual\Admin\AdminListColumnsUi;
 use TF\Multilingual\Admin\CustomFieldsSettingsUi;
 use TF\Multilingual\Admin\MediaEditorialUi;
+use TF\Multilingual\Admin\NavMenuEditorialUi;
 use TF\Multilingual\Admin\PostEditorialUi;
 use TF\Multilingual\Admin\TermEditorialUi;
 use TF\Multilingual\Domain\CustomField\CustomFieldPolicyRegistry;
 use TF\Multilingual\Domain\CustomField\SharedMetaSynchronizer;
 use TF\Multilingual\Domain\Language\LanguageRegistry;
+use TF\Multilingual\Domain\Language\SettingsRepository;
 use TF\Multilingual\Domain\Media\MediaFrontendFilter;
 use TF\Multilingual\Domain\Media\MediaTranslationRepository;
 use TF\Multilingual\Domain\Media\MediaTranslationResolver;
+use TF\Multilingual\Domain\Navigation\BlockNavigationFrontendFilter;
+use TF\Multilingual\Domain\Navigation\NavMenuFrontendFilter;
+use TF\Multilingual\Domain\Navigation\NavMenuLocationRepository;
 use TF\Multilingual\Domain\Translation\ContentTranslationResolver;
 use TF\Multilingual\Domain\Translation\TranslationGroupRepository;
 use TF\Multilingual\Editorial\TranslationEditorialService;
@@ -27,6 +32,7 @@ use TF\Multilingual\Integration\IntegrationManager;
 use TF\Multilingual\Query\QueryLanguageFilter;
 use TF\Multilingual\Query\TermQueryLanguageFilter;
 use TF\Multilingual\Routing\CurrentLanguageResolver;
+use TF\Multilingual\Routing\LocalizedUrlGenerator;
 use TF\Multilingual\Routing\RewriteManager;
 use TF\Multilingual\Routing\UrlLanguageResolver;
 
@@ -186,6 +192,34 @@ class Plugin {
 	private ?MediaEditorialUi $media_editorial_ui = null;
 
 	/**
+	 * Nav menu location repository.
+	 *
+	 * @var NavMenuLocationRepository|null
+	 */
+	private ?NavMenuLocationRepository $nav_menu_location_repository = null;
+
+	/**
+	 * Nav menu frontend filter.
+	 *
+	 * @var NavMenuFrontendFilter|null
+	 */
+	private ?NavMenuFrontendFilter $nav_menu_frontend_filter = null;
+
+	/**
+	 * Block navigation frontend filter.
+	 *
+	 * @var BlockNavigationFrontendFilter|null
+	 */
+	private ?BlockNavigationFrontendFilter $block_navigation_frontend_filter = null;
+
+	/**
+	 * Nav menu editorial UI component.
+	 *
+	 * @var NavMenuEditorialUi|null
+	 */
+	private ?NavMenuEditorialUi $nav_menu_editorial_ui = null;
+
+	/**
 	 * Retrieves the singleton instance.
 	 *
 	 * @return self
@@ -290,6 +324,36 @@ class Plugin {
 			$this->language_registry
 		);
 
+		$settings_repository                    = new SettingsRepository();
+		$this->nav_menu_location_repository     = new NavMenuLocationRepository(
+			$settings_repository,
+			$this->language_registry,
+			$translation_resolver
+		);
+		$url_generator                          = new LocalizedUrlGenerator(
+			$this->language_registry,
+			$url_resolver,
+			$translation_resolver
+		);
+		$this->nav_menu_frontend_filter         = new NavMenuFrontendFilter(
+			$this->nav_menu_location_repository,
+			$this->current_language_resolver,
+			$this->language_registry,
+			$translation_resolver,
+			$url_generator
+		);
+		$this->block_navigation_frontend_filter = new BlockNavigationFrontendFilter(
+			$this->current_language_resolver,
+			$this->language_registry,
+			$translation_resolver
+		);
+		$this->nav_menu_editorial_ui            = new NavMenuEditorialUi(
+			$this->nav_menu_location_repository,
+			$this->language_registry,
+			$translation_resolver,
+			$group_repo
+		);
+
 		$this->rewrite_manager->init_hooks();
 		$this->query_filter->init_hooks();
 		$this->term_query_filter->init_hooks();
@@ -302,6 +366,9 @@ class Plugin {
 		$this->integration_manager->init();
 		$this->media_frontend_filter->init_hooks();
 		$this->media_editorial_ui->register_hooks();
+		$this->nav_menu_frontend_filter->init_hooks();
+		$this->block_navigation_frontend_filter->init_hooks();
+		$this->nav_menu_editorial_ui->init_hooks();
 
 		$this->initialized = true;
 	}
@@ -557,6 +624,91 @@ class Plugin {
 		}
 
 		return $this->media_editorial_ui;
+	}
+
+	/**
+	 * Gets the nav menu location repository instance.
+	 *
+	 * @return NavMenuLocationRepository
+	 */
+	public function get_nav_menu_location_repository(): NavMenuLocationRepository {
+		if ( null === $this->nav_menu_location_repository ) {
+			$this->nav_menu_location_repository = new NavMenuLocationRepository(
+				new SettingsRepository(),
+				$this->get_language_registry()
+			);
+		}
+
+		return $this->nav_menu_location_repository;
+	}
+
+	/**
+	 * Gets the nav menu frontend filter instance.
+	 *
+	 * @return NavMenuFrontendFilter
+	 */
+	public function get_nav_menu_frontend_filter(): NavMenuFrontendFilter {
+		if ( null === $this->nav_menu_frontend_filter ) {
+			$group_repo           = new TranslationGroupRepository();
+			$translation_resolver = new ContentTranslationResolver( $group_repo, $this->get_language_registry() );
+			$url_resolver         = new UrlLanguageResolver( $this->get_language_registry() );
+			$url_generator        = new LocalizedUrlGenerator(
+				$this->get_language_registry(),
+				$url_resolver,
+				$translation_resolver
+			);
+
+			$this->nav_menu_frontend_filter = new NavMenuFrontendFilter(
+				$this->get_nav_menu_location_repository(),
+				$this->get_current_language_resolver(),
+				$this->get_language_registry(),
+				$translation_resolver,
+				$url_generator
+			);
+		}
+
+		return $this->nav_menu_frontend_filter;
+	}
+
+	/**
+	 * Gets the block navigation frontend filter instance.
+	 *
+	 * @return BlockNavigationFrontendFilter
+	 */
+	public function get_block_navigation_frontend_filter(): BlockNavigationFrontendFilter {
+		if ( null === $this->block_navigation_frontend_filter ) {
+			$group_repo           = new TranslationGroupRepository();
+			$translation_resolver = new ContentTranslationResolver( $group_repo, $this->get_language_registry() );
+
+			$this->block_navigation_frontend_filter = new BlockNavigationFrontendFilter(
+				$this->get_current_language_resolver(),
+				$this->get_language_registry(),
+				$translation_resolver
+			);
+		}
+
+		return $this->block_navigation_frontend_filter;
+	}
+
+	/**
+	 * Gets the nav menu editorial UI instance.
+	 *
+	 * @return NavMenuEditorialUi
+	 */
+	public function get_nav_menu_editorial_ui(): NavMenuEditorialUi {
+		if ( null === $this->nav_menu_editorial_ui ) {
+			$group_repo           = new TranslationGroupRepository();
+			$translation_resolver = new ContentTranslationResolver( $group_repo, $this->get_language_registry() );
+
+			$this->nav_menu_editorial_ui = new NavMenuEditorialUi(
+				$this->get_nav_menu_location_repository(),
+				$this->get_language_registry(),
+				$translation_resolver,
+				$group_repo
+			);
+		}
+
+		return $this->nav_menu_editorial_ui;
 	}
 
 	/**

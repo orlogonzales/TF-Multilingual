@@ -364,3 +364,35 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Regresión Fase 2.2 / 2.2A (Media): **72 passed, 0 failed**, 0 escrituras WPML.
   - Regresión Fase 2.1 (ACF Free): **60 passed, 0 failed**, 0 escrituras WPML.
   - Centinela WPML verificado: 3,403 filas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+
+---
+
+## [Fase 2.4] - 2026-10-07
+
+### Menús y Navegación Multilingüe
+- **Resolución Contextual de Ubicaciones (`NavMenuLocationRepository` & `NavMenuFrontendFilter`):**
+  - Mapeo persistente de ubicaciones de tema por idioma (`tfml_nav_menu_locations`) en `wp_options`.
+  - Invarianza total del idioma predeterminado: `theme_mod_nav_menu_locations` nativo de WordPress permanece inalterado.
+  - Intercepción en frontend de `theme_mod_nav_menu_locations`, `pre_wp_nav_menu` y `wp_nav_menu_args` para resolver el menú según el idioma del request (vía mapeo explícito o grupo de traducción `TranslationGroup`).
+  - Soporte de política de fallback al menú canónico cuando no existe traducción para el idioma activo.
+- **Localización Dinámica de Items de Menú (`NavMenuFrontendFilter`):**
+  - Reasignación de destinos de posts (`post_type` items) a sus IDs traducidos y URLs correspondientes vía `ContentTranslationResolver`.
+  - Reasignación de destinos de taxonomía (`taxonomy` items) a sus términos traducidos y URLs de archivo.
+  - Localización de URLs internas personalizadas (`custom` items) con prefijo de idioma activo, prevención estricta de doble prefijo (`/en/en/`), y preservación íntegra de query parameters y fragmentos.
+  - URLs externas permanecen completamente inalteradas.
+- **Rendimiento Zero N+1 O(1) con Pre-calentamiento por Lotes:**
+  - Pre-calentamiento por lotes de todos los post targets y term targets del menú en exactamente O(1) consultas fijas (3 consultas SQL para posts + 3 consultas SQL para términos).
+  - Cero consultas SQL adicionales durante el ciclo de renderizado de elementos de menú.
+- **Soporte FSE / Gutenberg (`BlockNavigationFrontendFilter`):**
+  - Intercepción de `render_block_data` en bloques `core/navigation`.
+  - Sustitución efímera del atributo `ref` (post `wp_navigation`) por su traducción correspondiente en memoria.
+  - Cero mutaciones en base de datos y sin mutar el array del bloque en memoria.
+- **Interfaz Administrativa (`NavMenuEditorialUi`):**
+  - Submenú bajo *Apariencia > Ubicaciones de Menú Multilingüe*.
+  - Matriz visual de ubicaciones de tema registradas e idiomas activos con selección de menús traducidos.
+  - Protección con capability `edit_theme_options` y validación de nonces de WordPress.
+- **Verificación y Calidad:**
+  - Suite de pruebas unitarias ampliada: **349 tests, 1,075 assertions, 0 errors, 0 failures, 0 deprecations**.
+  - Estándares WPCS / PHPCS: **95/95 archivos analizados, 0 errors, 0 warnings**.
+  - Verificación en laboratorio real WordPress (`scratch/verify_fase_2_4.php`): **32/32 assertions passed**.
+  - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
