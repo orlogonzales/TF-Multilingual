@@ -615,4 +615,50 @@ class TranslationEditorialServiceTest extends TestCase {
 		$element_after = $this->group_repo->find_element( 'term', 201 );
 		$this->assertSame( 2, $element_after->get_current_content_version() );
 	}
+
+	/**
+	 * Tests on_save_post does NOT increment version on autosaves, revisions, or unchanged content.
+	 */
+	public function test_on_save_post_ignores_autosaves_revisions_and_unchanged_posts(): void {
+		$this->create_test_post( 101, 'post', 'publish', 'Original Canonical Post' );
+		$this->service->assign_initial_language( 'post', 101, 'post', 'es' );
+
+		$element_initial = $this->group_repo->find_element( 'post', 101 );
+		$this->assertNotNull( $element_initial );
+		$initial_version     = $element_initial->get_current_content_version();
+		$initial_fingerprint = $element_initial->get_translatable_fingerprint();
+		$this->assertSame( 1, $initial_version );
+		$this->assertNotEmpty( $initial_fingerprint );
+
+		// 1. Autosave arrives -> must be ignored.
+		$GLOBALS['wp_test_post_autosaves'][999] = 101;
+		$this->service->on_save_post( 999 );
+
+		$element_after_autosave = $this->group_repo->find_element( 'post', 101 );
+		$this->assertSame( $initial_version, $element_after_autosave->get_current_content_version() );
+		$this->assertSame( $initial_fingerprint, $element_after_autosave->get_translatable_fingerprint() );
+
+		// 2. Revision arrives -> must be ignored.
+		$GLOBALS['wp_test_post_revisions'][888] = 101;
+		$this->service->on_save_post( 888 );
+
+		$element_after_revision = $this->group_repo->find_element( 'post', 101 );
+		$this->assertSame( $initial_version, $element_after_revision->get_current_content_version() );
+		$this->assertSame( $initial_fingerprint, $element_after_revision->get_translatable_fingerprint() );
+
+		// 3. Normal save of post without content changes -> must not increment version.
+		$this->service->on_save_post( 101, $GLOBALS['wp_test_posts'][101], true );
+
+		$element_after_normal_save = $this->group_repo->find_element( 'post', 101 );
+		$this->assertSame( $initial_version, $element_after_normal_save->get_current_content_version() );
+		$this->assertSame( $initial_fingerprint, $element_after_normal_save->get_translatable_fingerprint() );
+
+		// 4. Meaningful content change -> version increments to 2, fingerprint updates.
+		$GLOBALS['wp_test_posts'][101]->post_title = 'Meaningfully Changed Title';
+		$this->service->on_save_post( 101, $GLOBALS['wp_test_posts'][101], true );
+
+		$element_after_edit = $this->group_repo->find_element( 'post', 101 );
+		$this->assertSame( 2, $element_after_edit->get_current_content_version() );
+		$this->assertNotSame( $initial_fingerprint, $element_after_edit->get_translatable_fingerprint() );
+	}
 }

@@ -998,6 +998,13 @@ if ( ! class_exists( 'WP_Term' ) ) {
 		public string $slug = '';
 
 		/**
+		 * Term description.
+		 *
+		 * @var string
+		 */
+		public string $description = '';
+
+		/**
 		 * Term parent ID.
 		 *
 		 * @var int

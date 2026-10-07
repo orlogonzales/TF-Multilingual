@@ -346,3 +346,21 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
 
 ### Nota de Estado
 - Esta versión consolida el sistema de versionado lógico y estado de traducción de TF Multilingual (Fase 2.3), estableciendo las bases deterministas para la sincronización y auditoría editorial del catálogo multilingüe.
+
+---
+
+## [Fase 2.3A] - 2026-10-07
+
+### Hardening y Calidad Final
+- **Eliminación de Deprecations PHPUnit:**
+  - Declaración explícita de propiedad `$description` en el doble de prueba `WP_Term` (`tests/bootstrap.php`), eliminando las dos advertencias de creación dinámica de propiedades en PHP 8.2+.
+  - Suite de pruebas unitarias ahora ejecuta con **0 fallos, 0 errores, 0 deprecations**.
+- **Justificación y Validación Arquitectónica de Term Slug:**
+  - Documentación formal en ADR-021 justificando la inclusión de `slug` en la huella de términos (`slug ∈ fingerprint`) debido a su impacto en URLs públicas, permalinks y SEO.
+  - Nueva prueba unitaria específica en `TranslatableFingerprintTest` verificando que la mutación exclusiva del slug genera una huella criptográfica distinta.
+- **Invarianza de Autosaves y Revisions:**
+  - Nueva prueba unitaria en `TranslationEditorialServiceTest` demostrando rigurosamente que los guardados automáticos (`DOING_AUTOSAVE`), las revisiones (`wp_is_post_revision`) y los guardados sin mutación editorial no incrementan `current_content_version` ni alteran la huella digital.
+- **Regresión Cruzada Certificada:**
+  - Regresión Fase 2.2 / 2.2A (Media): **72 passed, 0 failed**, 0 escrituras WPML.
+  - Regresión Fase 2.1 (ACF Free): **60 passed, 0 failed**, 0 escrituras WPML.
+  - Centinela WPML verificado: 3,403 filas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).

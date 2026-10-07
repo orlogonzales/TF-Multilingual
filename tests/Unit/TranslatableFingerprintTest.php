@@ -211,6 +211,30 @@ class TranslatableFingerprintTest extends TestCase {
 	}
 
 	/**
+	 * Tests term fingerprint changes when ONLY slug is modified (name and description identical).
+	 */
+	public function test_term_fingerprint_sensitive_to_slug_change_only(): void {
+		$term1              = new WP_Term();
+		$term1->term_id     = 303;
+		$term1->taxonomy    = 'category';
+		$term1->name        = 'Ecotourism';
+		$term1->slug        = 'ecotourism-original';
+		$term1->description = 'Ecotourism tours and activities';
+
+		$term2              = new WP_Term();
+		$term2->term_id     = 303;
+		$term2->taxonomy    = 'category';
+		$term2->name        = 'Ecotourism';
+		$term2->slug        = 'ecotourism-renamed';
+		$term2->description = 'Ecotourism tours and activities';
+
+		$h1 = TranslatableFingerprint::compute_for_term( $term1 );
+		$h2 = TranslatableFingerprint::compute_for_term( $term2 );
+
+		$this->assertNotSame( $h1, $h2, 'Modifying term slug must alter term translatable fingerprint' );
+	}
+
+	/**
 	 * Tests instance methods delegate cleanly to static calculations.
 	 */
 	public function test_instance_methods(): void {
