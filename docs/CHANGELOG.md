@@ -312,7 +312,37 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - PHPUnit: 310 tests, 993 assertions (100% pass).
     - PHPCS: 82 files clean (100% clean).
 
+- **Versionado Lógico y Estado de Traducción (Fase 2.3):**
+  - **Autoridad de Versionado Lógico Desacoplada de Timestamps:**
+    - Prohibición estricta de marcas de tiempo (`post_modified`, `updated_at`) como criterio de vigencia.
+    - El estado de traducción se deriva de la comparación matemática: `source_version_at_translation >= canonical.current_content_version` (`UPDATED`) vs `<` (`REVIEW`).
+    - Objeto de valor tipado `TF\Multilingual\Domain\Translation\TranslationStatus` (`UNTRANSLATED = 'untranslated'`, `UPDATED = 'updated'`, `REVIEW = 'review'`).
+  - **Huella Digital Determinista (`TF\Multilingual\Domain\Versioning\TranslatableFingerprint`):**
+    - Algoritmo criptográfico SHA-256 (64 caracteres hexadecimales) que evalúa exclusivamente el contenido traducible.
+    - Normalización canónica rigurosa: unificación de saltos de línea (`\r\n` y `\r` a `\n`), recorte de espacios en blanco circundantes, ordenamiento alfabético determinista de claves de metadatos (`ksort`), y preservación estricta de tipos de datos falsy (`''` vs `'0'` vs `0` vs `false` vs `null` vs `[]`).
+    - Integración con políticas de Custom Fields: únicamente los metadatos registrados con política `TRANSLATE` forman parte de la huella digital. Los metadatos `SHARE` e `IGNORE` quedan estrictamente excluidos, evitando incrementos accidentales de versión o falsos positivos de revisión entre hermanos.
+    - Soporte independiente para taxonomías evaluando `name`, `slug` y `description`.
+    - Exclusión estricta de taxonomías y adjuntos del fingerprint del post (ciclos de vida independientes).
+  - **Servicio de Dominio (`TF\Multilingual\Domain\Versioning\TranslationStatusResolver`):**
+    - Resolución determinista del estado editorial en O(1) con caché en memoria in-request (`$status_cache`).
+    - El elemento canónico es por definición la autoridad de origen y resuelve invariablemente como `UPDATED`.
+    - Método `resolve_all_statuses( TranslationGroup $group )` para resolver en memoria todos los idiomas activos sin consultas SQL adicionales.
+  - **Orquestación en Capa de Aplicación (`TranslationEditorialService`):**
+    - Métodos públicos `sync_post_version( int $post_id )` y `sync_term_version( int $term_id, string $taxonomy )` que incrementan la versión del elemento ÚNICAMENTE si la huella digital ha mutado. Guardado sin cambios = 0 incremento de versión.
+    - Cuando se crea una nueva traducción (`create_post_translation`, `create_term_translation`), se registra automáticamente con `source_version_at_translation = canonical.current_content_version` y su huella digital inicial, naciendo en estado `UPDATED`.
+    - Actualización individual: al editar y guardar una traducción no canónica, su `source_version_at_translation` se alinea con la versión canónica actual, pasando a `UPDATED` mientras que las traducciones hermanas no modificadas permanecen legítimamente en `REVIEW`.
+    - Método `mark_translation_reviewed( string $element_type, int $element_id )` que permite a los editores confirmar la vigencia de una traducción sin alterar su texto.
+    - Enganches automáticos al ciclo de vida de WordPress: `save_post` (prioridad 50), `added_post_meta`, `updated_post_meta`, `deleted_post_meta` (prioridad 50) y `edited_term` (prioridad 50) con guardia de reentrancia en memoria (`$syncing_elements`).
+  - **Enriquecimiento de la Interfaz de Usuario:**
+    - Listados administrativos (`AdminListColumnsUi`): renderizado contextual de enlaces de traducción con distintivos visuales `dashicons-yes` (`tfml-link--translated`) para `UPDATED`, `dashicons-warning` (`tfml-link--review`) y etiqueta accesible `(requiere revisión)` para `REVIEW`, y `dashicons-plus` (`tfml-link--add`) para `UNTRANSLATED`.
+    - Editores nativos (`PostEditorialUi` y `TermEditorialUi`): visualización de insignias de estado por idioma e indicación de revisión pendiente en el contenido actual.
+  - **Rendimiento Zero N+1 y Escalabilidad O(1):**
+    - Pre-calentamiento por lotes (`get_editorial_data_for_elements`) demostrado en pruebas en vivo: exactamente 3 consultas SQL para 20 elementos y exactamente 3 consultas SQL para 50 elementos (O(1) absoluto).
+    - Renderizado de celdas de la tabla de listado: exactamente 0 consultas SQL adicionales para 20 y 50 elementos.
+  - **Suite de Pruebas y Certificación:**
+    - Suite de pruebas unitarias ampliada con `TranslatableFingerprintTest`, `TranslationStatusResolverTest` y casos de versionado en `TranslationEditorialServiceTest`: **327 tests, 1,030 assertions, 0 errores, 0 fallos**.
+    - Validación de estándares de código (PHPCS / WPCS): **87 archivos analizados, 0 errores, 0 warnings**.
+    - Verificación física en entorno real WordPress 7.1.2 (`scratch/verify_fase_2_3.php`): **67 aserciones pasadas (100%)**, con verificación estricta de invariantes de sentinela WPML (3,403 filas, MD5 `4241ca7e7ec6399a594537cb04790c10`).
+
 ### Nota de Estado
-- Esta versión consolida el sistema base de medios multilingües de TF Multilingual (Fase 2.2) y el protocolo endurecido de verificación externa (Fase 2.2A). Respeta la directriz de archivo físico único y attachment único en WordPress Core, almacena variantes de metadatos editoriales (ALT, título, leyenda, descripción) en la tabla dedicada `tfml_media_translations` sin crear grupos de traducción, implementa fallback estricto a metadatos de WordPress Core sin contaminación entre idiomas secundarios, filtra los hooks nativos de renderizado frontend (`wp_get_attachment_image`, `wp_get_attachment_caption`), integra la imagen destacada compartida (`_thumbnail_id`), provee una metabox nativa en el editor de medios, asegura un rendimiento de Zero N+1 con resolución batch en una sola consulta, y garantiza cero escrituras directas sobre tablas externas anfitrionas.
-
-
+- Esta versión consolida el sistema de versionado lógico y estado de traducción de TF Multilingual (Fase 2.3), estableciendo las bases deterministas para la sincronización y auditoría editorial del catálogo multilingüe.

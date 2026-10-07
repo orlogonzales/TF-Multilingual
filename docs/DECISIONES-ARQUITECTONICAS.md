@@ -174,4 +174,20 @@
 - **JUSTIFICACIÓN:** ACF almacena internamente la referencia del campo bajo el prefijo `_{name}` para resolver formateadores complejos y opciones de campo. Al emparejar transparentemente la clave de referencia con la clave de valor, `get_field()` funciona idénticamente en todas las traducciones hermanas, mientras que la invalidación explícita de `acf_flush_value_cache()` elimina lecturas estancadas en memoria.
 - **CONSECUENCIAS:** Integración 100% transparente para el usuario de ACF, desacoplamiento estricto cuando ACF no está activo, soporte completo de campos simples, compuestos y anidados en grupos, y compatibilidad total con el motor soberano de políticas de TFML.
 
+---
 
+### ADR-020: Medios Multilingües con Archivo Físico Único y Variantes Editoriales Aisladas
+- **DECISIÓN:** Cada medio en la biblioteca es un único attachment físico nativo de WordPress. Las variantes textuales multilingües (texto alternativo ALT, título, leyenda, descripción) se almacenan en la tabla relacional dedicada `tfml_media_translations` sin duplicar archivos en disco ni crear múltiples posts de adjunto. Si un idioma secundario no tiene traducción explícita, se aplica estrictamente fallback hacia los metadatos nativos del attachment en WordPress Core, sin contaminación cruzada hacia otros idiomas secundarios. La resolución en frontend se intercepta mediante filtros nativos (`wp_get_attachment_image_attributes`, `wp_get_attachment_caption`), respetando imágenes destacadas compartidas (`_thumbnail_id`) y WCAG para imágenes decorativas (`alt=""`).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Gestión de biblioteca de medios multilingüe sin fragmentación del almacenamiento físico ni multiplicación de adjuntos.
+- **JUSTIFICACIÓN:** Duplicar archivos físicos multiplica el uso de almacenamiento y fragmenta la biblioteca de WordPress. Almacenar variantes en tabla propia con resolución contextual en tiempo de renderizado proporciona soporte multilingüe completo con cero sobrecarga en disco y total compatibilidad con constructores y plugins de optimización de imágenes.
+- **CONSECUENCIAS:** Biblioteca limpia, compatibilidad nativa con `_thumbnail_id`, cero clonación de archivos físicos y soporte O(1) de lotes con pre-calentamiento en caché.
+
+---
+
+### ADR-021: Versionado Lógico Basado en Huella Criptográfica Determinista (TranslatableFingerprint) y Estados Editoriales Derivados
+- **DECISIÓN:** El estado de vigencia de una traducción (`UNTRANSLATED`, `UPDATED`, `REVIEW`) se determina exclusivamente mediante la comparación de versiones lógicas (`source_version_at_translation >= canonical.current_content_version`) y huellas criptográficas deterministas SHA-256 (`TranslatableFingerprint`), prohibiendo terminantemente el uso de marcas de tiempo (`post_modified`, `updated_at`, etc.) como autoridad de cambio.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Distinguir de forma determinista entre una traducción actualizada y una traducción desactualizada tras modificaciones editoriales en el contenido original.
+- **JUSTIFICACIÓN:** Las marcas de tiempo de WordPress (`post_modified`) mutan ante eventos no editoriales (revisiones automáticas, cambios de estado, plugins de seguridad, optimizaciones de base de datos) provocando falsos positivos masivos de revisión. Una huella digital determinista evaluando exclusivamente campos traducibles (título, contenido, extracto y metadatos con política explícita `TRANSLATE`) garantiza que la versión sólo avance cuando el texto editorial realmente haya cambiado.
+- **CONSECUENCIAS:** Cero falsos positivos en re-guardados sin cambios, O(1) propagación de estado a traducciones dependientes sin requerir actualizaciones en lote en base de datos, soporte explícito para confirmación de revisión sin alteración de texto (`mark_translation_reviewed`) e indicadores visuales contextuales en listados de administración y editores nativos.

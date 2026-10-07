@@ -343,6 +343,66 @@ final class TranslationElement {
 	}
 
 	/**
+	 * Returns clone with updated source version at translation.
+	 *
+	 * @param int $source_version Source version.
+	 * @return self
+	 */
+	public function with_source_version_at_translation( int $source_version ): self {
+		return new self(
+			$this->element_type,
+			$this->element_id,
+			$this->language_code,
+			$this->group_id,
+			$this->id,
+			$source_version,
+			$this->current_content_version,
+			$this->translatable_fingerprint,
+			$this->updated_at
+		);
+	}
+
+	/**
+	 * Returns clone with updated current content version.
+	 *
+	 * @param int $current_version Current content version.
+	 * @return self
+	 */
+	public function with_current_content_version( int $current_version ): self {
+		return new self(
+			$this->element_type,
+			$this->element_id,
+			$this->language_code,
+			$this->group_id,
+			$this->id,
+			$this->source_version_at_translation,
+			$current_version,
+			$this->translatable_fingerprint,
+			$this->updated_at
+		);
+	}
+
+	/**
+	 * Returns clone with updated translatable fingerprint.
+	 *
+	 * @param string $fingerprint Translatable fingerprint.
+	 * @return self
+	 */
+	public function with_translatable_fingerprint( string $fingerprint ): self {
+		return new self(
+			$this->element_type,
+			$this->element_id,
+			$this->language_code,
+			$this->group_id,
+			$this->id,
+			$this->source_version_at_translation,
+			$this->current_content_version,
+			$fingerprint,
+			$this->updated_at
+		);
+	}
+
+	/**
 	 * Returns clone with updated timestamp.
 	 *
 	 * @param string $updated_at Updated at timestamp.

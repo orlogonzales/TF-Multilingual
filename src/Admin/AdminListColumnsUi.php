@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace TF\Multilingual\Admin;
 
 use TF\Multilingual\Domain\Language\LanguageRegistry;
+use TF\Multilingual\Domain\Translation\TranslationStatus;
 use TF\Multilingual\Editorial\TranslationEditorialService;
 use WP_Post;
 use WP_Query;
@@ -355,18 +356,35 @@ class AdminListColumnsUi {
 			} elseif ( isset( $translations[ $code ] ) ) {
 				// Existing translation with edit link.
 				$edit_url = $translations[ $code ]['edit_url'] ?? '';
-				/* translators: %s: Language name */
-				$title = sprintf( __( 'Editar traducción en %s', 'tf-multilingual' ), $lang_name );
-				/* translators: 1: Language name, 2: Language code */
-				$aria = sprintf( __( 'Editar traducción en %1$s (%2$s)', 'tf-multilingual' ), $lang_name, $code_disp );
+				$status   = $translations[ $code ]['status'] ?? TranslationStatus::UPDATED;
 
-				$output .= sprintf(
-					'<a href="%s" class="tfml-link tfml-link--translated" title="%s" aria-label="%s"><span class="dashicons dashicons-yes" aria-hidden="true"></span><span class="tfml-code">%s</span></a>',
-					esc_url( $edit_url ),
-					esc_attr( $title ),
-					esc_attr( $aria ),
-					esc_html( $code_disp )
-				);
+				if ( TranslationStatus::REVIEW === $status ) {
+					/* translators: %s: Language name */
+					$title = sprintf( __( 'Editar traducción en %s (requiere revisión)', 'tf-multilingual' ), $lang_name );
+					/* translators: 1: Language name, 2: Language code */
+					$aria = sprintf( __( 'Editar traducción en %1$s (%2$s) - requiere revisión', 'tf-multilingual' ), $lang_name, $code_disp );
+
+					$output .= sprintf(
+						'<a href="%s" class="tfml-link tfml-link--review" title="%s" aria-label="%s"><span class="dashicons dashicons-warning" aria-hidden="true"></span><span class="tfml-code">%s</span></a>',
+						esc_url( $edit_url ),
+						esc_attr( $title ),
+						esc_attr( $aria ),
+						esc_html( $code_disp )
+					);
+				} else {
+					/* translators: %s: Language name */
+					$title = sprintf( __( 'Editar traducción en %s', 'tf-multilingual' ), $lang_name );
+					/* translators: 1: Language name, 2: Language code */
+					$aria = sprintf( __( 'Editar traducción en %1$s (%2$s)', 'tf-multilingual' ), $lang_name, $code_disp );
+
+					$output .= sprintf(
+						'<a href="%s" class="tfml-link tfml-link--translated" title="%s" aria-label="%s"><span class="dashicons dashicons-yes" aria-hidden="true"></span><span class="tfml-code">%s</span></a>',
+						esc_url( $edit_url ),
+						esc_attr( $title ),
+						esc_attr( $aria ),
+						esc_html( $code_disp )
+					);
+				}
 			} elseif ( isset( $missing[ $code ] ) ) {
 				// Missing translation.
 				if ( $can_create ) {
@@ -555,6 +573,8 @@ class AdminListColumnsUi {
 			.tfml-badge--current { background: #dcdcde; color: #1d2327; padding: 2px 6px; border-radius: 3px; font-size: 11px; line-height: 1.4; display: inline-flex; align-items: center; }
 			.tfml-link--translated { text-decoration: none; color: #2271b1; display: inline-flex; align-items: center; font-size: 11px; line-height: 1.4; }
 			.tfml-link--translated .dashicons { font-size: 14px; width: 14px; height: 14px; color: #46b450; vertical-align: middle; margin-right: 1px; }
+			.tfml-link--review { text-decoration: none; color: #b26b00; display: inline-flex; align-items: center; font-size: 11px; line-height: 1.4; }
+			.tfml-link--review .dashicons { font-size: 14px; width: 14px; height: 14px; color: #dba617; vertical-align: middle; margin-right: 1px; }
 			.tfml-link--add { text-decoration: none; color: #2271b1; padding: 0; margin: 0; border: none; background: transparent; cursor: pointer; display: inline-flex; align-items: center; font-size: 11px; line-height: 1.4; }
 			.tfml-link--add .dashicons { font-size: 14px; width: 14px; height: 14px; vertical-align: middle; margin-right: 1px; }
 			.tfml-link--add:hover { color: #135e96; text-decoration: underline; }

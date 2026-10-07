@@ -507,4 +507,112 @@ class TranslationEditorialServiceTest extends TestCase {
 		$this->assertArrayNotHasKey( '_edit_lock', $GLOBALS['wp_test_postmeta'][ $en_id ] ?? array() );
 		$this->assertArrayNotHasKey( 'unconfigured_field', $GLOBALS['wp_test_postmeta'][ $en_id ] ?? array() );
 	}
+
+	/**
+	 * Tests sync_post_version increments content version only when fingerprint changes.
+	 */
+	public function test_sync_post_version_increments_only_on_fingerprint_change(): void {
+		$this->create_test_post( 101, 'post', 'publish', 'Canonical Post' );
+		$this->service->assign_initial_language( 'post', 101, 'post', 'es' );
+
+		$element_before = $this->group_repo->find_element( 'post', 101 );
+		$this->assertNotNull( $element_before );
+		$this->assertSame( 1, $element_before->get_current_content_version() );
+
+		// 1. Sync without modifying content -> version remains 1.
+		$this->service->sync_post_version( 101 );
+		$element_same = $this->group_repo->find_element( 'post', 101 );
+		$this->assertSame( 1, $element_same->get_current_content_version() );
+
+		// 2. Modify post title -> fingerprint changes.
+		$GLOBALS['wp_test_posts'][101]->post_title = 'Canonical Post Updated';
+		$this->service->sync_post_version( 101 );
+
+		$element_after = $this->group_repo->find_element( 'post', 101 );
+		$this->assertSame( 2, $element_after->get_current_content_version() );
+
+		// 3. Another sync without change -> version remains 2.
+		$this->service->sync_post_version( 101 );
+		$element_unchanged = $this->group_repo->find_element( 'post', 101 );
+		$this->assertSame( 2, $element_unchanged->get_current_content_version() );
+	}
+
+	/**
+	 * Tests translation status transitions from UPDATED to REVIEW when source changes, and back to UPDATED.
+	 */
+	public function test_translation_status_transitions_and_review_resolution(): void {
+		$this->create_test_post( 101, 'post', 'publish', 'Canonical Post ES' );
+		$this->service->assign_initial_language( 'post', 101, 'post', 'es' );
+
+		$en_id = $this->service->create_post_translation( 101, 'en' );
+		$this->create_test_post( $en_id, 'post', 'draft', 'Translation Post EN' );
+		$this->service->sync_post_version( $en_id );
+
+		// Initial: both are UPDATED.
+		$data_initial = $this->service->get_editorial_data( 'post', 101, 'post' );
+		$this->assertSame( 'updated', $data_initial['translations']['en']['status'] );
+
+		// Modify source post -> source version becomes 2.
+		$GLOBALS['wp_test_posts'][101]->post_title = 'Canonical Post ES Modified';
+		$this->service->sync_post_version( 101 );
+
+		// Translation must now resolve as REVIEW.
+		$data_after_source_change = $this->service->get_editorial_data( 'post', 101, 'post' );
+		$this->assertSame( 'review', $data_after_source_change['translations']['en']['status'] );
+
+		// Update EN translation content -> sync EN version -> status transitions back to UPDATED.
+		$GLOBALS['wp_test_posts'][ $en_id ]->post_title = 'Translation Post EN Updated';
+		$this->service->sync_post_version( $en_id );
+
+		$data_after_translation_update = $this->service->get_editorial_data( 'post', 101, 'post' );
+		$this->assertSame( 'updated', $data_after_translation_update['translations']['en']['status'] );
+	}
+
+	/**
+	 * Tests mark_translation_reviewed resolves REVIEW status without editing content.
+	 */
+	public function test_mark_translation_reviewed_resolves_review_status(): void {
+		$this->create_test_post( 101, 'post', 'publish', 'Canonical Post ES' );
+		$this->service->assign_initial_language( 'post', 101, 'post', 'es' );
+
+		$en_id = $this->service->create_post_translation( 101, 'en' );
+
+		// Advance canonical source to version 2.
+		$GLOBALS['wp_test_posts'][101]->post_title = 'Minor typo fixed in ES';
+		$this->service->sync_post_version( 101 );
+
+		$data_before = $this->service->get_editorial_data( 'post', 101, 'post' );
+		$this->assertSame( 'review', $data_before['translations']['en']['status'] );
+
+		// Mark translation as reviewed.
+		$result = $this->service->mark_translation_reviewed( 'post', $en_id );
+		$this->assertTrue( $result );
+
+		$data_after = $this->service->get_editorial_data( 'post', 101, 'post' );
+		$this->assertSame( 'updated', $data_after['translations']['en']['status'] );
+	}
+
+	/**
+	 * Tests sync_term_version increments term content version only when name/slug/description changes.
+	 */
+	public function test_sync_term_version_increments_only_on_change(): void {
+		$this->create_test_term( 201, 'category', 'Aventuras', 'aventuras' );
+		$this->service->assign_initial_language( 'term', 201, 'category', 'es' );
+
+		$element = $this->group_repo->find_element( 'term', 201 );
+		$this->assertNotNull( $element );
+		$this->assertSame( 1, $element->get_current_content_version() );
+
+		// Sync without change -> unchanged.
+		$this->service->sync_term_version( 201, 'category' );
+		$element_same = $this->group_repo->find_element( 'term', 201 );
+		$this->assertSame( 1, $element_same->get_current_content_version() );
+
+		// Change term name -> version increments to 2.
+		$GLOBALS['wp_test_terms'][201]->name = 'Aventuras Extremas';
+		$this->service->sync_term_version( 201, 'category' );
+
+		$element_after = $this->group_repo->find_element( 'term', 201 );
+		$this->assertSame( 2, $element_after->get_current_content_version() );
+	}
 }

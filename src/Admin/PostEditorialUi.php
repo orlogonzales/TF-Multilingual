@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace TF\Multilingual\Admin;
 
 use TF\Multilingual\Domain\Language\LanguageRegistry;
+use TF\Multilingual\Domain\Translation\TranslationStatus;
 use TF\Multilingual\Editorial\Exceptions\EditorialException;
 use TF\Multilingual\Editorial\TranslationEditorialService;
 use WP_Post;
@@ -180,14 +181,25 @@ class PostEditorialUi {
 				<?php
 				// 1. Existing active translations.
 				foreach ( $translations as $code => $tinfo ) :
+					$status    = $tinfo['status'] ?? TranslationStatus::UPDATED;
+					$is_review = ( TranslationStatus::REVIEW === $status );
 					?>
 					<li style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
 						<span>
 							<?php if ( $tinfo['is_current'] ) : ?>
 								<strong><?php echo esc_html( $tinfo['language_name'] ); ?></strong>
-								<span class="dashicons dashicons-yes" style="color: #46b450;" title="<?php esc_attr_e( 'Current', 'tf-multilingual' ); ?>"></span>
+								<?php if ( $is_review ) : ?>
+									<span class="dashicons dashicons-warning" style="color: #dba617;" title="<?php esc_attr_e( 'Requiere revisión', 'tf-multilingual' ); ?>"></span>
+								<?php else : ?>
+									<span class="dashicons dashicons-yes" style="color: #46b450;" title="<?php esc_attr_e( 'Actualizada', 'tf-multilingual' ); ?>"></span>
+								<?php endif; ?>
 							<?php else : ?>
 								<?php echo esc_html( $tinfo['language_name'] ); ?>
+								<?php if ( $is_review ) : ?>
+									<span class="dashicons dashicons-warning" style="color: #dba617;" title="<?php esc_attr_e( 'Requiere revisión', 'tf-multilingual' ); ?>"></span>
+								<?php else : ?>
+									<span class="dashicons dashicons-yes" style="color: #46b450;" title="<?php esc_attr_e( 'Actualizada', 'tf-multilingual' ); ?>"></span>
+								<?php endif; ?>
 							<?php endif; ?>
 						</span>
 						<span>

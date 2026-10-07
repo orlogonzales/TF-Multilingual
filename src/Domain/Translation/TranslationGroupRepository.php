@@ -88,6 +88,7 @@ class TranslationGroupRepository {
 	 * @param int|null    $initial_element_id    Optional initial element ID to attach.
 	 * @param string|null $initial_language_code Optional language code for initial element.
 	 * @param bool        $as_canonical          Whether initial element is canonical.
+	 * @param string      $initial_fingerprint   Initial translatable fingerprint.
 	 * @return TranslationGroup The created group.
 	 * @throws InvalidTranslationElementException If element or language is invalid.
 	 * @throws TranslationConflictException If element is already assigned to a group.
@@ -98,7 +99,8 @@ class TranslationGroupRepository {
 		string $subtype,
 		?int $initial_element_id = null,
 		?string $initial_language_code = null,
-		bool $as_canonical = true
+		bool $as_canonical = true,
+		string $initial_fingerprint = ''
 	): TranslationGroup {
 		$group = TranslationGroup::create( $element_type, $subtype );
 
@@ -111,7 +113,11 @@ class TranslationGroupRepository {
 			$element = TranslationElement::create(
 				$element_type,
 				$initial_element_id,
-				$canonical_lang
+				$canonical_lang,
+				null,
+				1,
+				1,
+				$initial_fingerprint
 			);
 			$group->add_element( $element, $as_canonical );
 		}
@@ -334,10 +340,13 @@ class TranslationGroupRepository {
 	/**
 	 * Adds a translation element to an existing translation group.
 	 *
-	 * @param int    $group_id      Group ID.
-	 * @param int    $element_id    WordPress object ID.
-	 * @param string $language_code Canonical language code.
-	 * @param bool   $is_canonical  Whether to set as canonical element.
+	 * @param int    $group_id       Group ID.
+	 * @param int    $element_id     WordPress object ID.
+	 * @param string $language_code  Canonical language code.
+	 * @param bool   $is_canonical   Whether to set as canonical element.
+	 * @param int    $source_version Source version at translation.
+	 * @param int    $current_version Current content version.
+	 * @param string $fingerprint    Translatable fingerprint.
 	 * @return TranslationElement The persisted element.
 	 * @throws TranslationGroupNotFoundException If group does not exist.
 	 * @throws InvalidTranslationElementException If element or language is invalid.
@@ -347,7 +356,10 @@ class TranslationGroupRepository {
 		int $group_id,
 		int $element_id,
 		string $language_code,
-		bool $is_canonical = false
+		bool $is_canonical = false,
+		int $source_version = 1,
+		int $current_version = 1,
+		string $fingerprint = ''
 	): TranslationElement {
 		$group          = $this->find_or_fail( $group_id );
 		$canonical_lang = Language::normalize_code( $language_code );
@@ -377,7 +389,10 @@ class TranslationGroupRepository {
 				$group->get_element_type(),
 				$element_id,
 				$canonical_lang,
-				$group_id
+				$group_id,
+				$source_version,
+				$current_version,
+				$fingerprint
 			);
 
 			$persisted_element = $this->insert_element_row( $element );
@@ -425,6 +440,68 @@ class TranslationGroupRepository {
 		}
 
 		return TranslationElement::from_row( $row );
+	}
+
+	/**
+	 * Finds a single translation element by element type and element ID.
+	 *
+	 * @param string $element_type Element type ('post' or 'term').
+	 * @param int    $element_id   WordPress object ID.
+	 * @return TranslationElement|null The element or null if not registered.
+	 */
+	public function find_element( string $element_type, int $element_id ): ?TranslationElement {
+		$normalized_type = strtolower( trim( $element_type ) );
+		if ( $element_id <= 0 ) {
+			return null;
+		}
+
+		$query = $this->db->prepare(
+			"SELECT * FROM `{$this->table_group_elements}` WHERE `element_type` = %s AND `element_id` = %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$normalized_type,
+			$element_id
+		);
+
+		$row = $this->db->get_row( $query, ARRAY_A );
+		if ( ! is_array( $row ) ) {
+			return null;
+		}
+
+		return TranslationElement::from_row( $row );
+	}
+
+	/**
+	 * Updates the version numbers, fingerprint, and timestamp of an existing element.
+	 *
+	 * @param TranslationElement $element Updated element.
+	 * @return bool True on success, false if element not found or not modified.
+	 */
+	public function update_element( TranslationElement $element ): bool {
+		$updated_at = $element->get_updated_at() ?? $this->get_current_utc_timestamp();
+
+		$data = array(
+			'source_version_at_translation' => $element->get_source_version_at_translation(),
+			'current_content_version'       => $element->get_current_content_version(),
+			'translatable_fingerprint'      => $element->get_translatable_fingerprint(),
+			'updated_at'                    => $updated_at,
+		);
+
+		$where = array(
+			'element_type' => $element->get_element_type(),
+			'element_id'   => $element->get_element_id(),
+		);
+
+		$format       = array( '%d', '%d', '%s', '%s' );
+		$where_format = array( '%s', '%d' );
+
+		$updated = $this->db->update(
+			$this->table_group_elements,
+			$data,
+			$where,
+			$format,
+			$where_format
+		);
+
+		return false !== $updated;
 	}
 
 	/**

@@ -294,6 +294,7 @@ class Plugin {
 		$this->query_filter->init_hooks();
 		$this->term_query_filter->init_hooks();
 		$this->shared_meta_synchronizer->init_hooks();
+		$this->editorial_service->init_hooks();
 		$this->post_editorial_ui->init_hooks();
 		$this->term_editorial_ui->init_hooks();
 		$this->admin_list_columns_ui->register_hooks();

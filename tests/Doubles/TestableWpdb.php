@@ -212,6 +212,27 @@ class TestableWpdb extends wpdb {
 			}
 		}
 
+		if ( str_contains( $table, 'tfml_group_elements' ) ) {
+			$updated = 0;
+			foreach ( $this->group_elements as $id => $row ) {
+				$match = true;
+				if ( isset( $where['id'] ) && (int) $row['id'] !== (int) $where['id'] ) {
+					$match = false;
+				}
+				if ( isset( $where['element_type'] ) && $row['element_type'] !== $where['element_type'] ) {
+					$match = false;
+				}
+				if ( isset( $where['element_id'] ) && (int) $row['element_id'] !== (int) $where['element_id'] ) {
+					$match = false;
+				}
+				if ( $match ) {
+					$this->group_elements[ $id ] = array_merge( $this->group_elements[ $id ], $data );
+					++$updated;
+				}
+			}
+			return $updated;
+		}
+
 		return 0;
 	}
 
@@ -289,6 +310,16 @@ class TestableWpdb extends wpdb {
 			$lang     = $matches[2];
 			foreach ( $this->group_elements as $row ) {
 				if ( (int) $row['group_id'] === $group_id && $row['language_code'] === $lang ) {
+					return $row;
+				}
+			}
+		}
+
+		if ( preg_match( '/FROM `?[^` ]*tfml_group_elements`? WHERE `?element_type`? = \'([^\']+)\' AND `?element_id`? = (\d+)/i', $query, $matches ) ) {
+			$type  = $matches[1];
+			$el_id = (int) $matches[2];
+			foreach ( $this->group_elements as $row ) {
+				if ( $row['element_type'] === $type && (int) $row['element_id'] === $el_id ) {
 					return $row;
 				}
 			}

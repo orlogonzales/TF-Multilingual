@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace TF\Multilingual\Admin;
 
 use TF\Multilingual\Domain\Language\LanguageRegistry;
+use TF\Multilingual\Domain\Translation\TranslationStatus;
 use TF\Multilingual\Editorial\Exceptions\EditorialException;
 use TF\Multilingual\Editorial\TranslationEditorialService;
 use WP_Term;
@@ -136,13 +137,26 @@ class TermEditorialUi {
 
 					<p><strong><?php esc_html_e( 'Translations:', 'tf-multilingual' ); ?></strong></p>
 					<ul style="margin: 0 0 16px 0; padding: 0; list-style: none;">
-						<?php foreach ( $data['translations'] as $code => $tinfo ) : ?>
+						<?php
+						foreach ( $data['translations'] as $code => $tinfo ) :
+							$status    = $tinfo['status'] ?? TranslationStatus::UPDATED;
+							$is_review = ( TranslationStatus::REVIEW === $status );
+							?>
 							<li style="margin-bottom: 6px;">
 								<?php if ( $tinfo['is_current'] ) : ?>
 									<strong><?php echo esc_html( $tinfo['language_name'] ); ?></strong>
-									<span class="dashicons dashicons-yes" style="color: #46b450;"></span>
+									<?php if ( $is_review ) : ?>
+										<span class="dashicons dashicons-warning" style="color: #dba617;" title="<?php esc_attr_e( 'Requiere revisión', 'tf-multilingual' ); ?>"></span>
+									<?php else : ?>
+										<span class="dashicons dashicons-yes" style="color: #46b450;"></span>
+									<?php endif; ?>
 								<?php else : ?>
 									<?php echo esc_html( $tinfo['language_name'] ); ?>
+									<?php if ( $is_review ) : ?>
+										<span class="dashicons dashicons-warning" style="color: #dba617;" title="<?php esc_attr_e( 'Requiere revisión', 'tf-multilingual' ); ?>"></span>
+									<?php else : ?>
+										<span class="dashicons dashicons-yes" style="color: #46b450;" title="<?php esc_attr_e( 'Actualizada', 'tf-multilingual' ); ?>"></span>
+									<?php endif; ?>
 									<?php if ( ! empty( $tinfo['edit_url'] ) ) : ?>
 										— <a href="<?php echo esc_url( $tinfo['edit_url'] ); ?>"><?php esc_html_e( 'Edit', 'tf-multilingual' ); ?></a>
 									<?php endif; ?>
@@ -183,7 +197,7 @@ class TermEditorialUi {
 	 * @return void
 	 */
 	public function render_add_form_fields( string $taxonomy ): void {
-		$active_langs = $this->language_registry->get_active();
+		$active_langs = $this->language_registry->active();
 		$default_lang = $this->language_registry->get_default();
 		$default_code = null !== $default_lang ? $default_lang->get_code() : '';
 

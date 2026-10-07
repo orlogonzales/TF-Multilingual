@@ -17,7 +17,10 @@ use TF\Multilingual\Domain\Translation\ContentTranslationResolver;
 use TF\Multilingual\Domain\Translation\TranslationElement;
 use TF\Multilingual\Domain\Translation\TranslationGroup;
 use TF\Multilingual\Domain\Translation\TranslationGroupRepository;
+use TF\Multilingual\Domain\Translation\TranslationStatus;
 use TF\Multilingual\Domain\Translation\WordPressElementValidator;
+use TF\Multilingual\Domain\Versioning\TranslatableFingerprint;
+use TF\Multilingual\Domain\Versioning\TranslationStatusResolver;
 use TF\Multilingual\Editorial\Exceptions\EditorialConflictException;
 use TF\Multilingual\Editorial\Exceptions\EditorialPermissionException;
 use TF\Multilingual\Editorial\Exceptions\EditorialValidationException;
@@ -113,6 +116,27 @@ class TranslationEditorialService {
 	private CustomFieldPolicyRegistry $custom_field_policy_registry;
 
 	/**
+	 * Translation status resolver domain service.
+	 *
+	 * @var TranslationStatusResolver
+	 */
+	private TranslationStatusResolver $status_resolver;
+
+	/**
+	 * Translatable content fingerprint service.
+	 *
+	 * @var TranslatableFingerprint
+	 */
+	private TranslatableFingerprint $fingerprint_service;
+
+	/**
+	 * Sync lock recursion guard.
+	 *
+	 * @var array<int>
+	 */
+	private array $syncing_elements = array();
+
+	/**
 	 * Constructor.
 	 *
 	 * @param LanguageRegistry|null           $language_registry             Language registry.
@@ -121,6 +145,8 @@ class TranslationEditorialService {
 	 * @param WordPressElementValidator|null  $element_validator             Element validator.
 	 * @param wpdb|null                       $db                            WordPress database instance.
 	 * @param CustomFieldPolicyRegistry|null  $custom_field_policy_registry  Custom field policy registry.
+	 * @param TranslationStatusResolver|null  $status_resolver               Translation status resolver.
+	 * @param TranslatableFingerprint|null    $fingerprint_service           Fingerprint service.
 	 */
 	public function __construct(
 		?LanguageRegistry $language_registry = null,
@@ -128,7 +154,9 @@ class TranslationEditorialService {
 		?ContentTranslationResolver $translation_resolver = null,
 		?WordPressElementValidator $element_validator = null,
 		?wpdb $db = null,
-		?CustomFieldPolicyRegistry $custom_field_policy_registry = null
+		?CustomFieldPolicyRegistry $custom_field_policy_registry = null,
+		?TranslationStatusResolver $status_resolver = null,
+		?TranslatableFingerprint $fingerprint_service = null
 	) {
 		global $wpdb;
 
@@ -138,6 +166,26 @@ class TranslationEditorialService {
 		$this->element_validator            = null !== $element_validator ? $element_validator : new WordPressElementValidator();
 		$this->db                           = null !== $db ? $db : $wpdb;
 		$this->custom_field_policy_registry = null !== $custom_field_policy_registry ? $custom_field_policy_registry : new CustomFieldPolicyRegistry();
+		$this->status_resolver              = null !== $status_resolver ? $status_resolver : new TranslationStatusResolver( $this->group_repository, $this->language_registry );
+		$this->fingerprint_service          = null !== $fingerprint_service ? $fingerprint_service : new TranslatableFingerprint( $this->custom_field_policy_registry );
+	}
+
+	/**
+	 * Gets the translation status resolver.
+	 *
+	 * @return TranslationStatusResolver
+	 */
+	public function get_status_resolver(): TranslationStatusResolver {
+		return $this->status_resolver;
+	}
+
+	/**
+	 * Gets the translatable fingerprint service.
+	 *
+	 * @return TranslatableFingerprint
+	 */
+	public function get_fingerprint_service(): TranslatableFingerprint {
+		return $this->fingerprint_service;
 	}
 
 	/**
@@ -240,13 +288,19 @@ class TranslationEditorialService {
 					$current_language_name = $lang_name;
 				}
 
+				$status = $this->status_resolver->resolve_element_status( $element, $group );
+
 				$trans_info = array(
-					'element_id'    => $element->get_element_id(),
-					'language_code' => $code,
-					'language_name' => $lang_name,
-					'is_current'    => ( $element->get_element_id() === $element_id ),
-					'is_active'     => $is_active,
-					'edit_url'      => $edit_url,
+					'element_id'      => $element->get_element_id(),
+					'language_code'   => $code,
+					'language_name'   => $lang_name,
+					'is_current'      => ( $element->get_element_id() === $element_id ),
+					'is_active'       => $is_active,
+					'edit_url'        => $edit_url,
+					'status'          => $status,
+					'source_version'  => $element->get_source_version_at_translation(),
+					'current_version' => $element->get_current_content_version(),
+					'is_source'       => ( $element->get_element_id() === $group->get_canonical_element_id() ),
 				);
 
 				if ( $is_active ) {
@@ -262,6 +316,7 @@ class TranslationEditorialService {
 					$missing_languages[ $code ] = array(
 						'language_code' => $code,
 						'language_name' => $lang->get_name(),
+						'status'        => TranslationStatus::UNTRANSLATED,
 					);
 				}
 			}
@@ -271,6 +326,7 @@ class TranslationEditorialService {
 				$missing_languages[ $code ] = array(
 					'language_code' => $code,
 					'language_name' => $lang->get_name(),
+					'status'        => TranslationStatus::UNTRANSLATED,
 				);
 			}
 		}
@@ -436,13 +492,19 @@ class TranslationEditorialService {
 			throw EditorialConflictException::already_managed( $normalized_type, $element_id );
 		}
 
+		// Calculate initial fingerprint for canonical element.
+		$initial_fingerprint = ( 'post' === $normalized_type )
+			? $this->fingerprint_service->calculate_post_fingerprint( $element_id )
+			: $this->fingerprint_service->calculate_term_fingerprint( $element_id, $subtype );
+
 		// Create group with canonical designation.
 		$group = $this->group_repository->create_group(
 			$normalized_type,
 			$subtype,
 			$element_id,
 			$canonical_lang,
-			true
+			true,
+			$initial_fingerprint
 		);
 
 		$this->translation_resolver->flush_cache();
@@ -527,12 +589,27 @@ class TranslationEditorialService {
 
 		$new_post_id = $this->insert_post( $new_post_args );
 
-		// Add new translation post to the existing group.
-		$group_id = (int) $group->get_id();
-		$this->group_repository->add_translation( $group_id, $new_post_id, $canonical_target );
+		// Canonical element's version as source version reference.
+		$canonical_element = $group->get_canonical_element();
+		$source_version    = null !== $canonical_element ? $canonical_element->get_current_content_version() : 1;
 
 		// Initialize metadata configured with SHARE policy (Zero cloning: TRANSLATE/IGNORE remain uncopied).
 		$this->initialize_shared_meta( $source_post_id, $new_post_id );
+
+		// Initial fingerprint of the new translation post.
+		$initial_fingerprint = $this->fingerprint_service->calculate_post_fingerprint( $new_post_id );
+
+		// Add new translation post to the existing group.
+		$group_id = (int) $group->get_id();
+		$this->group_repository->add_translation(
+			$group_id,
+			$new_post_id,
+			$canonical_target,
+			false,
+			$source_version,
+			1,
+			$initial_fingerprint
+		);
 
 		$this->translation_resolver->flush_cache();
 		$this->clear_editorial_cache();
@@ -617,9 +694,21 @@ class TranslationEditorialService {
 		// Insert term via native WordPress API (slug is left to WordPress Core, no parent copied).
 		$new_term_id = $this->insert_term( $name_trimmed, $taxonomy );
 
+		$canonical_element   = $group->get_canonical_element();
+		$source_version      = null !== $canonical_element ? $canonical_element->get_current_content_version() : 1;
+		$initial_fingerprint = $this->fingerprint_service->calculate_term_fingerprint( $new_term_id, $taxonomy );
+
 		// Add new translation term to the existing group.
 		$group_id = (int) $group->get_id();
-		$this->group_repository->add_translation( $group_id, $new_term_id, $canonical_target );
+		$this->group_repository->add_translation(
+			$group_id,
+			$new_term_id,
+			$canonical_target,
+			false,
+			$source_version,
+			1,
+			$initial_fingerprint
+		);
 
 		$this->translation_resolver->flush_cache();
 		$this->clear_editorial_cache();
@@ -848,5 +937,306 @@ class TranslationEditorialService {
 		}
 		$GLOBALS['wp_test_postmeta'][ $post_id ][ $meta_key ] = $val;
 		return true;
+	}
+
+	/**
+	 * Synchronizes content version and fingerprint for a managed post.
+	 *
+	 * Increments version ONLY if translatable fingerprint has changed.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return void
+	 */
+	public function sync_post_version( int $post_id ): void {
+		if ( $post_id <= 0 || in_array( $post_id, $this->syncing_elements, true ) ) {
+			return;
+		}
+
+		$this->syncing_elements[] = $post_id;
+
+		try {
+			$element = $this->group_repository->find_element( 'post', $post_id );
+			if ( null === $element ) {
+				return;
+			}
+
+			$group = $this->translation_resolver->get_group_for_element( 'post', $post_id );
+			if ( null === $group ) {
+				return;
+			}
+
+			$new_fingerprint = $this->fingerprint_service->calculate_post_fingerprint( $post_id );
+			$old_fingerprint = $element->get_translatable_fingerprint();
+
+			// If fingerprint is unchanged and not initial empty, exit early.
+			if ( '' !== $old_fingerprint && $new_fingerprint === $old_fingerprint ) {
+				return;
+			}
+
+			$is_canonical = ( $element->get_element_id() === $group->get_canonical_element_id() );
+			$new_version  = ( '' === $old_fingerprint )
+				? $element->get_current_content_version()
+				: $element->get_current_content_version() + 1;
+
+			$canonical_element = $group->get_canonical_element();
+			$source_version    = $is_canonical
+				? $new_version
+				: ( null !== $canonical_element ? $canonical_element->get_current_content_version() : $element->get_source_version_at_translation() );
+
+			$updated_element = $element
+				->with_current_content_version( $new_version )
+				->with_source_version_at_translation( $source_version )
+				->with_translatable_fingerprint( $new_fingerprint );
+
+			$this->group_repository->update_element( $updated_element );
+			$this->translation_resolver->flush_cache();
+			$this->clear_editorial_cache();
+			$this->status_resolver->clear_cache();
+		} finally {
+			$key = array_search( $post_id, $this->syncing_elements, true );
+			if ( false !== $key ) {
+				unset( $this->syncing_elements[ $key ] );
+				$this->syncing_elements = array_values( $this->syncing_elements );
+			}
+		}
+	}
+
+	/**
+	 * Synchronizes content version and fingerprint for a managed term.
+	 *
+	 * Increments version ONLY if translatable fingerprint has changed.
+	 *
+	 * @param int    $term_id  Term ID.
+	 * @param string $taxonomy Taxonomy name.
+	 * @return void
+	 */
+	public function sync_term_version( int $term_id, string $taxonomy ): void {
+		if ( $term_id <= 0 || in_array( $term_id, $this->syncing_elements, true ) ) {
+			return;
+		}
+
+		$this->syncing_elements[] = $term_id;
+
+		try {
+			$element = $this->group_repository->find_element( 'term', $term_id );
+			if ( null === $element ) {
+				return;
+			}
+
+			$group = $this->translation_resolver->get_group_for_element( 'term', $term_id );
+			if ( null === $group ) {
+				return;
+			}
+
+			$new_fingerprint = $this->fingerprint_service->calculate_term_fingerprint( $term_id, $taxonomy );
+			$old_fingerprint = $element->get_translatable_fingerprint();
+
+			if ( '' !== $old_fingerprint && $new_fingerprint === $old_fingerprint ) {
+				return;
+			}
+
+			$is_canonical = ( $element->get_element_id() === $group->get_canonical_element_id() );
+			$new_version  = ( '' === $old_fingerprint )
+				? $element->get_current_content_version()
+				: $element->get_current_content_version() + 1;
+
+			$canonical_element = $group->get_canonical_element();
+			$source_version    = $is_canonical
+				? $new_version
+				: ( null !== $canonical_element ? $canonical_element->get_current_content_version() : $element->get_source_version_at_translation() );
+
+			$updated_element = $element
+				->with_current_content_version( $new_version )
+				->with_source_version_at_translation( $source_version )
+				->with_translatable_fingerprint( $new_fingerprint );
+
+			$this->group_repository->update_element( $updated_element );
+			$this->translation_resolver->flush_cache();
+			$this->clear_editorial_cache();
+			$this->status_resolver->clear_cache();
+		} finally {
+			$key = array_search( $term_id, $this->syncing_elements, true );
+			if ( false !== $key ) {
+				unset( $this->syncing_elements[ $key ] );
+				$this->syncing_elements = array_values( $this->syncing_elements );
+			}
+		}
+	}
+
+	/**
+	 * Explicitly marks a translation as reviewed against current canonical version.
+	 *
+	 * @param string $element_type Element type ('post' or 'term').
+	 * @param int    $element_id   WordPress object ID.
+	 * @return bool True on success, false if element not found or not managed.
+	 */
+	public function mark_translation_reviewed( string $element_type, int $element_id ): bool {
+		$element = $this->group_repository->find_element( $element_type, $element_id );
+		if ( null === $element ) {
+			return false;
+		}
+
+		$group = $this->translation_resolver->get_group_for_element( $element_type, $element_id );
+		if ( null === $group ) {
+			return false;
+		}
+
+		$canonical_element = $group->get_canonical_element();
+		if ( null === $canonical_element ) {
+			return false;
+		}
+
+		$canonical_version = $canonical_element->get_current_content_version();
+		if ( $element->get_source_version_at_translation() >= $canonical_version ) {
+			return true;
+		}
+
+		$updated_element = $element->with_source_version_at_translation( $canonical_version );
+		$success         = $this->group_repository->update_element( $updated_element );
+
+		if ( $success ) {
+			$this->translation_resolver->flush_cache();
+			$this->clear_editorial_cache();
+			$this->status_resolver->clear_cache();
+		}
+
+		return $success;
+	}
+
+	/**
+	 * Registers core lifecycle action hooks for automatic version tracking.
+	 *
+	 * @return void
+	 */
+	public function init_hooks(): void {
+		if ( ! function_exists( 'add_action' ) ) {
+			return;
+		}
+
+		add_action( 'save_post', array( $this, 'on_save_post' ), 50, 3 );
+		add_action( 'added_post_meta', array( $this, 'on_meta_added' ), 50, 4 );
+		add_action( 'updated_post_meta', array( $this, 'on_meta_updated' ), 50, 4 );
+		add_action( 'deleted_post_meta', array( $this, 'on_meta_deleted' ), 50, 3 );
+		add_action( 'edited_term', array( $this, 'on_edited_term' ), 50, 3 );
+	}
+
+	/**
+	 * Removes core lifecycle action hooks.
+	 *
+	 * @return void
+	 */
+	public function remove_hooks(): void {
+		if ( ! function_exists( 'remove_action' ) ) {
+			return;
+		}
+
+		remove_action( 'save_post', array( $this, 'on_save_post' ), 50 );
+		remove_action( 'added_post_meta', array( $this, 'on_meta_added' ), 50 );
+		remove_action( 'updated_post_meta', array( $this, 'on_meta_updated' ), 50 );
+		remove_action( 'deleted_post_meta', array( $this, 'on_meta_deleted' ), 50 );
+		remove_action( 'edited_term', array( $this, 'on_edited_term' ), 50 );
+	}
+
+	/**
+	 * Callback for save_post hook.
+	 *
+	 * @param int          $post_id Post ID.
+	 * @param WP_Post|null $post    Post object.
+	 * @param bool         $update  Whether this is an existing post being updated.
+	 * @return void
+	 */
+	public function on_save_post( int $post_id, ?WP_Post $post = null, bool $update = false ): void {
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+
+		if ( function_exists( 'wp_is_post_revision' ) && wp_is_post_revision( $post_id ) ) {
+			return;
+		}
+
+		if ( function_exists( 'wp_is_post_autosave' ) && wp_is_post_autosave( $post_id ) ) {
+			return;
+		}
+
+		$post_obj = null !== $post ? $post : $this->find_post( $post_id );
+		if ( ! $post_obj instanceof WP_Post ) {
+			return;
+		}
+
+		if ( 'auto-draft' === $post_obj->post_status ) {
+			return;
+		}
+
+		if ( ! $this->is_supported_post_type( $post_obj->post_type ) ) {
+			return;
+		}
+
+		$this->sync_post_version( $post_id );
+	}
+
+	/**
+	 * Callback for added_post_meta hook.
+	 *
+	 * @param int    $meta_id    Meta ID.
+	 * @param int    $object_id  Post ID.
+	 * @param string $meta_key   Meta key.
+	 * @param mixed  $meta_value Meta value.
+	 * @return void
+	 */
+	public function on_meta_added( int $meta_id, int $object_id, string $meta_key, mixed $meta_value ): void {
+		if ( CustomFieldPolicy::TRANSLATE !== $this->custom_field_policy_registry->get_policy( $meta_key ) ) {
+			return;
+		}
+
+		$this->sync_post_version( $object_id );
+	}
+
+	/**
+	 * Callback for updated_post_meta hook.
+	 *
+	 * @param int    $meta_id    Meta ID.
+	 * @param int    $object_id  Post ID.
+	 * @param string $meta_key   Meta key.
+	 * @param mixed  $meta_value Meta value.
+	 * @return void
+	 */
+	public function on_meta_updated( int $meta_id, int $object_id, string $meta_key, mixed $meta_value ): void {
+		if ( CustomFieldPolicy::TRANSLATE !== $this->custom_field_policy_registry->get_policy( $meta_key ) ) {
+			return;
+		}
+
+		$this->sync_post_version( $object_id );
+	}
+
+	/**
+	 * Callback for deleted_post_meta hook.
+	 *
+	 * @param mixed  $meta_ids  Array of deleted meta IDs or single ID.
+	 * @param int    $object_id Post ID.
+	 * @param string $meta_key  Meta key.
+	 * @return void
+	 */
+	public function on_meta_deleted( mixed $meta_ids, int $object_id, string $meta_key ): void {
+		if ( CustomFieldPolicy::TRANSLATE !== $this->custom_field_policy_registry->get_policy( $meta_key ) ) {
+			return;
+		}
+
+		$this->sync_post_version( $object_id );
+	}
+
+	/**
+	 * Callback for edited_term hook.
+	 *
+	 * @param int    $term_id  Term ID.
+	 * @param int    $tt_id    Term taxonomy ID.
+	 * @param string $taxonomy Taxonomy name.
+	 * @return void
+	 */
+	public function on_edited_term( int $term_id, int $tt_id, string $taxonomy ): void {
+		if ( ! $this->is_supported_taxonomy( $taxonomy ) ) {
+			return;
+		}
+
+		$this->sync_term_version( $term_id, $taxonomy );
 	}
 }
