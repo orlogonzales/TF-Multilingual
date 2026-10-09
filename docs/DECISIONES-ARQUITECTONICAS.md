@@ -285,4 +285,41 @@
 - **JUSTIFICACIÓN:** El ecosistema moderno de WordPress exige que las capacidades multilingües sean plenamente accesibles vía REST API sin comprometer la seguridad (anti-IDOR) ni el modelo determinista de versionado y grupos.
 - **CONSECUENCIAS:** Interfaz REST nativa, documentada y estandarizada; integración fluida con Gutenberg, editores headless y herramientas de traducción externas; cero drift en tablas centinela; seguridad verificada en laboratorio real y pruebas unitarias exhaustivas.
 
+---
+
+### ADR-026: Diagnóstico Administrativo Soberano, Integración con Site Health de WordPress Core y Cierre Transversal del Core
+- **DECISIÓN:** Se formaliza el subsistema de Diagnóstico del Sistema y Health Check de TF Multilingual junto con la certificación de cierre del Core del plugin:
+  1. **Servicio Desacoplado de Diagnóstico de Solo Lectura (`DiagnosticService`):**
+     - Ubicado en el namespace soberano `TF\Multilingual\Diagnostic`.
+     - Ejecuta auditorías bajo demanda sin sobrecarga en la navegación rutinaria del sitio.
+     - Cobertura transversal de seis ejes de salud del Core:
+       a) Entorno de ejecución: compatibilidad de PHP (>= 8.1), WordPress (>= 6.8) y extensiones requeridas (`mbstring`, `json`, `hash`).
+       b) Tablas maestras SQL: verificación física de existencia y recuentos de filas en las 5 tablas oficiales (`tfml_groups`, `tfml_group_elements`, `tfml_media_translations`, `tfml_strings`, `tfml_string_translations`) y correspondencia de versión de esquema (`SchemaManager::SCHEMA_VERSION`).
+       c) Catálogo de idiomas: validación de configuración (`is_configured`), existencia y estado activo del idioma predeterminado, y discriminación de idiomas activos/inactivos.
+       d) Integridad relacional libre de N+1: detección mediante consultas agregadas únicas de grupos vacíos, duplicados por grupo, asignaciones múltiples, elementos huérfanos sin post/término correspondiente y canonicals desalineados.
+       e) Enrutamiento y reescritura de URLs: verificación de permalinks bonitos y prefijos lingüísticos secundarios.
+       f) Módulos funcionales del Core: reporte de estado operativo de Media, Strings, Menús, SEO y REST API.
+     - Clasificación determinista de salud: `good` (óptima), `warning` (atención recomendada) y `critical` (inconsistencia grave).
+     - Principio de No Invasión: estrictamente de solo lectura; cero reparaciones destructivas automáticas.
+  2. **Interfaz Administrativa Dedicada y Segura (`DiagnosticUi`):**
+     - Submenú nativo bajo *TF Multilingual > Diagnóstico* (`tfml-diagnostic`).
+     - Protección exclusiva mediante la capability `manage_options` y nonces de WordPress.
+     - Cero exposición de rutas internas absolutas, credenciales, hashes ni datos sensibles.
+     - Botón interactivo para ejecutar auditorías en vivo.
+  3. **Integración Nativa con WordPress Core Site Health (`site_status_tests`):**
+     - Registra tres pruebas directas oficiales en *Herramientas > Salud del sitio*:
+       - `tfml_tables_integrity`: Integridad de las 5 tablas maestras.
+       - `tfml_default_language`: Configuración y vitalidad del idioma predeterminado.
+       - `tfml_relations_integrity`: Integridad relacional y consistencia de grupos.
+  4. **Protección Anti-IDOR Reforzada en Endpoints REST:**
+     - Endpoints públicos `/translations` y `/status` validan visibilidad elemento por elemento, ocultando posts borradores o privados y enmascarando canonicals protegidos ante usuarios no autorizados.
+  5. **Certificación y Cierre Oficial del Core de TF Multilingual:**
+     - Auditoría superada en persistencia, configuración (`tfml_settings`), ciclo de vida (`Lifecycle::activate()`, `Lifecycle::deactivate()`), desinstalación segura (`uninstall.php`), seguridad anti-IDOR, estándares WPCS y compatibilidad integral.
+     - Cero bit drift e invariancia absoluta en el centinela externo WPML.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Finalización del Core multilingüe antes de la apertura del ciclo Post-Core (Builders e integraciones externas).
+- **JUSTIFICACIÓN:** El sistema requiere capacidades soberanas de auditoría y diagnóstico para garantizar que el núcleo es sólido, consistente, auditable y seguro antes de interactuar con integraciones de terceros.
+- **CONSECUENCIAS:** Supervisión en tiempo real de la integridad del CMS; cero consultas N+1 en la administración; compatibilidad nativa con WordPress Site Health; cierre formal del Core de TF Multilingual.
+
+
 

@@ -11,11 +11,13 @@ namespace TF\Multilingual\Core;
 
 use TF\Multilingual\Admin\AdminListColumnsUi;
 use TF\Multilingual\Admin\CustomFieldsSettingsUi;
+use TF\Multilingual\Admin\DiagnosticUi;
 use TF\Multilingual\Admin\MediaEditorialUi;
 use TF\Multilingual\Admin\NavMenuEditorialUi;
 use TF\Multilingual\Admin\PostEditorialUi;
 use TF\Multilingual\Admin\StringEditorialUi;
 use TF\Multilingual\Admin\TermEditorialUi;
+use TF\Multilingual\Diagnostic\DiagnosticService;
 use TF\Multilingual\Domain\CustomField\CustomFieldPolicyRegistry;
 use TF\Multilingual\Domain\CustomField\SharedMetaSynchronizer;
 use TF\Multilingual\Domain\Language\LanguageRegistry;
@@ -284,6 +286,20 @@ class Plugin {
 	private ?RestApiRegistrar $rest_api_registrar = null;
 
 	/**
+	 * Diagnostic service.
+	 *
+	 * @var DiagnosticService|null
+	 */
+	private ?DiagnosticService $diagnostic_service = null;
+
+	/**
+	 * Diagnostic UI component.
+	 *
+	 * @var DiagnosticUi|null
+	 */
+	private ?DiagnosticUi $diagnostic_ui = null;
+
+	/**
 	 * Retrieves the singleton instance.
 	 *
 	 * @return self
@@ -456,6 +472,17 @@ class Plugin {
 			$this->editorial_service,
 			$this->editorial_service->get_status_resolver()
 		);
+		$this->diagnostic_service               = new DiagnosticService(
+			$this->language_registry,
+			$settings_repository,
+			$group_repo,
+			$this->media_repository,
+			$this->string_repository,
+			$this->nav_menu_location_repository
+		);
+		$this->diagnostic_ui                    = new DiagnosticUi(
+			$this->diagnostic_service
+		);
 
 		$this->rewrite_manager->init_hooks();
 		$this->query_filter->init_hooks();
@@ -475,6 +502,7 @@ class Plugin {
 		$this->string_editorial_ui->init_hooks();
 		$this->seo_frontend_filter->init_hooks();
 		$this->rest_api_registrar->init_hooks();
+		$this->diagnostic_ui->init_hooks();
 		if ( function_exists( 'add_action' ) ) {
 			add_action( 'shutdown', array( $this->string_translation_service, 'flush_observed_strings' ) );
 		}
@@ -981,6 +1009,43 @@ class Plugin {
 		return $this->rest_api_registrar;
 	}
 
+	/**
+	 * Gets the diagnostic service instance.
+	 *
+	 * @return DiagnosticService
+	 */
+	public function get_diagnostic_service(): DiagnosticService {
+		if ( null === $this->diagnostic_service ) {
+			$settings_repository = new SettingsRepository();
+			$group_repo          = new TranslationGroupRepository();
+
+			$this->diagnostic_service = new DiagnosticService(
+				$this->get_language_registry(),
+				$settings_repository,
+				$group_repo,
+				$this->get_media_repository(),
+				$this->get_string_repository(),
+				$this->get_nav_menu_location_repository()
+			);
+		}
+
+		return $this->diagnostic_service;
+	}
+
+	/**
+	 * Gets the diagnostic UI component instance.
+	 *
+	 * @return DiagnosticUi
+	 */
+	public function get_diagnostic_ui(): DiagnosticUi {
+		if ( null === $this->diagnostic_ui ) {
+			$this->diagnostic_ui = new DiagnosticUi(
+				$this->get_diagnostic_service()
+			);
+		}
+
+		return $this->diagnostic_ui;
+	}
 
 	/**
 	 * Returns whether the plugin has been initialized.

@@ -134,7 +134,20 @@ class StatusControllerTest extends TestCase {
 			$this->editorial_service
 		);
 
-		$GLOBALS['wp_test_posts'] = array();
+		$post1              = new WP_Post();
+		$post1->ID          = 101;
+		$post1->post_type   = 'post';
+		$post1->post_status = 'publish';
+
+		$post2              = new WP_Post();
+		$post2->ID          = 102;
+		$post2->post_type   = 'post';
+		$post2->post_status = 'publish';
+
+		$GLOBALS['wp_test_posts'] = array(
+			101 => $post1,
+			102 => $post2,
+		);
 		$GLOBALS['wp_test_terms'] = array();
 		$GLOBALS['wp_test_caps']  = array();
 	}
@@ -278,5 +291,73 @@ class StatusControllerTest extends TestCase {
 		$this->assertArrayHasKey( 'needs_review', $schema['properties'] );
 		$this->assertArrayHasKey( 'current_version', $schema['properties'] );
 		$this->assertArrayHasKey( 'source_version', $schema['properties'] );
+	}
+
+	/**
+	 * Tests get_item masks canonical details if canonical post is private/draft and user lacks read permission.
+	 */
+	public function test_get_item_masks_canonical_when_private(): void {
+		$post_canon              = new WP_Post();
+		$post_canon->ID          = 401;
+		$post_canon->post_type   = 'post';
+		$post_canon->post_status = 'draft';
+
+		$post_trans              = new WP_Post();
+		$post_trans->ID          = 402;
+		$post_trans->post_type   = 'post';
+		$post_trans->post_status = 'publish';
+
+		$GLOBALS['wp_test_posts'][401] = $post_canon;
+		$GLOBALS['wp_test_posts'][402] = $post_trans;
+
+		$this->db->groups[88]          = array(
+			'id'                   => 88,
+			'element_type'         => 'post',
+			'subtype'              => 'post',
+			'canonical_element_id' => 401,
+			'created_at'           => '2026-10-09 10:00:00',
+		);
+		$this->db->group_elements[401] = array(
+			'id'                            => 1,
+			'group_id'                      => 88,
+			'element_type'                  => 'post',
+			'element_id'                    => 401,
+			'language_code'                 => 'es',
+			'source_version_at_translation' => 2,
+			'current_content_version'       => 2,
+			'translatable_fingerprint'      => 'fp_es',
+		);
+		$this->db->group_elements[402] = array(
+			'id'                            => 2,
+			'group_id'                      => 88,
+			'element_type'                  => 'post',
+			'element_id'                    => 402,
+			'language_code'                 => 'en',
+			'source_version_at_translation' => 1,
+			'current_content_version'       => 1,
+			'translatable_fingerprint'      => 'fp_en',
+		);
+
+		$request = new WP_REST_Request( 'GET', '/tf-multilingual/v1/status/post/402' );
+		$request->set_param( 'element_type', 'post' );
+		$request->set_param( 'id', 402 );
+
+		// Unauthorized for canonical post 401.
+		$GLOBALS['wp_test_caps']['read_post:401'] = false;
+		$GLOBALS['wp_test_caps']['edit_post:401'] = false;
+
+		$response = $this->controller->get_item( $request );
+		$data     = $response->get_data();
+
+		$this->assertNull( $data['canonical_element_id'], 'Private canonical ID must be masked' );
+		$this->assertNull( $data['canonical_version'], 'Private canonical version must be masked' );
+
+		// Authorized editor.
+		$GLOBALS['wp_test_caps']['read_post:401'] = true;
+		$response2                                = $this->controller->get_item( $request );
+		$data2                                    = $response2->get_data();
+
+		$this->assertSame( 401, $data2['canonical_element_id'] );
+		$this->assertSame( 2, $data2['canonical_version'] );
 	}
 }

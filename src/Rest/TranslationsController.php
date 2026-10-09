@@ -319,8 +319,28 @@ class TranslationsController extends WP_REST_Controller {
 
 		$data = array();
 		foreach ( $paginated['items'] as $group ) {
-			$canonical_id = $group->get_canonical_element_id() ?? 0;
-			$data[]       = $this->format_group_data( $group, $canonical_id );
+			$visible_elem_id = null;
+			foreach ( $group->get_elements() as $elem ) {
+				$eid = $elem->get_element_id();
+				if ( 'post' === $element_type ) {
+					if ( $this->can_user_read_post( $eid ) ) {
+						$visible_elem_id = $eid;
+						break;
+					}
+				} elseif ( 'term' === $element_type ) {
+					if ( $this->is_taxonomy_public( $group->get_subtype() ) || $this->can_user_edit_element( 'term', $eid ) ) {
+						$visible_elem_id = $eid;
+						break;
+					}
+				}
+			}
+
+			// If no elements in group are readable by current user, do not leak the group.
+			if ( null === $visible_elem_id ) {
+				continue;
+			}
+
+			$data[] = $this->format_group_data( $group, $visible_elem_id );
 		}
 
 		$response = rest_ensure_response( $data );
@@ -749,8 +769,21 @@ class TranslationsController extends WP_REST_Controller {
 		foreach ( $elements as $elem ) {
 			$elem_id   = $elem->get_element_id();
 			$elem_lang = $elem->get_language_code();
-			$is_canon  = ( $elem_id === $canonical_id );
-			$status    = $this->status_resolver->resolve_element_status( $elem, $group );
+
+			// Anti-IDOR: Check if current user is allowed to read this sibling element.
+			$can_read = true;
+			if ( 'post' === $element_type ) {
+				$can_read = $this->can_user_read_post( $elem_id );
+			} elseif ( 'term' === $element_type ) {
+				$can_read = $this->is_taxonomy_public( $subtype ) || $this->can_user_edit_element( 'term', $elem_id );
+			}
+
+			if ( ! $can_read ) {
+				continue;
+			}
+
+			$is_canon = ( $elem_id === $canonical_id );
+			$status   = $this->status_resolver->resolve_element_status( $elem, $group );
 
 			$can_edit = $this->can_user_edit_element( $element_type, $elem_id );
 			$edit_url = $can_edit ? admin_url( $this->editorial_service->get_edit_url( $element_type, $elem_id, $subtype ) ) : '';
@@ -771,15 +804,28 @@ class TranslationsController extends WP_REST_Controller {
 		$all_active   = array_keys( $this->language_registry->active() );
 		$untranslated = array_values( array_diff( $all_active, array_keys( $translations ) ) );
 
+		// Anti-IDOR: Check if canonical element can be read by current user.
+		$can_read_canon = ( null !== $canonical_id );
+		if ( $can_read_canon ) {
+			if ( 'post' === $element_type ) {
+				$can_read_canon = $this->can_user_read_post( $canonical_id );
+			} elseif ( 'term' === $element_type ) {
+				$can_read_canon = $this->is_taxonomy_public( $subtype ) || $this->can_user_edit_element( 'term', $canonical_id );
+			}
+		}
+
+		$safe_canonical_id   = $can_read_canon ? $canonical_id : null;
+		$safe_canonical_lang = $can_read_canon ? $canonical_lang : null;
+
 		return array(
 			'group_id'               => (int) $group->get_id(),
 			'element_type'           => $element_type,
 			'element_id'             => $reference_id,
 			'subtype'                => $subtype,
 			'language_code'          => $ref_lang,
-			'is_canonical'           => ( $reference_id === $canonical_id ),
-			'canonical_element_id'   => $canonical_id,
-			'canonical_language'     => $canonical_lang,
+			'is_canonical'           => ( null !== $safe_canonical_id && $reference_id === $safe_canonical_id ),
+			'canonical_element_id'   => $safe_canonical_id,
+			'canonical_language'     => $safe_canonical_lang,
 			'translations'           => $translations,
 			'untranslated_languages' => $untranslated,
 		);
@@ -919,6 +965,15 @@ class TranslationsController extends WP_REST_Controller {
 	 * @return bool
 	 */
 	protected function can_user_read_post( int $post_id ): bool {
+		$post = $this->get_post_entity( $post_id );
+		if ( null === $post ) {
+			return false;
+		}
+
+		if ( 'publish' === $post->post_status ) {
+			return true;
+		}
+
 		if ( ! function_exists( 'current_user_can' ) ) {
 			return true;
 		}

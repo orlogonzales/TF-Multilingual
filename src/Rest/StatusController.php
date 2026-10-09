@@ -272,6 +272,21 @@ class StatusController extends WP_REST_Controller {
 			}
 		}
 
+		$canonical_element = $group->get_canonical_element();
+		$raw_canonical_id  = $group->get_canonical_element_id();
+		$can_read_canon    = ( null !== $raw_canonical_id );
+
+		if ( $can_read_canon ) {
+			if ( 'post' === $element_type ) {
+				$can_read_canon = $this->can_user_read_post( (int) $raw_canonical_id );
+			} elseif ( 'term' === $element_type ) {
+				$can_read_canon = $this->is_taxonomy_public( $group->get_subtype() ) || $this->can_user_edit_element( 'term', (int) $raw_canonical_id );
+			}
+		}
+
+		$canonical_id      = $can_read_canon ? $raw_canonical_id : null;
+		$canonical_version = ( $can_read_canon && null !== $canonical_element ) ? $canonical_element->get_current_content_version() : null;
+
 		if ( null === $element ) {
 			return rest_ensure_response(
 				array(
@@ -283,14 +298,13 @@ class StatusController extends WP_REST_Controller {
 					'current_version'      => 0,
 					'source_version'       => 0,
 					'fingerprint'          => '',
-					'canonical_element_id' => $group->get_canonical_element_id(),
-					'canonical_version'    => $group->get_canonical_element()?->get_current_content_version(),
+					'canonical_element_id' => $canonical_id,
+					'canonical_version'    => $canonical_version,
 				)
 			);
 		}
 
-		$status            = $this->status_resolver->resolve_element_status( $element, $group );
-		$canonical_element = $group->get_canonical_element();
+		$status = $this->status_resolver->resolve_element_status( $element, $group );
 
 		$data = array(
 			'element_type'         => $element_type,
@@ -301,8 +315,8 @@ class StatusController extends WP_REST_Controller {
 			'current_version'      => $element->get_current_content_version(),
 			'source_version'       => $element->get_source_version_at_translation(),
 			'fingerprint'          => $element->get_translatable_fingerprint(),
-			'canonical_element_id' => $group->get_canonical_element_id(),
-			'canonical_version'    => null !== $canonical_element ? $canonical_element->get_current_content_version() : null,
+			'canonical_element_id' => $canonical_id,
+			'canonical_version'    => $canonical_version,
 		);
 
 		return rest_ensure_response( $data );
@@ -497,6 +511,15 @@ class StatusController extends WP_REST_Controller {
 	 * @return bool
 	 */
 	protected function can_user_read_post( int $post_id ): bool {
+		$post = $this->get_post_entity( $post_id );
+		if ( null === $post ) {
+			return false;
+		}
+
+		if ( 'publish' === $post->post_status ) {
+			return true;
+		}
+
 		if ( ! function_exists( 'current_user_can' ) ) {
 			return true;
 		}

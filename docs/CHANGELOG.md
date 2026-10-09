@@ -497,4 +497,41 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
   - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
 
+---
+
+## [Fase 2.8] - 2026-10-09
+
+### Diagnóstico, Health Check y Cierre Integral del Core
+- **Verificación y Hardening de Seguridad REST Acotada:**
+  - Endpoints públicos `/translations` y `/status` actualizados para aplicar control de acceso Anti-IDOR sobre todos los elementos hermanos del grupo.
+  - Ocultamiento estricto de elementos privados, borradores o restringidos ante solicitudes de usuarios no autorizados, mostrándolos en `untranslated_languages`.
+  - Enmascaramiento soberano de `canonical_element_id` y `canonical_language` (`null`) en caso de que el elemento canónico sea privado o no accesible para el solicitante.
+- **Servicio de Diagnóstico Desacoplado (`DiagnosticService`):**
+  - Implementación en namespace `TF\Multilingual\Diagnostic` de auditoría de solo lectura integral y bajo demanda.
+  - Evaluación de 6 ejes estratégicos:
+    1. Entorno de ejecución (PHP >= 8.1, WordPress >= 6.8, extensiones `mbstring`, `json`, `hash`).
+    2. Tablas maestras SQL (presencia física y recuento de filas en las 5 tablas relacionales oficiales).
+    3. Catálogo de idiomas (configuración, idioma predeterminado activo, idiomas secundarios).
+    4. Integridad relacional (detección libre de N+1 de grupos vacíos, duplicados, elementos huérfanos y desalineaciones de canonical).
+    5. Reglas de reescritura y URLs (estado de permalinks y prefijos de idioma activos).
+    6. Módulos funcionales del Core (Media, Strings, Menús, SEO y REST API).
+- **Interfaz Administrativa Dedicada (`DiagnosticUi`):**
+  - Submenú nativo bajo *TF Multilingual > Diagnóstico* (`tfml-diagnostic`).
+  - Panel visual estructurado por tarjetas, distintivos de salud y resumen global con cero exposición de credenciales, rutas absolutas ni hashes sensibles.
+  - Botón de auditoría interactiva bajo demanda protegido con nonces y capability `manage_options`.
+- **Integración con WordPress Core Site Health (`site_status_tests`):**
+  - Conexión oficial a *Herramientas > Salud del sitio* con 3 tests directos:
+    - `tfml_tables_integrity`: Verificación de tablas maestras.
+    - `tfml_default_language`: Verificación del idioma predeterminado.
+    - `tfml_relations_integrity`: Verificación de integridad relacional.
+- **Certificación y Cierre Definitivo del Core:**
+  - Auditoría transversal satisfactoria: persistencia, configuración, ciclo de vida (`Lifecycle::activate()`, `Lifecycle::deactivate()`), desinstalación segura (`uninstall.php`), rendimiento y cero N+1.
+- **Verificación Integral y Calidad:**
+  - Suite de pruebas unitarias ampliada: **442 tests, 1,414 assertions, 0 errors, 0 failures, 0 warnings, 0 deprecations**.
+  - Estándares WPCS / PHPCS: **131/131 archivos analizados, 0 errors, 0 warnings**.
+  - Verificación en laboratorio real WordPress (`scratch/verify_fase_2_8.php`): **53/53 assertions passed (100%)**.
+  - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+  - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
+
+
 

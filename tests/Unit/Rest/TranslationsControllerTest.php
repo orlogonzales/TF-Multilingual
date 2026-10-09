@@ -146,7 +146,20 @@ class TranslationsControllerTest extends TestCase {
 			$this->status_resolver
 		);
 
-		$GLOBALS['wp_test_posts'] = array();
+		$post1              = new WP_Post();
+		$post1->ID          = 101;
+		$post1->post_type   = 'post';
+		$post1->post_status = 'publish';
+
+		$post2              = new WP_Post();
+		$post2->ID          = 102;
+		$post2->post_type   = 'post';
+		$post2->post_status = 'publish';
+
+		$GLOBALS['wp_test_posts'] = array(
+			101 => $post1,
+			102 => $post2,
+		);
 		$GLOBALS['wp_test_terms'] = array();
 		$GLOBALS['wp_test_caps']  = array();
 	}
@@ -426,5 +439,135 @@ class TranslationsControllerTest extends TestCase {
 		$this->assertArrayHasKey( 'group_id', $schema['properties'] );
 		$this->assertArrayHasKey( 'translations', $schema['properties'] );
 		$this->assertArrayHasKey( 'canonical_element_id', $schema['properties'] );
+	}
+
+	/**
+	 * Tests get_item does not expose private or draft sibling translations to unauthorized users.
+	 */
+	public function test_get_item_hides_private_sibling_from_unauthorized_users(): void {
+		$post1              = new WP_Post();
+		$post1->ID          = 201;
+		$post1->post_type   = 'page';
+		$post1->post_status = 'publish';
+
+		$post2              = new WP_Post();
+		$post2->ID          = 202;
+		$post2->post_type   = 'page';
+		$post2->post_status = 'draft';
+
+		$GLOBALS['wp_test_posts'][201] = $post1;
+		$GLOBALS['wp_test_posts'][202] = $post2;
+
+		$this->db->groups[55]          = array(
+			'id'                   => 55,
+			'element_type'         => 'post',
+			'subtype'              => 'page',
+			'canonical_element_id' => 201,
+			'created_at'           => '2026-10-09 10:00:00',
+		);
+		$this->db->group_elements[201] = array(
+			'id'                            => 1,
+			'group_id'                      => 55,
+			'element_type'                  => 'post',
+			'element_id'                    => 201,
+			'language_code'                 => 'es',
+			'source_version_at_translation' => 1,
+			'current_content_version'       => 1,
+			'translatable_fingerprint'      => 'fp1',
+		);
+		$this->db->group_elements[202] = array(
+			'id'                            => 2,
+			'group_id'                      => 55,
+			'element_type'                  => 'post',
+			'element_id'                    => 202,
+			'language_code'                 => 'en',
+			'source_version_at_translation' => 1,
+			'current_content_version'       => 1,
+			'translatable_fingerprint'      => 'fp2',
+		);
+
+		$request = new WP_REST_Request( 'GET', '/tf-multilingual/v1/translations/post/201' );
+		$request->set_param( 'element_type', 'post' );
+		$request->set_param( 'id', 201 );
+
+		// Unauthorized: cannot read draft post 202.
+		$GLOBALS['wp_test_caps']['read_post:202'] = false;
+		$GLOBALS['wp_test_caps']['edit_post:202'] = false;
+
+		$response = $this->controller->get_item( $request );
+		$data     = $response->get_data();
+
+		$this->assertArrayHasKey( 'es', $data['translations'] );
+		$this->assertArrayNotHasKey( 'en', $data['translations'], 'Private sibling post MUST NOT be exposed to unauthorized users' );
+		$this->assertContains( 'en', $data['untranslated_languages'], 'Unpublished sibling language must appear as untranslated for unauthorized users' );
+
+		// Authorized editor can see both.
+		$GLOBALS['wp_test_caps']['read_post:202'] = true;
+		$response2                                = $this->controller->get_item( $request );
+		$data2                                    = $response2->get_data();
+
+		$this->assertArrayHasKey( 'en', $data2['translations'], 'Authorized editor MUST be able to see draft sibling post' );
+		$this->assertSame( 202, $data2['translations']['en']['element_id'] );
+	}
+
+	/**
+	 * Tests get_item masks canonical element if it is private/draft and user lacks read permission.
+	 */
+	public function test_get_item_masks_canonical_when_private(): void {
+		$post1              = new WP_Post();
+		$post1->ID          = 301;
+		$post1->post_type   = 'page';
+		$post1->post_status = 'draft';
+
+		$post2              = new WP_Post();
+		$post2->ID          = 302;
+		$post2->post_type   = 'page';
+		$post2->post_status = 'publish';
+
+		$GLOBALS['wp_test_posts'][301] = $post1;
+		$GLOBALS['wp_test_posts'][302] = $post2;
+
+		$this->db->groups[77]          = array(
+			'id'                   => 77,
+			'element_type'         => 'post',
+			'subtype'              => 'page',
+			'canonical_element_id' => 301,
+			'created_at'           => '2026-10-09 10:00:00',
+		);
+		$this->db->group_elements[301] = array(
+			'id'                            => 1,
+			'group_id'                      => 77,
+			'element_type'                  => 'post',
+			'element_id'                    => 301,
+			'language_code'                 => 'es',
+			'source_version_at_translation' => 1,
+			'current_content_version'       => 1,
+			'translatable_fingerprint'      => 'fp1',
+		);
+		$this->db->group_elements[302] = array(
+			'id'                            => 2,
+			'group_id'                      => 77,
+			'element_type'                  => 'post',
+			'element_id'                    => 302,
+			'language_code'                 => 'en',
+			'source_version_at_translation' => 1,
+			'current_content_version'       => 1,
+			'translatable_fingerprint'      => 'fp2',
+		);
+
+		$request = new WP_REST_Request( 'GET', '/tf-multilingual/v1/translations/post/302' );
+		$request->set_param( 'element_type', 'post' );
+		$request->set_param( 'id', 302 );
+
+		// Unauthorized on post 301.
+		$GLOBALS['wp_test_caps']['read_post:301'] = false;
+		$GLOBALS['wp_test_caps']['edit_post:301'] = false;
+
+		$response = $this->controller->get_item( $request );
+		$data     = $response->get_data();
+
+		$this->assertNull( $data['canonical_element_id'], 'Private canonical ID must be nullified for unauthorized users' );
+		$this->assertNull( $data['canonical_language'], 'Private canonical language must be nullified for unauthorized users' );
+		$this->assertFalse( $data['is_canonical'] );
 	}
 }
