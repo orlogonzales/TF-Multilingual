@@ -88,4 +88,27 @@ class IntegrationManagerTest extends TestCase {
 
 		$this->assertNull( $manager->get_wpbakery_integration() );
 	}
+
+	/**
+	 * Test manager detects Elementor activity status.
+	 */
+	public function test_is_elementor_active(): void {
+		$manager   = new IntegrationManager( $this->policy_registry );
+		$is_active = $manager->is_elementor_active();
+		$this->assertSame( defined( 'ELEMENTOR_VERSION' ) || class_exists( '\Elementor\Plugin' ), $is_active );
+	}
+
+	/**
+	 * Test init instantiates ElementorIntegration if Elementor is active or null if not.
+	 */
+	public function test_init_loads_elementor_integration_when_active(): void {
+		$manager = new IntegrationManager( $this->policy_registry );
+		$manager->init();
+
+		if ( $manager->is_elementor_active() ) {
+			$this->assertInstanceOf( \TF\Multilingual\Integration\Elementor\ElementorIntegration::class, $manager->get_elementor_integration() );
+		} else {
+			$this->assertNull( $manager->get_elementor_integration() );
+		}
+	}
 }

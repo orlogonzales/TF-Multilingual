@@ -565,6 +565,51 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
   - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
 
+---
+
+## [Fase 3.2] - 2026-10-09
+
+### Compatibilidad con Elementor y Elementor Pro (Localización de Árbol JSON y Runtime en Vivo)
+- **Adaptador Desacoplado para Elementor (`ElementorIntegration`):**
+  - Implementación de `TF\Multilingual\Integration\Elementor\ElementorIntegration` para gestión estructurada de páginas construidas con Elementor Core y Elementor Pro.
+  - Detección en caliente del estado de Elementor mediante `IntegrationManager::is_elementor_active()` y `IntegrationManager::is_elementor_pro_active()`.
+  - Conexión del servicio `ContentTranslationResolver` a `IntegrationManager` en `Plugin.php` para resolución de enlaces y plantillas internas.
+- **Políticas Soberanas de Metadatos de Elementor:**
+  - Registro de políticas en `CustomFieldPolicyRegistry` respetando personalizaciones preexistentes:
+    - `_elementor_edit_mode` => `SHARE` (sincroniza el modo constructor).
+    - `_elementor_template_type` => `SHARE` (sincroniza el tipo de plantilla).
+    - `_elementor_version` => `SHARE` (mantiene consistencia de versión de Elementor).
+    - `_elementor_pro_version` => `SHARE` (mantiene consistencia de versión de Elementor Pro).
+    - `_wp_page_template` => `SHARE` (sincroniza plantilla de página, canvas, etc.).
+    - `_elementor_data` => `TRANSLATE` (independencia editorial del árbol JSON de maquetación).
+    - `_elementor_page_settings` => `TRANSLATE` (independencia editorial de configuración de página).
+    - `_elementor_css` => `IGNORE` (la caché de estilos CSS se regenera bajo demanda por idioma).
+- **Localización Segura del Árbol de Elementos JSON (`_elementor_data`):**
+  - Parseo estructurado y recorrido recursivo de secciones, columnas y widgets sin expresiones regulares ciegas sobre el string JSON.
+  - Preservación íntegra de la estructura técnica y de los IDs de elemento (`id: "..."`) para mantener la validez de reglas CSS personalizadas vinculadas a `.elementor-element-{id}`.
+  - Localización tipada y asistida en configuraciones (`settings`):
+    - Medios individuales (`image`, `photo`, `background_image`, `icon`, etc.): traducción de `id` y `url` con fallback determinista.
+    - Galerías (`gallery`, `carousel`, etc.): localización de colecciones de medios.
+    - Enlaces internos: traducción automática de URLs o IDs en controles de enlace apuntando a contenidos con traducción existente en el idioma destino.
+    - Plantillas de Elementor (`template_id`): resolución de plantillas traducidas.
+  - Persistencia segura con `wp_slash(wp_json_encode())` protegiendo contra la eliminación de escape en `update_post_meta`.
+- **Zero-Cloning Selectivo e Independencia Editorial:**
+  - Zero-Cloning estricto respetado para posts no construidos con Elementor.
+  - Inicialización asistida vía `tfml_post_translation_created` para posts con Elementor activo, clonando y localizando el árbol inicial.
+  - Verificación de independencia: modificaciones en la traducción no alteran en absoluto el post fuente original.
+- **Certificación en Runtime Real con Elementor Core y Elementor Pro:**
+  - Verificación en laboratorio sobre el entorno real de WordPress con Elementor 4.3.4 y Elementor Pro 4.1.0 activos.
+  - Renderizado frontend en vivo probado satisfactoriamente con `\Elementor\Plugin::$instance->frontend->get_builder_content_for_display($post_id)` demostrando contenido localizado e independiente para español e inglés.
+  - Centinela WPML 100% inalterado: 3,403 filas exactas y checksum MD5 intacto.
+- **Verificación Integral y Calidad:**
+  - Suite de pruebas unitarias ampliada: **471 tests, 1,495 assertions, 0 errors, 0 failures, 0 warnings, 0 deprecations**.
+  - Estándares WPCS / PHPCS: **136/136 archivos analizados, 0 errors, 0 warnings**.
+  - Verificación en laboratorio real WordPress (`scratch/verify_fase_3_2.php`): **35/35 assertions passed (100%)**.
+  - Regresiones Core y constructores: Fases 3.1 (27/27), 2.8 (53/53), 2.7 (47/47), 2.6 (48/48) **100% PASS**.
+  - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+  - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
+
+
 
 
 

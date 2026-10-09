@@ -485,6 +485,20 @@ if ( ! function_exists( 'wp_slash' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	/**
+	 * Stub for wp_json_encode.
+	 *
+	 * @param mixed $data    Data to encode.
+	 * @param int   $options Encode options.
+	 * @param int   $depth   Maximum depth.
+	 * @return string|false
+	 */
+	function wp_json_encode( mixed $data, int $options = 0, int $depth = 512 ): string|false {
+		return json_encode( $data, $options, $depth );
+	}
+}
+
 if ( ! function_exists( 'wp_unslash' ) ) {
 	/**
 	 * Stub for wp_unslash.

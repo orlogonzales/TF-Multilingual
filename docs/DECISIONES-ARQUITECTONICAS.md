@@ -352,6 +352,45 @@
 - **JUSTIFICACIÓN:** Los usuarios editoriales de WPBakery requieren conservar la arquitectura de filas, columnas y opciones de diseño al traducir páginas, sin romper el principio de independencia editorial de TF Multilingual.
 - **CONSECUENCIAS:** Soporte estructural completo para páginas maquetadas con WPBakery; retención segura garantizada en el ciclo de vida; certificación unitaria y de laboratorio real con cero regresiones en el Core.
 
+---
+
+### ADR-028: Adaptador de Compatibilidad para Elementor y Elementor Pro con Localización Segura del Árbol de Elementos JSON y Zero-Cloning Selectivo
+- **DECISIÓN:**
+  1. **Adaptador Desacoplado para Elementor (`ElementorIntegration`):**
+     - Implementación modular en `TF\Multilingual\Integration\Elementor\ElementorIntegration` coordinado a través de `IntegrationManager`.
+     - Detección dinámica y reactiva del entorno mediante comprobación de las constantes oficiales `ELEMENTOR_VERSION` y `ELEMENTOR_PRO_VERSION`.
+  2. **Políticas Soberanas de Metadatos de Elementor:**
+     - Se registran automáticamente políticas por defecto en `CustomFieldPolicyRegistry` respetando configuraciones previas del usuario:
+       - `_elementor_edit_mode`: Política `SHARE` (sincroniza el flag de edición visual 'builder' para que las traducciones abran el lienzo de Elementor de forma nativa).
+       - `_elementor_template_type`: Política `SHARE` (sincroniza la tipología de plantilla, e.g., 'wp-post', 'wp-page').
+       - `_elementor_version`: Política `SHARE` (garantiza coherencia de versión del motor).
+       - `_elementor_pro_version`: Política `SHARE` (garantiza compatibilidad de versión de Elementor Pro).
+       - `_wp_page_template`: Política `SHARE` (sincroniza la plantilla de página seleccionada, e.g., `elementor_canvas`, `elementor_header_footer`).
+       - `_elementor_data`: Política `TRANSLATE` (independencia editorial absoluta del árbol JSON de secciones, columnas y widgets).
+       - `_elementor_page_settings`: Política `TRANSLATE` (independencia de ajustes visuales y tipográficos específicos de cada idioma).
+       - `_elementor_css`: Política `IGNORE` (caché de CSS generado por Elementor tratada como efímera, regenerándose en demanda por idioma sin contaminaciones cruzadas).
+  3. **Preservación y Localización Segura del Árbol JSON (`_elementor_data`):**
+     - Procesamiento estructurado mediante decodificación JSON (`json_decode`) y persistencia protegida mediante `wp_slash(wp_json_encode())` para evitar la eliminación de barras invertidas por parte de `update_post_meta`.
+     - Recorrido recursivo exhaustivo preservando rigurosamente la jerarquía visual (`elements`, `widgetType`, `elType`) y los identificadores técnicos (`id: "..."`). Se preservan los IDs de elemento para no invalidar reglas de CSS personalizado asociadas a los selectores `.elementor-element-{id}`.
+     - Localización asistida y tipada de campos dentro del diccionario `settings`:
+       - **Medios individuales** (`image`, `photo`, `background_image`, `icon`, etc.): mapeo de `id` y `url` mediante `MediaTranslationResolver` con fallback determinista.
+       - **Galerías** (`gallery`, `carousel`, etc.): iteración y localización de arrays de objetos de medios (`['id' => X, 'url' => Y]`).
+       - **Enlaces internos** (`url` en configuraciones tipo enlace): resolución automática de IDs de post o enlaces directos cuando apuntan a contenidos con traducción existente en el idioma destino.
+       - **Referencias a plantillas** (`template_id` en widgets de plantilla o globales): mapeo al ID de la plantilla traducida correspondiente.
+       - **Prohibición de regex ciegas:** Cero reemplazos globales por expresiones regulares en strings JSON para evitar corrupciones de sintaxis o fallos de escape.
+  4. **Duplicación Asistida y Zero-Cloning Selectivo:**
+     - Para posts estándar o bloques Gutenberg no maquetados con Elementor, se mantiene estrictamente el principio de Zero-Cloning (`post_content` inicial vacío y cero metadatos de Elementor).
+     - Para posts maquetados con Elementor (`_elementor_edit_mode === 'builder'`), el hook `tfml_post_translation_created` duplica y localiza el árbol `_elementor_data` y clona `_elementor_page_settings`, dejando la traducción lista para edición en el lienzo de Elementor sin necesidad de reconstruir la composición visual.
+  5. **Independencia Editorial y Verificación en Runtime Real:**
+     - Modificaciones en la traducción no alteran el post fuente original (validado experimentalmente en laboratorio).
+     - Verificación directa sobre el entorno de ejecución activo de WordPress con Elementor 4.3.4 y Elementor Pro 4.1.0, renderizando en vivo con `\Elementor\Plugin::$instance->frontend->get_builder_content_for_display($post_id)` demostrando contenido localizado e independiente.
+     - Cero escrituras directas sobre tablas externas ni sobre el centinela WPML (`*_icl_*`).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.2 — Integración y certificación de compatibilidad con constructores visuales basados en árbol JSON (Elementor y Elementor Pro).
+- **JUSTIFICACIÓN:** Elementor almacena la maquetación en un árbol serializado JSON (`_elementor_data`). Una traducción requiere duplicar inicialmente la estructura de contenedores y widgets localizando los medios y enlaces asociados, manteniendo a la vez absoluta independencia editorial posterior y compatibilidad con el motor de renderizado frontend de Elementor.
+- **CONSECUENCIAS:** Compatibilidad transparente y robusta con Elementor y Elementor Pro; cero interferencia en posts que no usan Elementor; renderizado frontend fiel; y certificación completa con el centinela WPML inalterado.
+
+
 
 
 

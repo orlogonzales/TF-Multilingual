@@ -392,7 +392,8 @@ class Plugin {
 		);
 		$this->integration_manager          = new IntegrationManager(
 			$this->custom_field_policy_registry,
-			$this->media_resolver
+			$this->media_resolver,
+			$translation_resolver
 		);
 		$this->media_frontend_filter        = new MediaFrontendFilter(
 			$this->media_resolver,
@@ -690,9 +691,12 @@ class Plugin {
 	 */
 	public function get_integration_manager(): IntegrationManager {
 		if ( null === $this->integration_manager ) {
+			$group_repo                = new TranslationGroupRepository();
+			$translation_resolver      = new ContentTranslationResolver( $group_repo, $this->get_language_registry() );
 			$this->integration_manager = new IntegrationManager(
 				$this->get_custom_field_policy_registry(),
-				$this->get_media_resolver()
+				$this->get_media_resolver(),
+				$translation_resolver
 			);
 		}
 

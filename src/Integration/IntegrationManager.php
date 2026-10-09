@@ -11,13 +11,15 @@ namespace TF\Multilingual\Integration;
 
 use TF\Multilingual\Domain\CustomField\CustomFieldPolicyRegistry;
 use TF\Multilingual\Domain\Media\MediaTranslationResolver;
+use TF\Multilingual\Domain\Translation\ContentTranslationResolver;
 use TF\Multilingual\Integration\Acf\AcfIntegration;
+use TF\Multilingual\Integration\Elementor\ElementorIntegration;
 use TF\Multilingual\Integration\WPBakery\WPBakeryIntegration;
 
 /**
  * Class IntegrationManager
  *
- * Coordinates optional third-party integrations (e.g. ACF, WPBakery).
+ * Coordinates optional third-party integrations (e.g. ACF, WPBakery, Elementor).
  * Strictly decoupled: checks for availability before loading integration logic.
  */
 class IntegrationManager {
@@ -37,6 +39,13 @@ class IntegrationManager {
 	private ?MediaTranslationResolver $media_resolver = null;
 
 	/**
+	 * Content translation resolver.
+	 *
+	 * @var ContentTranslationResolver|null
+	 */
+	private ?ContentTranslationResolver $content_resolver = null;
+
+	/**
 	 * ACF integration component.
 	 *
 	 * @var AcfIntegration|null
@@ -51,17 +60,27 @@ class IntegrationManager {
 	private ?WPBakeryIntegration $wpbakery_integration = null;
 
 	/**
+	 * Elementor integration component.
+	 *
+	 * @var ElementorIntegration|null
+	 */
+	private ?ElementorIntegration $elementor_integration = null;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param CustomFieldPolicyRegistry      $policy_registry Policy registry.
-	 * @param MediaTranslationResolver|null $media_resolver  Optional media translation resolver.
+	 * @param CustomFieldPolicyRegistry         $policy_registry  Policy registry.
+	 * @param MediaTranslationResolver|null    $media_resolver   Optional media translation resolver.
+	 * @param ContentTranslationResolver|null  $content_resolver Optional content translation resolver.
 	 */
 	public function __construct(
 		CustomFieldPolicyRegistry $policy_registry,
-		?MediaTranslationResolver $media_resolver = null
+		?MediaTranslationResolver $media_resolver = null,
+		?ContentTranslationResolver $content_resolver = null
 	) {
-		$this->policy_registry = $policy_registry;
-		$this->media_resolver  = $media_resolver;
+		$this->policy_registry  = $policy_registry;
+		$this->media_resolver   = $media_resolver;
+		$this->content_resolver = $content_resolver;
 	}
 
 	/**
@@ -81,6 +100,15 @@ class IntegrationManager {
 				$this->media_resolver
 			);
 			$this->wpbakery_integration->init_hooks();
+		}
+
+		if ( $this->is_elementor_active() ) {
+			$this->elementor_integration = new ElementorIntegration(
+				$this->policy_registry,
+				$this->media_resolver,
+				$this->content_resolver
+			);
+			$this->elementor_integration->init_hooks();
 		}
 	}
 
@@ -103,6 +131,15 @@ class IntegrationManager {
 	}
 
 	/**
+	 * Checks whether Elementor is currently installed and active.
+	 *
+	 * @return bool True if Elementor is active.
+	 */
+	public function is_elementor_active(): bool {
+		return defined( 'ELEMENTOR_VERSION' ) || class_exists( '\Elementor\Plugin' );
+	}
+
+	/**
 	 * Gets the ACF integration instance, if active.
 	 *
 	 * @return AcfIntegration|null
@@ -118,5 +155,14 @@ class IntegrationManager {
 	 */
 	public function get_wpbakery_integration(): ?WPBakeryIntegration {
 		return $this->wpbakery_integration;
+	}
+
+	/**
+	 * Gets the Elementor integration instance, if active.
+	 *
+	 * @return ElementorIntegration|null
+	 */
+	public function get_elementor_integration(): ?ElementorIntegration {
+		return $this->elementor_integration;
 	}
 }
