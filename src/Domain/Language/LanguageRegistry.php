@@ -261,6 +261,18 @@ class LanguageRegistry {
 	}
 
 	/**
+	 * Checks whether a given language code is the sovereign default language.
+	 *
+	 * @param string $code Language code.
+	 * @return bool
+	 */
+	public function is_default( string $code ): bool {
+		$this->ensure_loaded();
+
+		return null !== $this->default_language && Language::normalize_code( $code ) === $this->default_language;
+	}
+
+	/**
 	 * Registers a new language into the registry.
 	 *
 	 * Registering a language does NOT automatically designate it as the default language.

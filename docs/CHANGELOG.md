@@ -462,3 +462,39 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
   - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
 
+---
+
+## [Fase 2.7] - 2026-10-09
+
+### REST API Multilingüe
+- **Exposición Soberana de Endpoints bajo Namespace `/wp-json/tf-multilingual/v1/`:**
+  - `RestApiRegistrar`: Orquestador desacoplado conectado al hook `rest_api_init` de WordPress Core, registrando controladores REST para idiomas, traducciones y estado de versionado.
+- **Controlador de Idiomas (`LanguagesController`):**
+  - Endpoint público `GET /tf-multilingual/v1/languages`: catálogo de idiomas activos configurados, con parámetro opcional `all=true` (restringido a usuarios con `manage_options`) para incluir idiomas inactivos.
+  - Generación de esquema OpenAPI / JSON Schema completo para autocapacidad y validación de tipos.
+- **Controlador de Traducciones (`TranslationsController`):**
+  - Endpoint de consulta singular `GET /tf-multilingual/v1/translations/(?P<element_type>post|term)/(?P<id>[\d]+)`: retorna grupo de traducción, idioma asignado, variante canónica, mapa completo de traducciones hermanas con permalinks y estados editoriales, e idiomas no traducidos (`untranslated_languages`).
+  - Representación explícita para elementos sin grupo asignado (`group_id => null`), retornando su idioma intrínseco si existe y todos los demás idiomas como no traducidos.
+  - Endpoint de listado coleccionado `GET /tf-multilingual/v1/translations`: soporte de paginación $O(1)$ con cabeceras estándar `X-WP-Total` y `X-WP-TotalPages`, y filtrado por `element_type` y `subtype`.
+  - Endpoint de vinculación editorial `POST /tf-multilingual/v1/translations/link`: asociación de objetos independientes a un grupo común con validaciones estrictas de homogeneidad y no colisión de idiomas.
+  - Endpoint de desvinculación editorial `POST /tf-multilingual/v1/translations/unlink`: desasociación limpia de elementos con reasignación opcional de canonical.
+- **Controlador de Estado y Versionado (`StatusController`):**
+  - Endpoint de auditoría de versión `GET /tf-multilingual/v1/status/(?P<element_type>post|term)/(?P<id>[\d]+)`: inspección de `current_content_version`, `source_version_at_translation`, `translatable_fingerprint`, estado editorial lógico (`needs_review`, `is_canonical`, etc.) y detalle comparativo frente al canónico.
+  - Endpoint de validación editorial `POST /tf-multilingual/v1/status/reviewed`: marca explícita de revisión completada actualizando `source_version_at_translation` a la versión canónica actual y retornando el estado fresco en la misma respuesta.
+- **Seguridad Robusta Anti-IDOR y Verificación de Capacidades:**
+  - Control de acceso granular según tipo de elemento (`post` vs `term`) y estado de publicación:
+    - Elementos públicos (`publish` o términos) son legibles por cualquier usuario.
+    - Borradores, elementos privados o no públicos requieren capabilities específicas (`read_post` / `edit_post`).
+    - En operaciones de vinculación (`/translations/link`), se exige verificación dual de permisos tanto en el elemento fuente (`source_id`) como en el elemento destino (`target_id`).
+    - En operaciones de mutación (`/unlink`, `/status/reviewed`), se exige autorización de edición (`edit_post` o capability de taxonomía).
+  - Manejo de respuestas de autenticación/autorización con códigos HTTP estándar (`401 Unauthorized` si no autenticado, `403 Forbidden` si carece de privilegios).
+- **Rendimiento y Paginación Optimizada en Base de Datos:**
+  - Incorporación de `TranslationGroupRepository::paginate_groups()` para paginación $O(1)$ en endpoints de colección.
+- **Verificación Integral y Calidad:**
+  - Suite de pruebas unitarias ampliada: **428 tests, 1,337 assertions, 0 errors, 0 failures, 0 warnings, 0 deprecations**.
+  - Estándares WPCS / PHPCS: **127/127 archivos analizados, 0 errors, 0 warnings**.
+  - Verificación en laboratorio real WordPress (`scratch/verify_fase_2_7.php`): **47/47 assertions passed (100%)**.
+  - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+  - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
+
+

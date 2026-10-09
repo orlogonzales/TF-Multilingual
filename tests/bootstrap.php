@@ -635,6 +635,9 @@ if ( ! function_exists( 'current_user_can' ) ) {
 	 * @return bool
 	 */
 	function current_user_can( string $capability, mixed ...$args ): bool {
+		if ( ! empty( $args ) && isset( $GLOBALS['wp_test_caps'][ $capability . ':' . $args[0] ] ) ) {
+			return (bool) $GLOBALS['wp_test_caps'][ $capability . ':' . $args[0] ];
+		}
 		if ( isset( $GLOBALS['wp_test_caps'][ $capability ] ) ) {
 			return (bool) $GLOBALS['wp_test_caps'][ $capability ];
 		}
@@ -1505,5 +1508,550 @@ if ( ! function_exists( 'is_sitemap' ) ) {
 	 */
 	function is_sitemap(): bool {
 		return $GLOBALS['wp_test_is_sitemap'] ?? false;
+	}
+}
+
+if ( ! class_exists( 'WP_Error' ) ) {
+	/**
+	 * Stub for WP_Error class.
+	 */
+	// phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound,PEAR.NamingConventions.ValidClassName.StartWithCapital
+	class WP_Error {
+		/**
+		 * Error code.
+		 *
+		 * @var string
+		 */
+		public string $code;
+
+		/**
+		 * Error message.
+		 *
+		 * @var string
+		 */
+		public string $message;
+
+		/**
+		 * Error data.
+		 *
+		 * @var mixed
+		 */
+		public mixed $data;
+
+		/**
+		 * Constructor.
+		 *
+		 * @param string $code    Error code.
+		 * @param string $message Error message.
+		 * @param mixed  $data    Error data.
+		 */
+		public function __construct( string $code = '', string $message = '', mixed $data = '' ) {
+			$this->code    = $code;
+			$this->message = $message;
+			$this->data    = $data;
+		}
+
+		/**
+		 * Gets error code.
+		 *
+		 * @return string
+		 */
+		public function get_error_code(): string {
+			return $this->code;
+		}
+
+		/**
+		 * Gets error message.
+		 *
+		 * @param string $code Error code.
+		 * @return string
+		 */
+		public function get_error_message( $code = '' ): string {
+			return $this->message;
+		}
+
+		/**
+		 * Gets error data.
+		 *
+		 * @param string $code Error code.
+		 * @return mixed
+		 */
+		public function get_error_data( $code = '' ): mixed {
+			return $this->data;
+		}
+	}
+}
+
+if ( ! function_exists( 'is_wp_error' ) ) {
+	/**
+	 * Stub for is_wp_error.
+	 *
+	 * @param mixed $thing Thing to check.
+	 * @return bool
+	 */
+	function is_wp_error( mixed $thing ): bool {
+		return $thing instanceof WP_Error;
+	}
+}
+
+if ( ! function_exists( 'is_user_logged_in' ) ) {
+	/**
+	 * Stub for is_user_logged_in.
+	 *
+	 * @return bool
+	 */
+	function is_user_logged_in(): bool {
+		return $GLOBALS['wp_test_user_logged_in'] ?? false;
+	}
+}
+
+if ( ! class_exists( 'WP_REST_Request' ) ) {
+	/**
+	 * Stub for WP_REST_Request class.
+	 */
+	// phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound,PEAR.NamingConventions.ValidClassName.StartWithCapital
+	class WP_REST_Request implements ArrayAccess {
+		/**
+		 * HTTP method.
+		 *
+		 * @var string
+		 */
+		private string $method = 'GET';
+
+		/**
+		 * Route path.
+		 *
+		 * @var string
+		 */
+		private string $route = '';
+
+		/**
+		 * Request parameters.
+		 *
+		 * @var array<string, mixed>
+		 */
+		private array $params = array();
+
+		/**
+		 * Headers.
+		 *
+		 * @var array<string, string>
+		 */
+		private array $headers = array();
+
+		/**
+		 * Constructor.
+		 *
+		 * @param string               $method     HTTP method.
+		 * @param string               $route      Route path.
+		 * @param array<string, mixed> $attributes Attributes.
+		 */
+		public function __construct( string $method = 'GET', string $route = '', array $attributes = array() ) {
+			$this->method = strtoupper( $method );
+			$this->route  = $route;
+		}
+
+		/**
+		 * Gets HTTP method.
+		 *
+		 * @return string
+		 */
+		public function get_method(): string {
+			return $this->method;
+		}
+
+		/**
+		 * Sets HTTP method.
+		 *
+		 * @param string $method Method name.
+		 */
+		public function set_method( string $method ): void {
+			$this->method = strtoupper( $method );
+		}
+
+		/**
+		 * Gets route.
+		 *
+		 * @return string
+		 */
+		public function get_route(): string {
+			return $this->route;
+		}
+
+		/**
+		 * Sets route.
+		 *
+		 * @param string $route Route path.
+		 */
+		public function set_route( string $route ): void {
+			$this->route = $route;
+		}
+
+		/**
+		 * Gets a parameter.
+		 *
+		 * @param string $key Parameter name.
+		 * @return mixed
+		 */
+		public function get_param( string $key ): mixed {
+			return $this->params[ $key ] ?? null;
+		}
+
+		/**
+		 * Sets a parameter.
+		 *
+		 * @param string $key   Parameter name.
+		 * @param mixed  $value Parameter value.
+		 */
+		public function set_param( string $key, mixed $value ): void {
+			$this->params[ $key ] = $value;
+		}
+
+		/**
+		 * Gets all parameters.
+		 *
+		 * @return array<string, mixed>
+		 */
+		public function get_params(): array {
+			return $this->params;
+		}
+
+		/**
+		 * Sets parameters.
+		 *
+		 * @param array<string, mixed> $params Parameters.
+		 */
+		public function set_params( array $params ): void {
+			$this->params = $params;
+		}
+
+		/**
+		 * Gets JSON body parameters.
+		 *
+		 * @return array<string, mixed>
+		 */
+		public function get_json_params(): array {
+			return $this->params;
+		}
+
+		/**
+		 * Offset exists.
+		 *
+		 * @param mixed $offset Parameter key.
+		 * @return bool
+		 */
+		public function offsetExists( mixed $offset ): bool {
+			return isset( $this->params[ $offset ] );
+		}
+
+		/**
+		 * Offset get.
+		 *
+		 * @param mixed $offset Parameter key.
+		 * @return mixed
+		 */
+		public function offsetGet( mixed $offset ): mixed {
+			return $this->params[ $offset ] ?? null;
+		}
+
+		/**
+		 * Offset set.
+		 *
+		 * @param mixed $offset Parameter key.
+		 * @param mixed $value  Parameter value.
+		 */
+		public function offsetSet( mixed $offset, mixed $value ): void {
+			$this->params[ $offset ] = $value;
+		}
+
+		/**
+		 * Offset unset.
+		 *
+		 * @param mixed $offset Parameter key.
+		 */
+		public function offsetUnset( mixed $offset ): void {
+			unset( $this->params[ $offset ] );
+		}
+
+		/**
+		 * Gets a header.
+		 *
+		 * @param string $header Header name.
+		 * @return string|null
+		 */
+		public function get_header( string $header ): ?string {
+			return $this->headers[ strtolower( $header ) ] ?? null;
+		}
+
+		/**
+		 * Sets a header.
+		 *
+		 * @param string $header Header name.
+		 * @param string $value  Header value.
+		 */
+		public function set_header( string $header, string $value ): void {
+			$this->headers[ strtolower( $header ) ] = $value;
+		}
+	}
+}
+
+if ( ! class_exists( 'WP_REST_Response' ) ) {
+	/**
+	 * Stub for WP_REST_Response class.
+	 */
+	// phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound,PEAR.NamingConventions.ValidClassName.StartWithCapital
+	class WP_REST_Response {
+		/**
+		 * Response data.
+		 *
+		 * @var mixed
+		 */
+		public mixed $data;
+
+		/**
+		 * HTTP status code.
+		 *
+		 * @var int
+		 */
+		public int $status;
+
+		/**
+		 * Response headers.
+		 *
+		 * @var array<string, string>
+		 */
+		public array $headers = array();
+
+		/**
+		 * Constructor.
+		 *
+		 * @param mixed                 $data    Data.
+		 * @param int                   $status  Status code.
+		 * @param array<string, string> $headers Headers.
+		 */
+		public function __construct( mixed $data = null, int $status = 200, array $headers = array() ) {
+			$this->data    = $data;
+			$this->status  = $status;
+			$this->headers = $headers;
+		}
+
+		/**
+		 * Gets data.
+		 *
+		 * @return mixed
+		 */
+		public function get_data(): mixed {
+			return $this->data;
+		}
+
+		/**
+		 * Sets data.
+		 *
+		 * @param mixed $data Data.
+		 */
+		public function set_data( mixed $data ): void {
+			$this->data = $data;
+		}
+
+		/**
+		 * Gets status code.
+		 *
+		 * @return int
+		 */
+		public function get_status(): int {
+			return $this->status;
+		}
+
+		/**
+		 * Sets status code.
+		 *
+		 * @param int $status Status code.
+		 */
+		public function set_status( int $status ): void {
+			$this->status = $status;
+		}
+
+		/**
+		 * Gets headers.
+		 *
+		 * @return array<string, string>
+		 */
+		public function get_headers(): array {
+			return $this->headers;
+		}
+
+		/**
+		 * Sets a header.
+		 *
+		 * @param string $key   Header name.
+		 * @param string $value Header value.
+		 */
+		public function header( string $key, string $value ): void {
+			$this->headers[ $key ] = $value;
+		}
+	}
+}
+
+if ( ! class_exists( 'WP_REST_Server' ) ) {
+	/**
+	 * Stub for WP_REST_Server class.
+	 */
+	// phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound,PEAR.NamingConventions.ValidClassName.StartWithCapital
+	class WP_REST_Server {
+		public const READABLE   = 'GET';
+		public const CREATABLE  = 'POST';
+		public const EDITABLE   = 'POST, PUT, PATCH';
+		public const DELETABLE  = 'DELETE';
+		public const ALLMETHODS = 'GET, POST, PUT, PATCH, DELETE';
+	}
+}
+
+if ( ! class_exists( 'WP_REST_Controller' ) ) {
+	/**
+	 * Stub for WP_REST_Controller abstract class.
+	 */
+	// phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound,PEAR.NamingConventions.ValidClassName.StartWithCapital
+	abstract class WP_REST_Controller {
+		/**
+		 * Route namespace.
+		 *
+		 * @var string
+		 */
+		protected $namespace;
+
+		/**
+		 * Route rest base.
+		 *
+		 * @var string
+		 */
+		protected $rest_base;
+
+		/**
+		 * Resource schema.
+		 *
+		 * @var array<string, mixed>|null
+		 */
+		protected $schema = null;
+
+		/**
+		 * Registers routes.
+		 */
+		public function register_routes() {}
+
+		/**
+		 * Prepares item for response.
+		 *
+		 * @param mixed           $item    Item.
+		 * @param WP_REST_Request $request Request.
+		 * @return WP_REST_Response
+		 */
+		public function prepare_item_for_response( $item, $request ) {
+			return new WP_REST_Response( $item );
+		}
+
+		/**
+		 * Gets item schema.
+		 *
+		 * @return array<string, mixed>
+		 */
+		public function get_item_schema() {
+			return array();
+		}
+
+		/**
+		 * Gets public item schema.
+		 *
+		 * @return array<string, mixed>
+		 */
+		public function get_public_item_schema() {
+			return $this->get_item_schema();
+		}
+
+		/**
+		 * Adds additional fields schema.
+		 *
+		 * @param array<string, mixed> $schema Schema array.
+		 * @return array<string, mixed>
+		 */
+		public function add_additional_fields_schema( array $schema ): array {
+			return $schema;
+		}
+	}
+}
+
+if ( ! function_exists( 'register_rest_route' ) ) {
+	/**
+	 * Stub for register_rest_route.
+	 *
+	 * @param string               $route_namespace Route namespace.
+	 * @param string               $route           Route path.
+	 * @param array<string, mixed> $args            Route arguments.
+	 * @param bool                 $override        Whether to override.
+	 * @return bool
+	 */
+	function register_rest_route( string $route_namespace, string $route, array $args = array(), bool $override = false ): bool {
+		if ( ! isset( $GLOBALS['wp_rest_routes'] ) ) {
+			$GLOBALS['wp_rest_routes'] = array();
+		}
+		if ( ! isset( $GLOBALS['wp_rest_routes'][ $route_namespace ] ) ) {
+			$GLOBALS['wp_rest_routes'][ $route_namespace ] = array();
+		}
+		$GLOBALS['wp_rest_routes'][ $route_namespace ][ $route ] = $args;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'rest_ensure_response' ) ) {
+	/**
+	 * Stub for rest_ensure_response.
+	 *
+	 * @param mixed $response Response object or raw data.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	function rest_ensure_response( mixed $response ): mixed {
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+		if ( $response instanceof WP_REST_Response ) {
+			return $response;
+		}
+		return new WP_REST_Response( $response );
+	}
+}
+
+if ( ! function_exists( 'rest_authorization_required_code' ) ) {
+	/**
+	 * Stub for rest_authorization_required_code.
+	 *
+	 * @return int
+	 */
+	function rest_authorization_required_code(): int {
+		return is_user_logged_in() ? 403 : 401;
+	}
+}
+
+if ( ! function_exists( 'rest_sanitize_boolean' ) ) {
+	/**
+	 * Stub for rest_sanitize_boolean.
+	 *
+	 * @param mixed $value Value to sanitize.
+	 * @return bool
+	 */
+	function rest_sanitize_boolean( mixed $value ): bool {
+		return (bool) filter_var( $value, FILTER_VALIDATE_BOOLEAN );
+	}
+}
+
+if ( ! function_exists( 'rest_validate_request_arg' ) ) {
+	/**
+	 * Stub for rest_validate_request_arg.
+	 *
+	 * @param mixed           $value   Value.
+	 * @param WP_REST_Request $request Request.
+	 * @param string          $param   Param key.
+	 * @return bool
+	 */
+	function rest_validate_request_arg( mixed $value, $request, string $param ): bool {
+		return true;
 	}
 }

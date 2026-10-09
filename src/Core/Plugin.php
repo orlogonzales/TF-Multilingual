@@ -38,6 +38,7 @@ use TF\Multilingual\Editorial\TranslationEditorialService;
 use TF\Multilingual\Integration\IntegrationManager;
 use TF\Multilingual\Query\QueryLanguageFilter;
 use TF\Multilingual\Query\TermQueryLanguageFilter;
+use TF\Multilingual\Rest\RestApiRegistrar;
 use TF\Multilingual\Routing\CurrentLanguageResolver;
 use TF\Multilingual\Routing\LocalizedUrlGenerator;
 use TF\Multilingual\Routing\RewriteManager;
@@ -276,6 +277,13 @@ class Plugin {
 	private ?SeoFrontendFilter $seo_frontend_filter = null;
 
 	/**
+	 * REST API registrar.
+	 *
+	 * @var RestApiRegistrar|null
+	 */
+	private ?RestApiRegistrar $rest_api_registrar = null;
+
+	/**
 	 * Retrieves the singleton instance.
 	 *
 	 * @return self
@@ -441,6 +449,13 @@ class Plugin {
 			$this->canonical_url_manager,
 			$this->core_sitemaps_filter
 		);
+		$this->rest_api_registrar               = new RestApiRegistrar(
+			$this->language_registry,
+			$group_repo,
+			$translation_resolver,
+			$this->editorial_service,
+			$this->editorial_service->get_status_resolver()
+		);
 
 		$this->rewrite_manager->init_hooks();
 		$this->query_filter->init_hooks();
@@ -459,6 +474,7 @@ class Plugin {
 		$this->nav_menu_editorial_ui->init_hooks();
 		$this->string_editorial_ui->init_hooks();
 		$this->seo_frontend_filter->init_hooks();
+		$this->rest_api_registrar->init_hooks();
 		if ( function_exists( 'add_action' ) ) {
 			add_action( 'shutdown', array( $this->string_translation_service, 'flush_observed_strings' ) );
 		}
@@ -942,6 +958,27 @@ class Plugin {
 		}
 
 		return $this->seo_frontend_filter;
+	}
+
+	/**
+	 * Gets the REST API registrar instance.
+	 *
+	 * @return RestApiRegistrar
+	 */
+	public function get_rest_api_registrar(): RestApiRegistrar {
+		if ( null === $this->rest_api_registrar ) {
+			$group_repo               = new TranslationGroupRepository();
+			$translation_resolver     = new ContentTranslationResolver( $group_repo, $this->get_language_registry() );
+			$this->rest_api_registrar = new RestApiRegistrar(
+				$this->get_language_registry(),
+				$group_repo,
+				$translation_resolver,
+				$this->get_editorial_service(),
+				$this->get_editorial_service()->get_status_resolver()
+			);
+		}
+
+		return $this->rest_api_registrar;
 	}
 
 

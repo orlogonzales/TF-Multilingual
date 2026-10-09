@@ -670,6 +670,76 @@ class TranslationGroupRepository {
 	}
 
 	/**
+	 * Paginates translation groups by element type and optional subtype.
+	 *
+	 * @param string      $element_type Element type ('post' or 'term').
+	 * @param string|null $subtype      Optional subtype (post_type or taxonomy).
+	 * @param int         $page         Page number (1-based).
+	 * @param int         $per_page     Items per page.
+	 * @return array{items: array<int, TranslationGroup>, total: int, total_pages: int}
+	 */
+	public function paginate_groups( string $element_type, ?string $subtype = null, int $page = 1, int $per_page = 10 ): array {
+		$page     = max( 1, $page );
+		$per_page = max( 1, min( 100, $per_page ) );
+		$offset   = ( $page - 1 ) * $per_page;
+
+		$where_clauses = array( '`element_type` = %s' );
+		$params        = array( $element_type );
+
+		if ( null !== $subtype && '' !== $subtype ) {
+			$where_clauses[] = '`subtype` = %s';
+			$params[]        = $subtype;
+		}
+
+		$where_sql = implode( ' AND ', $where_clauses );
+
+		$count_query = $this->db->prepare(
+			"SELECT COUNT(*) FROM `{$this->table_groups}` WHERE {$where_sql}", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$params
+		);
+
+		$total = (int) $this->db->get_var( $count_query );
+		if ( 0 === $total ) {
+			return array(
+				'items'       => array(),
+				'total'       => 0,
+				'total_pages' => 0,
+			);
+		}
+
+		$total_pages = (int) ceil( $total / $per_page );
+
+		$ids_params   = array_merge( $params, array( $per_page, $offset ) );
+		$ids_query    = $this->db->prepare(
+			"SELECT `id` FROM `{$this->table_groups}` WHERE {$where_sql} ORDER BY `id` DESC LIMIT %d OFFSET %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$ids_params
+		);
+		$group_id_col = $this->db->get_col( $ids_query );
+
+		if ( empty( $group_id_col ) || ! is_array( $group_id_col ) ) {
+			return array(
+				'items'       => array(),
+				'total'       => $total,
+				'total_pages' => $total_pages,
+			);
+		}
+
+		$items = array();
+		foreach ( $group_id_col as $gid ) {
+			$group = $this->find( (int) $gid );
+			if ( null !== $group ) {
+				$items[] = $group;
+			}
+		}
+
+		return array(
+			'items'       => $items,
+			'total'       => $total,
+			'total_pages' => $total_pages,
+		);
+	}
+
+	/**
 	 * Validates that an element is not already registered in another translation group.
 	 *
 	 * @param string $element_type Element type ('post' or 'term').

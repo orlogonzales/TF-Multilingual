@@ -252,3 +252,37 @@
 - **JUSTIFICACIÓN:** Cumple rigurosamente las especificaciones de Google Search Central y Bing Webmaster Guidelines para sitios multilingües, manteniendo la soberanía de la URL y evitando sobrecarga al no reinventar el motor de sitemaps de WordPress Core.
 - **CONSECUENCIAS:** Señalización internacional precisa y conforme a estándares; sitemaps automáticos y completos para todos los idiomas; compatibilidad sin fricción con Yoast SEO y Rank Math; cero bit drift y cero escrituras en bases de datos externas o tablas centinela.
 
+---
+
+### ADR-025: Arquitectura REST API Multilingüe Nativa de WordPress con Protección Anti-IDOR, Versionado Lógico y Paginación O(1)
+- **DECISIÓN:** Se implementa el subsistema REST API de TF Multilingual bajo el namespace soberano `tf-multilingual/v1`, reutilizando la arquitectura de controladores nativa de WordPress Core (`WP_REST_Controller`):
+  1. **Estructura de Controladores y Registro (`RestApiRegistrar`):**
+     - Centraliza la registración de endpoints conectándose a la acción nativa `rest_api_init`.
+     - Orquesta tres controladores especializados: `LanguagesController`, `TranslationsController`, y `StatusController`.
+  2. **Endpoint Público de Idiomas (`LanguagesController`):**
+     - `GET /wp-json/tf-multilingual/v1/languages`: lectura pública (`__return_true`) de idiomas registrados.
+     - Parámetro opcional `all=true` para incluir idiomas inactivos (por defecto retorna únicamente idiomas activos).
+     - Retorna: `code`, `locale`, `name`, `native_name`, `is_default`, `active`, `order`.
+  3. **Endpoints de Traducciones y Grupos (`TranslationsController`):**
+     - `GET /wp-json/tf-multilingual/v1/translations`: colección paginada con headers `X-WP-Total` y `X-WP-TotalPages`, filtros por `element_type` y `subtype`, y paginación en base de datos en O(1) mediante `TranslationGroupRepository::paginate_groups`.
+     - `GET /wp-json/tf-multilingual/v1/translations/(post|term)/{id}`: inspección del grupo de traducción, elementos hermanos, estados, URLs canónicas/edit y lista de idiomas sin traducir. Si el elemento no tiene grupo, responde estructura estándar sin error con `group_id => null`.
+     - `POST /wp-json/tf-multilingual/v1/translations/link`: vinculación de elementos existentes en un grupo (o creación de grupo si el elemento fuente aún no está asignado).
+     - `POST /wp-json/tf-multilingual/v1/translations/unlink`: desvinculación transaccional de un elemento de su grupo de traducción con reasignación opcional de elemento canónico.
+  4. **Endpoints de Estado Editorial y Versionado Lógico (`StatusController`):**
+     - `GET /wp-json/tf-multilingual/v1/status/(post|term)/{id}`: consulta detallada de estado editorial (`updated`, `review`, `untranslated`), versiones de contenido (`current_version`, `source_version`), fingerprints criptográficos y versiones canónicas.
+     - `POST /wp-json/tf-multilingual/v1/status/reviewed`: marcado editorial de traducción revisada, alineando `source_version_at_translation` con la versión actual del canónico y retornando el estado actualizado `updated` (`needs_review => false`).
+  5. **Gobernanza de Seguridad Estricta y Prevención Anti-IDOR:**
+     - Todo endpoint declara explícitamente `permission_callback`.
+     - En endpoints de lectura (`GET`), si el post no está publicado (`draft`, `pending`, `private`, `trash`), se requiere `read_post` o `edit_post` sobre el ID específico (`current_user_can('edit_post', $id)`), impidiendo la divulgación indebida de contenidos no públicos.
+     - En el endpoint de vinculación (`POST /link`), se exige autorización de edición sobre **ambos** elementos (`source_id` y `target_id`), impidiendo ataques de suplantación o manipulación cruzada de contenidos protegidos.
+     - En endpoints de escritura/mutación (`POST /unlink`, `POST /status/reviewed`), se verifica la capacidad editorial sobre el elemento específico (`current_user_can('edit_post', $id)` o `current_user_can('edit_term', $id)`).
+     - Esquemas OpenAPI y JSON Schema declarados con callbacks estrictos de sanitización (`sanitize_callback`) y validación (`validate_callback`).
+  6. **Reutilización de Lógica de Negocio y Cero Escrituras Externas:**
+     - Los controladores no duplican lógica de dominio; delegan a `TranslationEditorialService`, `TranslationGroupRepository`, `ContentTranslationResolver`, `TranslationStatusResolver` y `LanguageRegistry`.
+     - Garantía de Cero mutaciones en bases de datos externas o tablas centinela (`*_icl_*`).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Consumo de metadatos multilingües, sincronización desacoplada, soporte headless y administración editorial mediante interfaces REST estándar.
+- **JUSTIFICACIÓN:** El ecosistema moderno de WordPress exige que las capacidades multilingües sean plenamente accesibles vía REST API sin comprometer la seguridad (anti-IDOR) ni el modelo determinista de versionado y grupos.
+- **CONSECUENCIAS:** Interfaz REST nativa, documentada y estandarizada; integración fluida con Gutenberg, editores headless y herramientas de traducción externas; cero drift en tablas centinela; seguridad verificada en laboratorio real y pruebas unitarias exhaustivas.
+
+
