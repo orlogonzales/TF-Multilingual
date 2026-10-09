@@ -38,6 +38,7 @@ use TF\Multilingual\Domain\Translation\ContentTranslationResolver;
 use TF\Multilingual\Domain\Translation\TranslationGroupRepository;
 use TF\Multilingual\Editorial\TranslationEditorialService;
 use TF\Multilingual\Integration\IntegrationManager;
+use TF\Multilingual\Migration\MigrationManager;
 use TF\Multilingual\Query\QueryLanguageFilter;
 use TF\Multilingual\Query\TermQueryLanguageFilter;
 use TF\Multilingual\Rest\RestApiRegistrar;
@@ -298,6 +299,13 @@ class Plugin {
 	 * @var DiagnosticUi|null
 	 */
 	private ?DiagnosticUi $diagnostic_ui = null;
+
+	/**
+	 * Migration manager.
+	 *
+	 * @var MigrationManager|null
+	 */
+	private ?MigrationManager $migration_manager = null;
 
 	/**
 	 * Retrieves the singleton instance.
@@ -1051,6 +1059,24 @@ class Plugin {
 		}
 
 		return $this->diagnostic_ui;
+	}
+
+	/**
+	 * Gets the migration manager instance.
+	 *
+	 * @return MigrationManager
+	 */
+	public function get_migration_manager(): MigrationManager {
+		global $wpdb;
+
+		if ( null === $this->migration_manager ) {
+			$this->migration_manager = new MigrationManager(
+				$wpdb,
+				$this->get_language_registry()
+			);
+		}
+
+		return $this->migration_manager;
 	}
 
 	/**

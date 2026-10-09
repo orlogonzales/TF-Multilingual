@@ -390,6 +390,31 @@
 - **JUSTIFICACIÓN:** Elementor almacena la maquetación en un árbol serializado JSON (`_elementor_data`). Una traducción requiere duplicar inicialmente la estructura de contenedores y widgets localizando los medios y enlaces asociados, manteniendo a la vez absoluta independencia editorial posterior y compatibilidad con el motor de renderizado frontend de Elementor.
 - **CONSECUENCIAS:** Compatibilidad transparente y robusta con Elementor y Elementor Pro; cero interferencia en posts que no usan Elementor; renderizado frontend fiel; y certificación completa con el centinela WPML inalterado.
 
+---
+
+### ADR-029: Subsistema de Migración Desacoplado: Principio Estricto de Solo Lectura, Inventario Diagnóstico y Simulación Dry-Run
+- **DECISIÓN:**
+  1. **Principio Absoluto de Solo Lectura sobre Sistemas de Origen:**
+     - El subsistema de migración (`TF\Multilingual\Migration\`) opera de forma estrictamente no invasiva sobre las tablas de sistemas multilingües externos (WPML `*_icl_*`, Polylang `term_taxonomy`).
+     - Queda terminantemente prohibida cualquier mutación, alteración estructural o eliminación (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`) sobre tablas ajenas a TFML.
+  2. **Detección Dinámica de Fuentes (`MigrationSourceDetector`):**
+     - Inspección de tablas y taxonomías disponibles para identificar fuentes instaladas (`wpml`, `polylang`) con recuentos globales y metadatos de configuración.
+  3. **Inventario Diagnóstico e Inmutable (`MigrationInventoryReport`):**
+     - Detección exhaustiva de idiomas de origen y evaluación de correspondencia con el catálogo soberano de TFML (`LanguageRegistry`), señalando idiomas ausentes como advertencia previa a cualquier importación.
+     - Clasificación y conteo de elementos traducibles desglosados por tipo de contenido (`post_page`, `post_post`, `post_tours`, `tax_category`, `tax_post_tag`, etc.).
+     - Conteo diferenciado de grupos de traducción (`trid`) separando grupos de contenido editorial de elementos adjuntos (`post_attachment`), asegurando que la futura importación respete la arquitectura Media Model B Refinado de TFML (adjuntos compartidos sin duplicación física de posts).
+     - Identificación de conflictos potenciales (elementos ya registrados previamente en `tfml_group_elements`) y registros huérfanos en la fuente (elementos que ya no existen en `wp_posts` o `wp_terms`).
+  4. **Simulación de Migración (Dry-Run):**
+     - Los analizadores de origen (`WpmlSourceAnalyzer`, `PolylangSourceAnalyzer`) implementan simulaciones estructuradas en memoria (`simulate_migration()`).
+     - Identifican el elemento canónico (`source_language_code IS NULL` o primer elemento) y proyectan la estructura de grupos de traducción de TFML sin ejecutar escrituras en base de datos.
+  5. **Gobernanza de Ejecución:**
+     - No se ejecutan migraciones masivas ni destructivas sin un entorno controlado, respaldo verificado y autorización explícita.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.3 — Apertura del subsistema de migración desde plugins multilingües de terceros.
+- **JUSTIFICACIÓN:** Una migración fiable requiere comprender exactamente el estado relacional de los datos preexistentes, validar los idiomas activos y verificar posibles inconsistencias antes de alterar cualquier tabla de TFML, manteniendo total inmunidad en el centinela WPML.
+- **CONSECUENCIAS:** Capacidad de diagnóstico predictivo y simulaciones de migración 100% seguras; cero riesgo de corrupción en las tablas originales de WPML o Polylang; base sólida para futuros runners de importación por lotes idempotentes.
+
+
 
 
 

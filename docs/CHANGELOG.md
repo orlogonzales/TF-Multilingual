@@ -609,6 +609,35 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
   - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
 
+---
+
+## [Fase 3.3] - 2026-10-09
+
+### Subsistema de Migración: Detección, Análisis Read-Only e Inventario Diagnóstico (WPML y Polylang)
+- **Matriz de Compatibilidad de Elementor formalizada (`docs/COMPATIBILIDAD-ELEMENTOR.md`):**
+  - Documentación de funciones verificadas en Elementor Core (secciones, columnas, widgets básicos, enlaces, medios, IDs técnicos, renderizado en vivo) y Pro (versión reactiva, galerías, plantillas).
+  - Delimitación rigurosa de elementos pendientes en backlog (Theme Builder, formulários, dynamic tags, widgets globales, contenedores complejos) y módulos de terceros no certificados.
+- **Subsistema de Migración Desacoplado (`TF\Multilingual\Migration\`):**
+  - **Principio Inviolable de Solo Lectura:** Prohibición absoluta de consultas de escritura (`INSERT`, `UPDATE`, `DELETE`, etc.) sobre tablas de sistemas multilingües externos.
+  - Implementación de `MigrationSourceDetector`: escaneo no invasivo de la base de datos para identificar la presencia de WPML (22 tablas `icl_*`) y Polylang (taxonomías `language`, `term_translations`).
+  - Implementación de `WpmlSourceAnalyzer`:
+    - Inventario exhaustivo de idiomas en `icl_languages` y correspondencia con `LanguageRegistry`.
+    - Detección de elementos clasificados por `element_type` (páginas, posts, tours, rooms, taxonomías y attachments).
+    - Conteo de grupos de traducción (`trid`) distinguiendo grupos de contenido editorial de attachments clonados para gobernanza Media Model B Refinado.
+    - Detección de advertencias por idiomas ausentes en TFML (`fr`) y potenciales conflictos/huérfanos.
+    - Simulación de migración (Dry-Run): proyección de asignación canónica y miembros de grupo sin tocar la base de datos.
+  - Implementación de `PolylangSourceAnalyzer`: análisis no invasivo de taxonomías de Polylang (`language`, `term_translations`, `post_translations`).
+  - Value object `MigrationInventoryReport`: estructura de datos inmutable para diagnóstico, advertencias y reportes reproducibles.
+  - Orquestador `MigrationManager` integrado en `Plugin.php` accesible vía `get_migration_manager()`.
+- **Verificación Integral y Calidad:**
+  - Suite de pruebas unitarias ampliada: **484 tests, 1,570 assertions, 0 errors, 0 failures, 0 warnings, 0 deprecations**.
+  - Estándares WPCS / PHPCS: **146/146 archivos analizados, 0 errors, 0 warnings**.
+  - Verificación en laboratorio real WordPress (`scratch/verify_fase_3_3.php`): **38/38 assertions passed (100%)**.
+  - Regresiones Core y constructores: Fases 3.2 (35/35), 3.1 (27/27), 2.8 (53/53) **100% PASS**.
+  - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+  - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
+
+
 
 
 

@@ -36,6 +36,20 @@ if ( ! class_exists( 'wpdb' ) ) {
 		public string $posts = 'wp_posts';
 
 		/**
+		 * Terms table name.
+		 *
+		 * @var string
+		 */
+		public string $terms = 'wp_terms';
+
+		/**
+		 * Term taxonomy table name.
+		 *
+		 * @var string
+		 */
+		public string $term_taxonomy = 'wp_term_taxonomy';
+
+		/**
 		 * Last insert ID.
 		 *
 		 * @var int
@@ -170,6 +184,27 @@ if ( ! class_exists( 'wpdb' ) ) {
 		}
 
 		/**
+		 * Stubs get_col method.
+		 *
+		 * @param string $query SQL query.
+		 * @param int    $x     Column offset.
+		 * @return array
+		 */
+		public function get_col( string $query, int $x = 0 ): array {
+			return array();
+		}
+
+		/**
+		 * Stubs esc_like method.
+		 *
+		 * @param string $text Text to escape.
+		 * @return string
+		 */
+		public function esc_like( string $text ): string {
+			return addcslashes( $text, '_%\\' );
+		}
+
+		/**
 		 * Stubs query method.
 		 *
 		 * @param string $query SQL query.
@@ -229,6 +264,51 @@ if ( ! function_exists( 'delete_option' ) ) {
 			return true;
 		}
 		return false;
+	}
+}
+
+if ( ! function_exists( 'is_serialized' ) ) {
+	/**
+	 * Stub for is_serialized.
+	 *
+	 * @param mixed $data Data to check.
+	 * @param bool  $strict Strict format check.
+	 * @return bool
+	 */
+	function is_serialized( mixed $data, bool $strict = true ): bool {
+		if ( ! is_string( $data ) ) {
+			return false;
+		}
+		$data = trim( $data );
+		if ( 'N;' === $data ) {
+			return true;
+		}
+		if ( strlen( $data ) < 4 ) {
+			return false;
+		}
+		if ( ':' !== $data[1] ) {
+			return false;
+		}
+		$lastc = substr( $data, -1 );
+		if ( ';' !== $lastc && '}' !== $lastc ) {
+			return false;
+		}
+		return true;
+	}
+}
+
+if ( ! function_exists( 'maybe_unserialize' ) ) {
+	/**
+	 * Stub for maybe_unserialize.
+	 *
+	 * @param mixed $original Original value.
+	 * @return mixed
+	 */
+	function maybe_unserialize( mixed $original ): mixed {
+		if ( is_serialized( $original ) ) {
+			return @unserialize( $original );
+		}
+		return $original;
 	}
 }
 
