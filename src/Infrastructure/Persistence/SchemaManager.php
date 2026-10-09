@@ -256,6 +256,30 @@ CREATE TABLE {$table_string_translations} (
 	}
 
 	/**
+	 * Drops all managed database tables in reverse dependency order.
+	 *
+	 * CAUTION: Destructive operation. Should only be called when explicit purge is requested.
+	 *
+	 * @return void
+	 */
+	public function drop_tables(): void {
+		$table_keys = array(
+			'string_translations',
+			'strings',
+			'media_translations',
+			'group_elements',
+			'groups',
+		);
+
+		foreach ( $table_keys as $key ) {
+			$table_name = $this->get_table_name( $key );
+			$this->db->query( "DROP TABLE IF EXISTS {$table_name}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		}
+
+		delete_option( self::OPTION_SCHEMA_VERSION );
+	}
+
+	/**
 	 * Verifies physically whether all five managed tables exist in the database.
 	 *
 	 * @return bool True if all tables exist.

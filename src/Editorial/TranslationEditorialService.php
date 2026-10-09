@@ -578,12 +578,23 @@ class TranslationEditorialService {
 		}
 
 		// Sovereign Rule: Insert new translation post strictly as 'draft'.
-		// Zero cloning: do NOT copy post_content, post_excerpt, postmeta, terms, or thumbnail.
+		// Zero cloning: do NOT copy post_excerpt, terms, or thumbnail by default.
+		// Content may be initialized by opt-in integrations (e.g. page builders).
+		$initial_content = '';
+		if ( function_exists( 'apply_filters' ) ) {
+			$initial_content = (string) apply_filters(
+				'tfml_initial_translation_post_content',
+				'',
+				$source_post,
+				$canonical_target
+			);
+		}
+
 		$new_post_args = array(
 			'post_type'    => $source_post->post_type,
 			'post_status'  => 'draft',
 			'post_title'   => '',
-			'post_content' => '',
+			'post_content' => $initial_content,
 			'post_author'  => function_exists( 'get_current_user_id' ) ? get_current_user_id() : 1,
 		);
 
@@ -610,6 +621,10 @@ class TranslationEditorialService {
 			1,
 			$initial_fingerprint
 		);
+
+		if ( function_exists( 'do_action' ) ) {
+			do_action( 'tfml_post_translation_created', $new_post_id, $source_post_id, $canonical_target );
+		}
 
 		$this->translation_resolver->flush_cache();
 		$this->clear_editorial_cache();

@@ -65,4 +65,27 @@ class IntegrationManagerTest extends TestCase {
 
 		$this->assertNull( $manager->get_acf_integration() );
 	}
+
+	/**
+	 * Test manager detects inactive WPBakery when constant or class not defined.
+	 */
+	public function test_is_wpbakery_active_returns_false_when_not_loaded(): void {
+		$manager   = new IntegrationManager( $this->policy_registry );
+		$is_active = $manager->is_wpbakery_active();
+		$this->assertSame( defined( 'WPB_VC_VERSION' ) || class_exists( 'Vc_Manager' ), $is_active );
+	}
+
+	/**
+	 * Test init does not instantiate WPBakeryIntegration if WPBakery is not active.
+	 */
+	public function test_init_does_not_load_wpbakery_when_inactive(): void {
+		if ( defined( 'WPB_VC_VERSION' ) || class_exists( 'Vc_Manager' ) ) {
+			$this->markTestSkipped( 'WPBakery is currently loaded in this environment.' );
+		}
+
+		$manager = new IntegrationManager( $this->policy_registry );
+		$manager->init();
+
+		$this->assertNull( $manager->get_wpbakery_integration() );
+	}
 }

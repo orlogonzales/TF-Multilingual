@@ -7,6 +7,10 @@
 
 declare( strict_types=1 );
 
+if ( file_exists( dirname( __DIR__, 2 ) . '/contact-form-7/vendor/autoload.php' ) ) {
+	require_once dirname( __DIR__, 2 ) . '/contact-form-7/vendor/autoload.php';
+}
+
 // Bootstrap WordPress.
 require_once dirname( __DIR__, 4 ) . '/wp-load.php';
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';

@@ -321,5 +321,37 @@
 - **JUSTIFICACIÓN:** El sistema requiere capacidades soberanas de auditoría y diagnóstico para garantizar que el núcleo es sólido, consistente, auditable y seguro antes de interactuar con integraciones de terceros.
 - **CONSECUENCIAS:** Supervisión en tiempo real de la integridad del CMS; cero consultas N+1 en la administración; compatibilidad nativa con WordPress Site Health; cierre formal del Core de TF Multilingual.
 
+---
+
+### ADR-027: Adaptador de Compatibilidad para WPBakery Page Builder y Formalización del Ciclo de Vida (Hardening de Desinstalación y Retención)
+- **DECISIÓN:**
+  1. **Hardening del Ciclo de Vida y Política de Retención (`Lifecycle` & `SchemaManager`):**
+     - La desactivación de TF Multilingual es estrictamente no destructiva: preserva al 100% las 5 tablas maestras, esquemas, relaciones, cadenas y opciones.
+     - La desinstalación (`uninstall.php` y `Lifecycle::uninstall()`) aplica por defecto una **política de retención segura de datos** sin eliminar tablas ni configuraciones.
+     - Se implementa una opción explícita de purga (`tfml_purge_data_on_uninstall`). Únicamente cuando esta opción esté configurada en `true`, `Lifecycle::uninstall()` invoca `SchemaManager::drop_tables()` eliminando las 5 tablas maestras en orden estricto inverso de dependencia (`tfml_string_translations`, `tfml_strings`, `tfml_media_translations`, `tfml_group_elements`, `tfml_groups`) y elimina las opciones maestras (`tfml_settings`, `tfml_schema_version`, `tfml_purge_data_on_uninstall`).
+  2. **Adaptador Desacoplado para WPBakery Page Builder (`WPBakeryIntegration`):**
+     - Se integra un adaptador modular en `TF\Multilingual\Integration\WPBakery\WPBakeryIntegration` coordinado a través de `IntegrationManager`.
+     - Políticas soberanas de metadatos registradas automáticamente en `CustomFieldPolicyRegistry`:
+       - `_wpb_vc_js_status`: Política `SHARE` (sincroniza el estado del editor visual para que las traducciones abran el builder de forma nativa).
+       - `_wpb_post_custom_css`: Política `TRANSLATE` (independencia editorial para estilos CSS específicos de cada idioma).
+       - `_wpb_shortcodes_custom_css`: Política `TRANSLATE` (independencia editorial para opciones de diseño de shortcodes individuales).
+     - Respeto de configuraciones previas: el registro por defecto no sobreescribe políticas personalizadas previamente fijadas por el administrador.
+  3. **Duplicación Asistida de Estructura y Zero-Cloning Selectivo:**
+     - Se preserva el principio de Zero-Cloning para posts regulares y bloques Gutenberg estándar (`post_content` inicial vacío en borradores de traducción).
+     - Para posts que contienen estructura de WPBakery (`[vc_row]`, `[vc_column]`), el hook `tfml_initial_translation_post_content` inicializa el borrador de traducción con la jerarquía de shortcodes clonada y localiza los atributos de medios, permitiendo al editor traducir textos en pantalla sin reconstruir la cuadrícula visual.
+     - El hook `tfml_post_translation_created` duplica el CSS personalizado base al borrador inicial, manteniendo absoluta independencia en mutaciones posteriores (`TRANSLATE`).
+  4. **Localización de Media en Shortcodes y Pre-calentamiento O(1):**
+     - El método `localize_shortcode_media` detecta atributos `image="ID"`, `background_image="ID"` y listas `images="ID1,ID2"`.
+     - Extrae los IDs de medios y pre-calienta la caché mediante `MediaTranslationResolver::prime_cache()` evitando consultas N+1.
+     - Permite mapeo de IDs traducidos mediante el filtro extensible `tfml_localize_attachment_id`.
+  5. **Fronteras Estrictas Post-Core:**
+     - Elementor queda estrictamente aislado para la Fase 3.2 sin mezclar código en esta fase.
+     - Cero escrituras directas sobre tablas externas ni sobre el centinela WPML (`*_icl_*`).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Apertura del ciclo Post-Core (Fase 3.1) enfocado en constructores visuales basados en shortcodes (`js_composer` / WPBakery).
+- **JUSTIFICACIÓN:** Los usuarios editoriales de WPBakery requieren conservar la arquitectura de filas, columnas y opciones de diseño al traducir páginas, sin romper el principio de independencia editorial de TF Multilingual.
+- **CONSECUENCIAS:** Soporte estructural completo para páginas maquetadas con WPBakery; retención segura garantizada en el ciclo de vida; certificación unitaria y de laboratorio real con cero regresiones en el Core.
+
+
 
 

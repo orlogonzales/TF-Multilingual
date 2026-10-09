@@ -10,8 +10,14 @@ declare( strict_types=1 );
 // If uninstall not called from WordPress, exit.
 defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
 
-/*
- * In Phase 1.0 (Baseline), uninstallation preserves all data.
- * Destructive data purging and optional table cleanup will be implemented
- * in subsequent microfases according to the approved architecture.
- */
+// Load Composer autoloader if Lifecycle class is not yet loaded.
+if ( ! class_exists( 'TF\Multilingual\Infrastructure\Lifecycle' ) ) {
+	$autoloader = __DIR__ . '/vendor/autoload.php';
+	if ( file_exists( $autoloader ) ) {
+		require_once $autoloader;
+	}
+}
+
+if ( class_exists( 'TF\Multilingual\Infrastructure\Lifecycle' ) ) {
+	TF\Multilingual\Infrastructure\Lifecycle::uninstall();
+}

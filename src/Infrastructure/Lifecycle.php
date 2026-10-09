@@ -71,6 +71,11 @@ class Lifecycle {
 	}
 
 	/**
+	 * Option name determining if data should be purged upon uninstall.
+	 */
+	public const OPTION_PURGE_ON_UNINSTALL = 'tfml_purge_data_on_uninstall';
+
+	/**
 	 * Executes deactivation tasks.
 	 *
 	 * Strictly non-destructive: preserves all tables, settings and content.
@@ -80,5 +85,29 @@ class Lifecycle {
 	public static function deactivate(): void {
 		// Clean transitories or temporary caches if needed.
 		// Content, relations and schema remain 100% intact.
+	}
+
+	/**
+	 * Executes uninstallation tasks adhering strictly to data retention policy.
+	 *
+	 * By default, uninstallation is non-destructive (preserves database tables and options).
+	 * If explicit purge is enabled via the 'tfml_purge_data_on_uninstall' option, drops all
+	 * managed tables and deletes plugin configuration.
+	 *
+	 * @return void
+	 */
+	public static function uninstall(): void {
+		$purge = (bool) get_option( self::OPTION_PURGE_ON_UNINSTALL, false );
+
+		if ( ! $purge ) {
+			return;
+		}
+
+		$schema_manager = new SchemaManager();
+		$schema_manager->drop_tables();
+
+		delete_option( 'tfml_settings' );
+		delete_option( SchemaManager::OPTION_SCHEMA_VERSION );
+		delete_option( self::OPTION_PURGE_ON_UNINSTALL );
 	}
 }

@@ -533,5 +533,38 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
   - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
 
+---
+
+## [Fase 3.1] - 2026-10-09
+
+### Hardening del Ciclo de Vida y Compatibilidad con WPBakery Page Builder
+- **Hardening del Ciclo de Vida y Política de Retención (`Lifecycle` & `SchemaManager`):**
+  - Implementación de `SchemaManager::drop_tables()` para borrado limpio y estructurado de las 5 tablas maestras en orden inverso de dependencia (`tfml_string_translations`, `tfml_strings`, `tfml_media_translations`, `tfml_group_elements`, `tfml_groups`).
+  - Implementación de `Lifecycle::uninstall()` con política soberana de retención segura de datos por defecto (no destructiva).
+  - Incorporación de opción explícita de purga `tfml_purge_data_on_uninstall` (`Lifecycle::OPTION_PURGE_ON_UNINSTALL`) que, de ser activada, ejecuta el vaciado total de tablas y opciones maestras.
+  - Actualización de `uninstall.php` para invocar `Lifecycle::uninstall()` cargando de forma resiliente el autoloader de Composer si no se encuentra en memoria.
+  - Creación de suite de pruebas unitarias dedicadas en `tests/Unit/LifecycleTest.php` y ampliación de `tests/Unit/SchemaManagerTest.php`.
+- **Adaptador de Compatibilidad para WPBakery Page Builder (`WPBakeryIntegration`):**
+  - Implementación de `TF\Multilingual\Integration\WPBakery\WPBakeryIntegration` como adaptador desacoplado para constructores basados en shortcodes (`js_composer` / Visual Composer).
+  - Registro de políticas soberanas de metadatos en `CustomFieldPolicyRegistry`:
+    - `_wpb_vc_js_status` => `SHARE` (sincroniza el estado del editor visual para abrir WPBakery nativamente en traducciones).
+    - `_wpb_post_custom_css` => `TRANSLATE` (independencia editorial para estilos CSS específicos de cada idioma).
+    - `_wpb_shortcodes_custom_css` => `TRANSLATE` (independencia editorial para estilos de shortcodes individuales).
+  - Coordinación modular a través de `IntegrationManager` y conexión del servicio `MediaTranslationResolver` en `Plugin.php`.
+  - Zero-Cloning selectivo: duplicación asistida de la jerarquía de shortcodes (`[vc_row]`, `[vc_column]`, etc.) en borradores de traducción vía `tfml_initial_translation_post_content`, garantizando que posts estándar y bloques Gutenberg preserven `post_content` estrictamente vacío.
+  - Localización de shortcode media: reemplazo asistido de atributos `image="ID"`, `background_image="ID"` y `images="ID1,ID2"` mediante `localize_shortcode_media()`, con pre-calentamiento en memoria $O(1)$ (`MediaTranslationResolver::prime_cache()`) y filtro extensible `tfml_localize_attachment_id`.
+  - Duplicación de baseline CSS inicial mediante hook `tfml_post_translation_created` manteniendo independencia editorial posterior.
+- **Fronteras Estrictas Post-Core:**
+  - Elementor estrictamente aislado para la Fase 3.2 sin mezclar código en esta fase.
+  - Mandato de gobernanza respetado: se certifica unitaria y estructuralmente el adaptador con fixtures y pruebas reales de laboratorio, dejando constancia explícita de que la certificación funcional completa sobre un runtime con `js_composer` activo se ejecutará cuando dicho plugin esté instalado.
+  - Centinela WPML 100% invariante (cero escrituras y cero bit drift).
+- **Verificación Integral y Calidad:**
+  - Suite de pruebas unitarias ampliada: **460 tests, 1,460 assertions, 0 errors, 0 failures, 0 warnings, 0 deprecations**.
+  - Estándares WPCS / PHPCS: **134/134 archivos analizados, 0 errors, 0 warnings**.
+  - Verificación en laboratorio real WordPress (`scratch/verify_fase_3_1.php`): **27/27 assertions passed (100%)**.
+  - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+  - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
+
+
 
 

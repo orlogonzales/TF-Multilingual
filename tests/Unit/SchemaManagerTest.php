@@ -79,4 +79,53 @@ class SchemaManagerTest extends TestCase {
 		// Verify term subtype column in groups.
 		$this->assertStringContainsString( 'subtype varchar(32) NOT NULL default \'\'', $sql );
 	}
+
+	/**
+	 * Tests drop_tables executes DROP TABLE queries in reverse dependency order.
+	 */
+	public function test_drop_tables_executes_queries_in_reverse_dependency_order(): void {
+		$mock_db         = $this->createMock( wpdb::class );
+		$mock_db->prefix = 'wptest_';
+
+		$executed_queries = array();
+		$mock_db->method( 'query' )->willReturnCallback(
+			function ( string $query ) use ( &$executed_queries ) {
+				$executed_queries[] = $query;
+				return true;
+			}
+		);
+
+		update_option( SchemaManager::OPTION_SCHEMA_VERSION, '1.0.0' );
+		$this->assertSame( '1.0.0', get_option( SchemaManager::OPTION_SCHEMA_VERSION ) );
+
+		$manager = new SchemaManager( $mock_db );
+		$manager->drop_tables();
+
+		$this->assertCount( 5, $executed_queries );
+		$this->assertSame( 'DROP TABLE IF EXISTS wptest_tfml_string_translations', $executed_queries[0] );
+		$this->assertSame( 'DROP TABLE IF EXISTS wptest_tfml_strings', $executed_queries[1] );
+		$this->assertSame( 'DROP TABLE IF EXISTS wptest_tfml_media_translations', $executed_queries[2] );
+		$this->assertSame( 'DROP TABLE IF EXISTS wptest_tfml_group_elements', $executed_queries[3] );
+		$this->assertSame( 'DROP TABLE IF EXISTS wptest_tfml_groups', $executed_queries[4] );
+
+		$this->assertNull( get_option( SchemaManager::OPTION_SCHEMA_VERSION, null ) );
+	}
+
+	/**
+	 * Tests needs_upgrade method.
+	 */
+	public function test_needs_upgrade(): void {
+		$mock_db         = $this->createMock( wpdb::class );
+		$mock_db->prefix = 'wptest_';
+		$manager         = new SchemaManager( $mock_db );
+
+		delete_option( SchemaManager::OPTION_SCHEMA_VERSION );
+		$this->assertTrue( $manager->needs_upgrade() );
+
+		update_option( SchemaManager::OPTION_SCHEMA_VERSION, '0.9.0' );
+		$this->assertTrue( $manager->needs_upgrade() );
+
+		update_option( SchemaManager::OPTION_SCHEMA_VERSION, '1.0.0' );
+		$this->assertFalse( $manager->needs_upgrade() );
+	}
 }
