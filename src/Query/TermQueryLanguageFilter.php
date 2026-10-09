@@ -269,6 +269,11 @@ class TermQueryLanguageFilter {
 			return true;
 		}
 
+		// Core Sitemaps requests.
+		if ( ( function_exists( 'is_sitemap' ) && is_sitemap() ) || ( function_exists( 'get_query_var' ) && ! empty( get_query_var( 'sitemap' ) ) ) ) {
+			return true;
+		}
+
 		return false;
 	}
 

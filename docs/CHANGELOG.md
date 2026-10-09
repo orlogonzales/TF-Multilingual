@@ -432,3 +432,33 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Estándares WPCS / PHPCS: **111/111 archivos analizados, 0 errors, 0 warnings**.
   - Verificación en laboratorio real WordPress (`scratch/verify_fase_2_5.php`): **44/44 assertions passed (100%)**.
   - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+
+---
+
+## [Fase 2.6] - 2026-10-09
+
+### SEO Multilingüe (Hreflang, Canonical y Core Sitemaps)
+- **Generación Soberana de Hreflang (`HreflangGenerator`):**
+  - Descubrimiento determinista de variantes traducidas para contenido singular, términos taxonómicos y portada (front page / home).
+  - **Invariante de Publicación:** Exclusión estricta de variantes no publicadas (borradores, privados, papelera) e idiomas inactivos.
+  - **Invariante de Frescura Editorial vs Publicación:** Variantes publicadas con estado editorial `REVIEW` (`needs_review`) permanecen plenamente indexables y son emitidas en `hreflang`.
+  - **Invariante Estricta de `x-default`:** `x-default` apunta exclusivamente a la URL de la variante en el idioma predeterminado del sitio cuando existe y está publicada; si la variante predeterminada está ausente, `x-default` queda estrictamente ausente (sin invenciones ni falsos fallbacks a la home).
+- **Gestión Unívoca de Canonical (`CanonicalUrlManager`):**
+  - Cada variante de traducción cuenta con su propia URL canónica localizada (`rel="canonical"`), garantizando que las traducciones nunca apunten erróneamente al idioma predeterminado.
+  - Intercepción limpia del hook canónico de WordPress Core (`wp_get_canonical_url`).
+  - Intercepción de hooks de suites SEO de terceros (`wpseo_canonical` para Yoast SEO y `rank_math/canonical_url` para Rank Math), evitando etiquetas canónicas duplicadas o conflictivas.
+- **Integración con XML Sitemaps Nativos de WordPress Core (`CoreSitemapsFilter`):**
+  - Reutilización de la infraestructura nativa `wp_sitemaps` de WordPress Core sin motores paralelos.
+  - Intercepción de `wp_sitemaps_posts_query_args` y `wp_sitemaps_taxonomies_query_args` con `tfml_suppress_filters => true`, permitiendo la indexación de todas las variantes sin restricción por idioma del request.
+  - Exclusión de contexto sitemap (`is_sitemap()`, query var `sitemap`) en `QueryLanguageFilter` y `TermQueryLanguageFilter`.
+  - Localización de URLs de entrada en `$entry['loc']` para posts y términos, descartando borradores o variantes de idiomas inactivos (`array()`).
+- **Coordinación y Salida Frontend (`SeoFrontendFilter`):**
+  - Inyección de etiquetas `<link rel="alternate" hreflang="..." href="..." />` en `<head>` con prioridad temprana (`wp_head`, prioridad 2).
+  - Filtro extensible `tfml_hreflang_variants` para desarrolladores.
+- **Verificación Integral y Calidad:**
+  - Suite de pruebas unitarias ampliada: **401 tests, 1,227 assertions, 0 errors, 0 failures, 0 warnings, 0 deprecations**.
+  - Estándares WPCS / PHPCS: **119/119 archivos analizados, 0 errors, 0 warnings**.
+  - Verificación en laboratorio real WordPress (`scratch/verify_fase_2_6.php`): **48/48 assertions passed (100%)**.
+  - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+  - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
+

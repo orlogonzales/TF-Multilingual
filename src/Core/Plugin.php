@@ -26,6 +26,10 @@ use TF\Multilingual\Domain\Media\MediaTranslationResolver;
 use TF\Multilingual\Domain\Navigation\BlockNavigationFrontendFilter;
 use TF\Multilingual\Domain\Navigation\NavMenuFrontendFilter;
 use TF\Multilingual\Domain\Navigation\NavMenuLocationRepository;
+use TF\Multilingual\Domain\Seo\CanonicalUrlManager;
+use TF\Multilingual\Domain\Seo\CoreSitemapsFilter;
+use TF\Multilingual\Domain\Seo\HreflangGenerator;
+use TF\Multilingual\Domain\Seo\SeoFrontendFilter;
 use TF\Multilingual\Domain\Strings\StringRepository;
 use TF\Multilingual\Domain\Strings\StringTranslationService;
 use TF\Multilingual\Domain\Translation\ContentTranslationResolver;
@@ -244,6 +248,34 @@ class Plugin {
 	private ?StringEditorialUi $string_editorial_ui = null;
 
 	/**
+	 * Hreflang generator.
+	 *
+	 * @var HreflangGenerator|null
+	 */
+	private ?HreflangGenerator $hreflang_generator = null;
+
+	/**
+	 * Canonical URL manager.
+	 *
+	 * @var CanonicalUrlManager|null
+	 */
+	private ?CanonicalUrlManager $canonical_url_manager = null;
+
+	/**
+	 * Core sitemaps filter.
+	 *
+	 * @var CoreSitemapsFilter|null
+	 */
+	private ?CoreSitemapsFilter $core_sitemaps_filter = null;
+
+	/**
+	 * SEO frontend filter.
+	 *
+	 * @var SeoFrontendFilter|null
+	 */
+	private ?SeoFrontendFilter $seo_frontend_filter = null;
+
+	/**
 	 * Retrieves the singleton instance.
 	 *
 	 * @return self
@@ -387,6 +419,28 @@ class Plugin {
 			$this->string_repository,
 			$this->language_registry
 		);
+		$this->hreflang_generator               = new HreflangGenerator(
+			$this->language_registry,
+			$group_repo,
+			$translation_resolver,
+			$url_generator
+		);
+		$this->canonical_url_manager            = new CanonicalUrlManager(
+			$this->language_registry,
+			$translation_resolver,
+			$url_generator,
+			$url_resolver
+		);
+		$this->core_sitemaps_filter             = new CoreSitemapsFilter(
+			$this->language_registry,
+			$translation_resolver,
+			$url_generator
+		);
+		$this->seo_frontend_filter              = new SeoFrontendFilter(
+			$this->hreflang_generator,
+			$this->canonical_url_manager,
+			$this->core_sitemaps_filter
+		);
 
 		$this->rewrite_manager->init_hooks();
 		$this->query_filter->init_hooks();
@@ -404,6 +458,7 @@ class Plugin {
 		$this->block_navigation_frontend_filter->init_hooks();
 		$this->nav_menu_editorial_ui->init_hooks();
 		$this->string_editorial_ui->init_hooks();
+		$this->seo_frontend_filter->init_hooks();
 		if ( function_exists( 'add_action' ) ) {
 			add_action( 'shutdown', array( $this->string_translation_service, 'flush_observed_strings' ) );
 		}
@@ -793,6 +848,100 @@ class Plugin {
 		}
 
 		return $this->string_editorial_ui;
+	}
+
+	/**
+	 * Gets the hreflang generator instance.
+	 *
+	 * @return HreflangGenerator
+	 */
+	public function get_hreflang_generator(): HreflangGenerator {
+		if ( null === $this->hreflang_generator ) {
+			$group_repo               = new TranslationGroupRepository();
+			$translation_resolver     = new ContentTranslationResolver( $group_repo, $this->get_language_registry() );
+			$url_resolver             = new UrlLanguageResolver( $this->get_language_registry() );
+			$url_generator            = new LocalizedUrlGenerator(
+				$this->get_language_registry(),
+				$url_resolver,
+				$translation_resolver
+			);
+			$this->hreflang_generator = new HreflangGenerator(
+				$this->get_language_registry(),
+				$group_repo,
+				$translation_resolver,
+				$url_generator
+			);
+		}
+
+		return $this->hreflang_generator;
+	}
+
+	/**
+	 * Gets the canonical URL manager instance.
+	 *
+	 * @return CanonicalUrlManager
+	 */
+	public function get_canonical_url_manager(): CanonicalUrlManager {
+		if ( null === $this->canonical_url_manager ) {
+			$group_repo                  = new TranslationGroupRepository();
+			$translation_resolver        = new ContentTranslationResolver( $group_repo, $this->get_language_registry() );
+			$url_resolver                = new UrlLanguageResolver( $this->get_language_registry() );
+			$url_generator               = new LocalizedUrlGenerator(
+				$this->get_language_registry(),
+				$url_resolver,
+				$translation_resolver
+			);
+			$this->canonical_url_manager = new CanonicalUrlManager(
+				$this->get_language_registry(),
+				$translation_resolver,
+				$url_generator,
+				$url_resolver
+			);
+		}
+
+		return $this->canonical_url_manager;
+	}
+
+	/**
+	 * Gets the core sitemaps filter instance.
+	 *
+	 * @return CoreSitemapsFilter
+	 */
+	public function get_core_sitemaps_filter(): CoreSitemapsFilter {
+		if ( null === $this->core_sitemaps_filter ) {
+			$group_repo                 = new TranslationGroupRepository();
+			$translation_resolver       = new ContentTranslationResolver( $group_repo, $this->get_language_registry() );
+			$url_resolver               = new UrlLanguageResolver( $this->get_language_registry() );
+			$url_generator              = new LocalizedUrlGenerator(
+				$this->get_language_registry(),
+				$url_resolver,
+				$translation_resolver
+			);
+			$this->core_sitemaps_filter = new CoreSitemapsFilter(
+				$this->get_language_registry(),
+				$translation_resolver,
+				$url_generator
+			);
+		}
+
+		return $this->core_sitemaps_filter;
+	}
+
+	/**
+	 * Gets the SEO frontend filter instance.
+	 *
+	 * @return SeoFrontendFilter
+	 */
+	public function get_seo_frontend_filter(): SeoFrontendFilter {
+		if ( null === $this->seo_frontend_filter ) {
+			$this->seo_frontend_filter = new SeoFrontendFilter(
+				$this->get_hreflang_generator(),
+				$this->get_canonical_url_manager(),
+				$this->get_core_sitemaps_filter()
+			);
+		}
+
+		return $this->seo_frontend_filter;
 	}
 
 

@@ -847,6 +847,30 @@ if ( ! function_exists( 'has_filter' ) ) {
 	}
 }
 
+if ( ! function_exists( 'apply_filters' ) ) {
+	/**
+	 * Stub for apply_filters.
+	 *
+	 * @param string $hook_name Hook name.
+	 * @param mixed  $value     Filtered value.
+	 * @param mixed  ...$args   Additional arguments.
+	 * @return mixed
+	 */
+	function apply_filters( string $hook_name, mixed $value, mixed ...$args ): mixed {
+		if ( ! isset( $GLOBALS['wp_test_filters'][ $hook_name ] ) || empty( $GLOBALS['wp_test_filters'][ $hook_name ] ) ) {
+			return $value;
+		}
+
+		$current = $value;
+		foreach ( $GLOBALS['wp_test_filters'][ $hook_name ] as $entry ) {
+			$callback = $entry['callback'];
+			$current  = $callback( $current, ...$args );
+		}
+
+		return $current;
+	}
+}
+
 if ( ! function_exists( 'is_admin' ) ) {
 	/**
 	 * Stub for is_admin.
@@ -1321,5 +1345,165 @@ if ( ! function_exists( 'home_url' ) ) {
 	function home_url( string $path = '', ?string $scheme = null ): string {
 		$base = $GLOBALS['wp_test_home_url'] ?? 'http://example.com';
 		return rtrim( $base, '/' ) . ( '' !== $path ? '/' . ltrim( $path, '/' ) : '' );
+	}
+}
+
+if ( ! function_exists( 'is_singular' ) ) {
+	/**
+	 * Stub for is_singular.
+	 *
+	 * @param string|array<string> $post_types Optional post types.
+	 * @return bool
+	 */
+	function is_singular( $post_types = '' ): bool {
+		return $GLOBALS['wp_test_is_singular'] ?? false;
+	}
+}
+
+if ( ! function_exists( 'is_category' ) ) {
+	/**
+	 * Stub for is_category.
+	 *
+	 * @param mixed $category Optional category.
+	 * @return bool
+	 */
+	function is_category( $category = '' ): bool {
+		return $GLOBALS['wp_test_is_category'] ?? false;
+	}
+}
+
+if ( ! function_exists( 'is_tag' ) ) {
+	/**
+	 * Stub for is_tag.
+	 *
+	 * @param mixed $slug Optional tag.
+	 * @return bool
+	 */
+	function is_tag( $slug = '' ): bool {
+		return $GLOBALS['wp_test_is_tag'] ?? false;
+	}
+}
+
+if ( ! function_exists( 'is_tax' ) ) {
+	/**
+	 * Stub for is_tax.
+	 *
+	 * @param mixed $taxonomy Optional taxonomy.
+	 * @param mixed $term     Optional term.
+	 * @return bool
+	 */
+	function is_tax( $taxonomy = '', $term = '' ): bool {
+		return $GLOBALS['wp_test_is_tax'] ?? false;
+	}
+}
+
+if ( ! function_exists( 'is_front_page' ) ) {
+	/**
+	 * Stub for is_front_page.
+	 *
+	 * @return bool
+	 */
+	function is_front_page(): bool {
+		return $GLOBALS['wp_test_is_front_page'] ?? false;
+	}
+}
+
+if ( ! function_exists( 'is_home' ) ) {
+	/**
+	 * Stub for is_home.
+	 *
+	 * @return bool
+	 */
+	function is_home(): bool {
+		return $GLOBALS['wp_test_is_home'] ?? false;
+	}
+}
+
+if ( ! function_exists( 'get_queried_object' ) ) {
+	/**
+	 * Stub for get_queried_object.
+	 *
+	 * @return mixed
+	 */
+	function get_queried_object(): mixed {
+		return $GLOBALS['wp_test_queried_object'] ?? null;
+	}
+}
+
+if ( ! function_exists( 'get_queried_object_id' ) ) {
+	/**
+	 * Stub for get_queried_object_id.
+	 *
+	 * @return int
+	 */
+	function get_queried_object_id(): int {
+		return (int) ( $GLOBALS['wp_test_queried_object_id'] ?? 0 );
+	}
+}
+
+if ( ! function_exists( 'is_feed' ) ) {
+	/**
+	 * Stub for is_feed.
+	 *
+	 * @param string|array<string> $feeds Optional feed types.
+	 * @return bool
+	 */
+	function is_feed( $feeds = '' ): bool {
+		return $GLOBALS['wp_test_is_feed'] ?? false;
+	}
+}
+
+if ( ! function_exists( 'is_trackback' ) ) {
+	/**
+	 * Stub for is_trackback.
+	 *
+	 * @return bool
+	 */
+	function is_trackback(): bool {
+		return $GLOBALS['wp_test_is_trackback'] ?? false;
+	}
+}
+
+if ( ! function_exists( 'is_404' ) ) {
+	/**
+	 * Stub for is_404.
+	 *
+	 * @return bool
+	 */
+	function is_404(): bool {
+		return $GLOBALS['wp_test_is_404'] ?? false;
+	}
+}
+
+if ( ! function_exists( 'is_search' ) ) {
+	/**
+	 * Stub for is_search.
+	 *
+	 * @return bool
+	 */
+	function is_search(): bool {
+		return $GLOBALS['wp_test_is_search'] ?? false;
+	}
+}
+
+if ( ! function_exists( 'is_preview' ) ) {
+	/**
+	 * Stub for is_preview.
+	 *
+	 * @return bool
+	 */
+	function is_preview(): bool {
+		return $GLOBALS['wp_test_is_preview'] ?? false;
+	}
+}
+
+if ( ! function_exists( 'is_sitemap' ) ) {
+	/**
+	 * Stub for is_sitemap.
+	 *
+	 * @return bool
+	 */
+	function is_sitemap(): bool {
+		return $GLOBALS['wp_test_is_sitemap'] ?? false;
 	}
 }

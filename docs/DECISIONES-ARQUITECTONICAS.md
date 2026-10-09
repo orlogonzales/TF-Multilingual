@@ -228,3 +228,27 @@
 - **CONTEXTO:** Gestión de cadenas de interfaz dinámicas y de plugins/temas sin interceptar globalmente gettext ni reemplazar archivos `.po/.mo` de WordPress Core.
 - **JUSTIFICACIÓN:** Separar las cadenas explícitas de la infraestructura general de gettext previene sobrecarga masiva en memoria y colisiones con cadenas internas de WordPress, al tiempo que proporciona control editorial de versiones y actualizaciones sin fricción.
 - **CONSECUENCIAS:** API predecible y ultrarrápida; rendimiento O(1) comprobado en listas de más de 100 cadenas; preservación de traducciones ante correcciones tipográficas del original; interfaz nativa para traductores y administradores.
+
+---
+
+### ADR-024: Arquitectura SEO Multilingüe Soberana (Hreflang, Canonical Unívoco y Sitemaps Nativos de WordPress Core)
+- **DECISIÓN:** Se implementa la suite técnica de SEO Multilingüe de TF Multilingual estructurada en tres pilares inseparables:
+  1. **Generación Soberana de Hreflang (`HreflangGenerator`):**
+     - Emite etiquetas `<link rel="alternate" hreflang="..." href="..." />` en `<head>` para contenido singular, taxonomías y portada.
+     - **Invariante de Publicación:** Solo las variantes de traducción con estado de publicación `'publish'` (`$post->post_status === 'publish'`) en idiomas activos son indexables e incluidas en `hreflang`. Contenidos en borrador (`draft`), privado, papelera o asociados a idiomas inactivos son estrictamente descartados.
+     - **Invariante de Frescura Editorial vs Publicación:** El estado `REVIEW` (`needs_review`) derivado del versionado lógico (Fase 2.3) es un indicador de frescura editorial interna, **no** un estado de visibilidad o despublicación. Por tanto, un contenido publicado (`'publish'`) que requiera revisión permanece plenamente indexable y debe ser emitido en `hreflang` y `sitemaps`.
+     - **Invariante Estricta de `x-default`:** La etiqueta `x-default` apunta de forma determinista y exclusiva a la URL de la variante en el idioma predeterminado del sitio (e.g. `es`), **únicamente** cuando existe una variante publicada válida en dicho idioma. Si un grupo de traducción solo cuenta con variantes publicadas en idiomas secundarios (e.g. `en` y `pt`, pero no `es`), la etiqueta `x-default` queda **estrictamente ausente** (jamás se inventa, jamás apunta a la portada de fallback, ni a un idioma secundario arbitrario).
+  2. **Gestión Unívoca de Canonical (`CanonicalUrlManager`):**
+     - Cada variante de traducción indexable cuenta con su propia URL canónica localizada (`rel="canonical"`). Queda prohibido apuntar todas las traducciones al idioma predeterminado.
+     - Se intercepta el hook canónico de WordPress Core (`wp_get_canonical_url`) y los hooks canónicos de suites SEO de terceros populares (`wpseo_canonical` para Yoast SEO y `rank_math/canonical_url` para Rank Math), garantizando compatibilidad sin acoplamiento duro y evitando etiquetas canónicas duplicadas o conflictivas.
+  3. **Integración con XML Sitemaps Nativos de WordPress Core (`CoreSitemapsFilter`):**
+     - Se reutiliza la infraestructura nativa de WordPress Core (`wp_sitemaps`) sin crear sitemaps paralelos.
+     - Para evitar que el aislamiento de consultas de TFML oculte las traducciones de otros idiomas durante la generación del sitemap, se interceptan las consultas de posts y taxonomías (`wp_sitemaps_posts_query_args` y `wp_sitemaps_taxonomies_query_args`) estableciendo `tfml_suppress_filters => true`, y se excluye el contexto sitemap (`is_sitemap()`, query var `sitemap`) en `QueryLanguageFilter` y `TermQueryLanguageFilter`.
+     - Las entradas del sitemap (`wp_sitemaps_posts_entry` y `wp_sitemaps_taxonomies_entry`) localizan dinámicamente `$entry['loc']` al idioma correspondiente de cada elemento y descartan entradas en borrador o pertenecientes a idiomas inactivos retornando un array vacío (`array()`).
+  4. **Frontend Hooking (`SeoFrontendFilter`):**
+     - Centraliza la inicialización de los componentes y conecta la salida HTML de `hreflang` a la acción `wp_head` con prioridad temprana (prioridad 2), exponiendo el filtro extensible `tfml_hreflang_variants`.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Indexación en motores de búsqueda, señalización multilingüe internacional y prevención de canibalización de contenidos o contenido duplicado entre idiomas.
+- **JUSTIFICACIÓN:** Cumple rigurosamente las especificaciones de Google Search Central y Bing Webmaster Guidelines para sitios multilingües, manteniendo la soberanía de la URL y evitando sobrecarga al no reinventar el motor de sitemaps de WordPress Core.
+- **CONSECUENCIAS:** Señalización internacional precisa y conforme a estándares; sitemaps automáticos y completos para todos los idiomas; compatibilidad sin fricción con Yoast SEO y Rank Math; cero bit drift y cero escrituras en bases de datos externas o tablas centinela.
+

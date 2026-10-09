@@ -310,6 +310,11 @@ class QueryLanguageFilter {
 			return true;
 		}
 
+		// Core Sitemaps requests.
+		if ( ( function_exists( 'is_sitemap' ) && is_sitemap() ) || ! empty( $query->get( 'sitemap' ) ) || ( function_exists( 'get_query_var' ) && ! empty( get_query_var( 'sitemap' ) ) ) ) {
+			return true;
+		}
+
 		return false;
 	}
 
