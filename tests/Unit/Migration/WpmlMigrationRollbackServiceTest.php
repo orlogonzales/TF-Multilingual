@@ -196,4 +196,85 @@ class WpmlMigrationRollbackServiceTest extends TestCase {
 
 		$service->rollback_groups( array( 99 ), 'exec_fail' );
 	}
+
+	/**
+	 * Test 5: Rollback blocks unowned/foreign groups even if force = true.
+	 */
+	public function test_rollback_blocks_unowned_or_foreign_groups_even_if_force_true(): void {
+		$db         = $this->create_mock_db();
+		$group_repo = $this->createMock( TranslationGroupRepository::class );
+
+		$service      = new WpmlMigrationRollbackService( $db, $group_repo );
+		$execution_id = 'exec_ownership_alpha';
+
+		// Register manifest for execution Alpha stating it only created group 42.
+		$service->save_execution_manifest(
+			$execution_id,
+			array(
+				'execution_id'       => $execution_id,
+				'imported_group_ids' => array( 42 ),
+			)
+		);
+
+		// An unauthorized attempt tries to rollback group 999 (foreign or pre-existing) using force = true.
+		$group_repo->expects( $this->never() )->method( 'delete' );
+
+		$res = $service->rollback_groups( array( 999 ), $execution_id, true );
+
+		$this->assertFalse( $res['success'] );
+		$this->assertSame( 1, $res['blocked_groups_count'] );
+		$this->assertSame( 0, $res['reverted_groups_count'] );
+		$this->assertSame( 'not_owned', $res['blocked_groups'][0]['code'] );
+		$this->assertStringContainsString( 'propiedad no demostrada', $res['blocked_groups'][0]['reason'] );
+
+		// Clean up.
+		$service->delete_execution_manifest( $execution_id );
+	}
+
+	/**
+	 * Test 6: Rollback only reverts owned groups and strictly preserves pre-existing groups.
+	 */
+	public function test_rollback_preserves_preexisting_groups_during_partial_rollback(): void {
+		$db         = $this->create_mock_db();
+		$group_repo = $this->createMock( TranslationGroupRepository::class );
+
+		$group_owned = TranslationGroup::create( 'post', 'post', 10, 42 );
+		$el1         = TranslationElement::create( 'post', 10, 'es', 42 );
+		$group_owned->add_element( $el1, true );
+
+		$group_repo->method( 'find' )->willReturnCallback(
+			function ( int $id ) use ( $group_owned ) {
+				if ( 42 === $id ) {
+					return $group_owned;
+				}
+				return null;
+			}
+		);
+
+		// Group 42 MUST be deleted, but group 999 MUST NEVER be deleted.
+		$group_repo->expects( $this->once() )->method( 'delete' )->with( 42 )->willReturn( true );
+
+		$service      = new WpmlMigrationRollbackService( $db, $group_repo );
+		$execution_id = 'exec_ownership_beta';
+
+		$service->save_execution_manifest(
+			$execution_id,
+			array(
+				'execution_id'       => $execution_id,
+				'imported_group_ids' => array( 42 ),
+			)
+		);
+
+		// Request rollback of both group 42 (owned) and group 999 (pre-existing / unowned).
+		$res = $service->rollback_groups( array( 42, 999 ), $execution_id, false );
+
+		$this->assertTrue( $res['success'] );
+		$this->assertSame( 1, $res['reverted_groups_count'] );
+		$this->assertSame( 1, $res['blocked_groups_count'] );
+		$this->assertSame( 999, $res['blocked_groups'][0]['group_id'] );
+		$this->assertSame( 'not_owned', $res['blocked_groups'][0]['code'] );
+
+		// Clean up.
+		$service->delete_execution_manifest( $execution_id );
+	}
 }

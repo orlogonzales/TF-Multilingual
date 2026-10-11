@@ -75,27 +75,96 @@ class WpmlMigrationRollbackService {
 	}
 
 	/**
+	 * Option key prefix for migration execution manifests.
+	 */
+	public const OPTION_MANIFEST_PREFIX = 'tfml_migration_manifest_';
+
+	/**
+	 * Gets the persisted execution manifest for an execution token.
+	 *
+	 * @param string $execution_id Execution token.
+	 * @return array<string, mixed>|null
+	 */
+	public function get_execution_manifest( string $execution_id ): ?array {
+		if ( '' === trim( $execution_id ) || ! function_exists( 'get_option' ) ) {
+			return null;
+		}
+
+		$manifest = get_option( self::OPTION_MANIFEST_PREFIX . $execution_id, null );
+
+		return is_array( $manifest ) ? $manifest : null;
+	}
+
+	/**
+	 * Saves or registers an execution manifest.
+	 *
+	 * @param string               $execution_id Execution token.
+	 * @param array<string, mixed> $data         Manifest data.
+	 * @return bool
+	 */
+	public function save_execution_manifest( string $execution_id, array $data ): bool {
+		if ( '' === trim( $execution_id ) || ! function_exists( 'update_option' ) ) {
+			return false;
+		}
+
+		return update_option( self::OPTION_MANIFEST_PREFIX . $execution_id, $data, false );
+	}
+
+	/**
+	 * Deletes an execution manifest upon successful rollback.
+	 *
+	 * @param string $execution_id Execution token.
+	 * @return bool
+	 */
+	public function delete_execution_manifest( string $execution_id ): bool {
+		if ( '' === trim( $execution_id ) || ! function_exists( 'delete_option' ) ) {
+			return false;
+		}
+
+		return delete_option( self::OPTION_MANIFEST_PREFIX . $execution_id );
+	}
+
+	/**
 	 * Inspects potential rollback dependencies and blockers before executing deletion.
 	 *
-	 * Detects whether groups have been edited by editorial users post-migration.
+	 * Enforces strict execution ownership (preventing deletion of pre-existing or foreign groups)
+	 * and detects whether groups have been edited by editorial users post-migration.
 	 *
-	 * @param array<int, int> $group_ids List of group IDs to inspect.
+	 * @param array<int, int> $group_ids    List of group IDs to inspect.
+	 * @param string          $execution_id Execution token to verify ownership against.
 	 * @return array{
 	 *     eligible_groups: array<int, int>,
-	 *     blocked_groups: array<int, array{group_id: int, reason: string}>
+	 *     blocked_groups: array<int, array{group_id: int, reason: string, code: string}>
 	 * }
 	 */
-	public function inspect_dependencies( array $group_ids ): array {
+	public function inspect_dependencies( array $group_ids, string $execution_id = '' ): array {
 		$eligible = array();
 		$blocked  = array();
 
+		$manifest  = '' !== $execution_id ? $this->get_execution_manifest( $execution_id ) : null;
+		$owned_ids = null !== $manifest && isset( $manifest['imported_group_ids'] )
+			? array_map( 'intval', (array) $manifest['imported_group_ids'] )
+			: null;
+
 		foreach ( $group_ids as $group_id ) {
-			$group = $this->group_repository->find( (int) $group_id );
+			$group_id = (int) $group_id;
+
+			// 1. Strict execution ownership verification.
+			if ( null !== $owned_ids && ! in_array( $group_id, $owned_ids, true ) ) {
+				$blocked[] = array(
+					'group_id' => $group_id,
+					'reason'   => sprintf( 'El grupo ID %d no fue creado por la ejecución "%s" (propiedad no demostrada; protegido contra eliminación).', $group_id, $execution_id ),
+					'code'     => 'not_owned',
+				);
+				continue;
+			}
+
+			$group = $this->group_repository->find( $group_id );
 			if ( null === $group ) {
 				continue;
 			}
 
-			// Check for post-migration content version increment.
+			// 2. Check for post-migration content version increment.
 			$has_editorial_edits = false;
 			foreach ( $group->get_elements() as $element ) {
 				if ( $element->get_current_content_version() > $element->get_source_version_at_translation() ) {
@@ -106,11 +175,12 @@ class WpmlMigrationRollbackService {
 
 			if ( $has_editorial_edits ) {
 				$blocked[] = array(
-					'group_id' => (int) $group_id,
+					'group_id' => $group_id,
 					'reason'   => 'El grupo presenta ediciones editoriales posteriores a la migración (versión de contenido incrementada).',
+					'code'     => 'editorial_edits',
 				);
 			} else {
-				$eligible[] = (int) $group_id;
+				$eligible[] = $group_id;
 			}
 		}
 
@@ -131,20 +201,37 @@ class WpmlMigrationRollbackService {
 	 *     reverted_groups_count: int,
 	 *     reverted_elements_count: int,
 	 *     blocked_groups_count: int,
-	 *     blocked_groups: array<int, array{group_id: int, reason: string}>,
+	 *     blocked_groups: array<int, array{group_id: int, reason: string, code?: string}>,
 	 *     message: string
 	 * }
 	 * @throws MigrationExecutionException If transaction fails.
 	 */
 	public function rollback_execution( MigrationExecutionReport $report, bool $force = false ): array {
-		$group_ids = $report->get_imported_group_ids();
+		$execution_id = $report->get_execution_id();
+		$group_ids    = $report->get_imported_group_ids();
 
-		$result = $this->rollback_groups( $group_ids, $report->get_execution_id(), $force );
+		// Auto-register manifest from execution report if not already persisted.
+		if ( '' !== $execution_id && null === $this->get_execution_manifest( $execution_id ) ) {
+			$this->save_execution_manifest(
+				$execution_id,
+				array(
+					'execution_id'       => $execution_id,
+					'source'             => $report->get_source(),
+					'imported_group_ids' => $group_ids,
+					'created_at'         => $report->get_started_at(),
+				)
+			);
+		}
+
+		$result = $this->rollback_groups( $group_ids, $execution_id, $force );
 
 		// Reset checkpoint for source upon full execution rollback.
 		if ( $result['success'] ) {
 			$this->checkpoint_repository->delete( $report->get_source() );
 			$this->lock->force_release( $report->get_source() );
+			if ( '' !== $execution_id ) {
+				$this->delete_execution_manifest( $execution_id );
+			}
 		}
 
 		return $result;
@@ -162,7 +249,7 @@ class WpmlMigrationRollbackService {
 	 *     reverted_groups_count: int,
 	 *     reverted_elements_count: int,
 	 *     blocked_groups_count: int,
-	 *     blocked_groups: array<int, array{group_id: int, reason: string}>,
+	 *     blocked_groups: array<int, array{group_id: int, reason: string, code?: string}>,
 	 *     message: string
 	 * }
 	 * @throws MigrationExecutionException If database operation fails.
@@ -180,9 +267,19 @@ class WpmlMigrationRollbackService {
 			);
 		}
 
-		$inspection = $this->inspect_dependencies( $group_ids );
-		$eligible   = $force ? $group_ids : $inspection['eligible_groups'];
-		$blocked    = $force ? array() : $inspection['blocked_groups'];
+		$inspection = $this->inspect_dependencies( $group_ids, $execution_id );
+		$eligible   = $inspection['eligible_groups'];
+		$blocked    = array();
+
+		foreach ( $inspection['blocked_groups'] as $item ) {
+			// force = true ONLY overrides post-migration editorial edits of legitimately owned groups.
+			// It NEVER overrides lack of ownership (pre-existing or foreign groups are strictly protected)!
+			if ( $force && 'editorial_edits' === ( $item['code'] ?? '' ) ) {
+				$eligible[] = (int) $item['group_id'];
+			} else {
+				$blocked[] = $item;
+			}
+		}
 
 		if ( empty( $eligible ) && ! empty( $blocked ) ) {
 			return array(
@@ -192,7 +289,7 @@ class WpmlMigrationRollbackService {
 				'reverted_elements_count' => 0,
 				'blocked_groups_count'    => count( $blocked ),
 				'blocked_groups'          => $blocked,
-				'message'                 => 'Reversión abortada: todos los grupos planificados presentan dependencias o ediciones posteriores.',
+				'message'                 => 'Reversión abortada: ningún grupo es elegible para eliminación (bloqueados por falta de propiedad demostrada o ediciones posteriores).',
 			);
 		}
 

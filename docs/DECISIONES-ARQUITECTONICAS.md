@@ -522,3 +522,30 @@
 - **CONTEXTO:** Fase 3.7 — Validación integral del migrador en entorno aislado y reversibilidad.
 - **JUSTIFICACIÓN:** Toda migración debe ser inherentemente reversible sin dejar basura residual en TFML ni dañar las entidades del sitio origen, proporcionando un canal de marcha atrás seguro si se detectan anomalías tras la migración.
 - **CONSECUENCIAS:** Seguridad operacional garantizada: la migración puede ejecutarse sabiendo que existe un mecanismo formal y probado de reversión total sin impacto en WordPress Core ni en WPML.
+
+---
+
+### ADR-034: Preparación y Certificación de Laboratorio Aislado, Acreditación de Propiedad en Rollback y Salvaguarda de Datos Reales
+- **DECISIÓN:**
+  1. **Aislamiento Técnico del Laboratorio Staging (`lab.ecoterra` y `cms_ect_lab`):**
+     - Creación de un entorno de ejecución completamente desacoplado del sitio de producción `cms.ecoterra`:
+       - Directorio propio e independiente: `d:\laragon\www\lab.ecoterra`.
+       - Base de datos MySQL exclusiva e independiente: `cms_ect_lab` (separada de `cms_ect` y de cualquier base de datos de otros proyectos).
+       - Archivo `wp-config.php` propio con credenciales y sales criptográficas exclusivas.
+       - URL local soberana: `http://lab.ecoterra.test`.
+       - Bloqueo total de comunicaciones externas salientes: `WP_HTTP_BLOCK_EXTERNAL = true`, `WP_ACCESSIBLE_HOSTS = localhost,127.0.0.1`.
+       - Bloqueo estricto de envíos de correo: filtro prioritario en `pre_wp_mail` forzado a `false`.
+       - Protección contra indexación: `blog_public = 0`, cabecera HTTP `X-Robots-Tag: noindex, nofollow, noarchive` y meta robots.
+       - Desactivación de ejecución en background y auto-actualizaciones: `DISABLE_WP_CRON = true`, `DISALLOW_FILE_EDIT = true`, `AUTOMATIC_UPDATER_DISABLED = true`.
+  2. **Auditoría Avanzada de Propiedad de Ejecución en el Motor de Rollback:**
+     - Implementación del registro de manifiesto de ejecución (`tfml_migration_manifest_{execution_id}`) que almacena formalmente la lista estricta de IDs de grupos creados durante una corrida (`imported_group_ids`).
+     - `WpmlMigrationRollbackService::inspect_dependencies()` valida la titularidad: si un grupo no fue creado por la ejecución en cuestión, es clasificado como `not_owned` y bloqueado.
+     - **Inmunidad de Grupos Preexistentes y Ajenos frente a `force = true`:** La bandera `$force = true` únicamente anula bloqueos por modificaciones editoriales posteriores (`editorial_edits`) sobre grupos legítimamente propios, pero **NUNCA** permite eliminar grupos no pertenecientes a la ejecución ni grupos preexistentes (`not_owned`).
+  3. **Salvaguarda Soberana del Sitio Origen y Protocolo de Copia:**
+     - La base de datos original `cms_ect` permanece como fuente estrictamente de solo lectura (`0 INSERT / UPDATE / DELETE`).
+     - Se prohíbe taxativamente la copia de tablas reales de producción a `cms_ect_lab` sin la autorización previa y expresa del usuario.
+     - La Fase 3.8 queda certificada con esquemas limpios y datos sintéticos en el laboratorio, preparando la infraestructura técnica para la fase subsiguiente de respaldo y copia consentida.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.8 — Preparación y certificación del laboratorio aislado.
+- **JUSTIFICACIÓN:** Validar migraciones con datos reales exige un entorno estéril, contenido y protegido contra filtraciones (correos a clientes reales, webhooks o indexación), junto con un motor de reversión blindado contra la eliminación accidental de datos de otras operaciones.
+- **CONSECUENCIAS:** Entorno seguro y reproducible listo para recibir datos reales una vez autorizados, con garantías matemáticas de que el rollback no destruirá grupos preexistentes ni sobrepasará los límites de su propia ejecución.

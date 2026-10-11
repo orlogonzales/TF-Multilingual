@@ -746,6 +746,30 @@ class WpmlMigrationExecutor {
 		// Count imported elements from reconciliation.
 		$imported_elements = (int) ( $reconciliation['tfml_imported_elements'] ?? 0 );
 
+		// Extract imported group IDs and register execution manifest for ownership tracking.
+		$imported_group_ids = array();
+		foreach ( $all_results as $res ) {
+			if ( 'imported' === ( $res['status'] ?? '' ) && ! empty( $res['group_id'] ) ) {
+				$imported_group_ids[] = (int) $res['group_id'];
+			}
+		}
+		$imported_group_ids = array_values( array_unique( $imported_group_ids ) );
+
+		if ( function_exists( 'update_option' ) ) {
+			update_option(
+				WpmlMigrationRollbackService::OPTION_MANIFEST_PREFIX . $token,
+				array(
+					'execution_id'       => $token,
+					'source'             => 'wpml',
+					'plan_fingerprint'   => $plan->get_fingerprint(),
+					'imported_group_ids' => $imported_group_ids,
+					'started_at'         => $started_at,
+					'finished_at'        => gmdate( 'Y-m-d H:i:s' ),
+				),
+				false
+			);
+		}
+
 		return new MigrationExecutionReport(
 			array(
 				'execution_id'         => $token,

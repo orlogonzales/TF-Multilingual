@@ -756,3 +756,33 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Regresiones Core, constructores y migración: Fases 3.6 (34/34), 3.5 (31/31), 3.4 (31/31), 3.3 (38/38), 3.2 (35/35), 3.1 (27/27), 2.8 (53/53) **100% PASS** (216/216 regresiones).
   - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
   - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
+
+---
+
+## [Fase 3.8] - 2026-10-11
+
+### Preparación y Certificación del Laboratorio Aislado y Auditoría de Propiedad en Rollback
+- **Aprovisionamiento y Aislamiento del Laboratorio Staging:**
+  - Creación de directorio independiente en `d:\laragon\www\lab.ecoterra` con Core WordPress completo y Directory Junction hacia el repositorio de `tf-multilingual`.
+  - Creación de base de datos MySQL exclusiva `cms_ect_lab` (independiente de `cms_ect` y sin uso de bases de datos de otros proyectos).
+  - Configuración aislada en `wp-config.php` con credenciales separadas, URL local soberana `http://lab.ecoterra.test` y sales criptográficas exclusivas.
+  - Implementación de salvaguardas de contención: `WP_HTTP_BLOCK_EXTERNAL = true`, `DISABLE_WP_CRON = true`, `DISALLOW_FILE_EDIT = true`, `AUTOMATIC_UPDATER_DISABLED = true`.
+  - Creación del `mu-plugins/lab-isolation-guard.php` con cortocircuito de correos (`pre_wp_mail -> false`), forzado de cabecera y meta `X-Robots-Tag: noindex, nofollow, noarchive` y bloqueo de XML-RPC / pingbacks.
+- **Esquema Limpio y Verificación de Infraestructura en `cms_ect_lab`:**
+  - Instalación limpia de tablas Core (`wp_options`, `wp_posts`, `wp_postmeta`, `wp_terms`, `wp_term_taxonomy`, `wp_term_relationships`).
+  - Creación de las 5 tablas maestras de TFML (`wp_tfml_groups`, `wp_tfml_group_elements`, `wp_tfml_media_translations`, `wp_tfml_strings`, `wp_tfml_string_translations`).
+  - Verificación de transacciones InnoDB, confirmación (`COMMIT`) y reversión (`ROLLBACK`) de infraestructura en `cms_ect_lab`.
+- **Auditoría Avanzada de Propiedad de Ejecución en el Motor de Rollback:**
+  - Registro de manifiesto de ejecución (`tfml_migration_manifest_{execution_id}`) persistido por `WpmlMigrationExecutor::run()` y gestionado por `WpmlMigrationRollbackService`.
+  - Verificación estricta de titularidad en `inspect_dependencies()`: los grupos que no consten en el manifiesto son clasificados como `not_owned`.
+  - Inmunidad de grupos ajenos y preexistentes frente a `$force = true`: la bandera forzada solo anula el bloqueo de ediciones editoriales (`editorial_edits`) en grupos propios, pero **NUNCA** elimina grupos no creados por la ejecución.
+- **Protección y Salvaguarda del Sitio Origen:**
+  - Conexión al sitio origen `cms.ecoterra` (`cms_ect`) estrictamente de solo lectura (cero escrituras).
+  - Constatación formal de que las tablas de WPML no han sido copiadas a `cms_ect_lab`, manteniéndose la copia real pendiente de autorización expresa del usuario.
+- **Verificación Integral y Calidad:**
+  - Suite de pruebas unitarias ampliada: **519 tests, 1.777 assertions, 0 errors, 0 failures, 0 warnings, 0 deprecations**.
+  - Estándares WPCS / PHPCS: **167/167 archivos analizados, 0 errors, 0 warnings**.
+  - Verificación en laboratorio real WordPress (`scratch/verify_fase_3_8.php`): **48/48 assertions passed (100%)**.
+  - Regresiones Core, constructores y migración: Fases 3.7 (49/49), 3.6 (34/34), 3.5 (31/31), 3.4 (31/31), 3.3 (38/38), 3.2 (35/35), 3.1 (27/27), 2.8 (53/53) **100% PASS** (265/265 regresiones).
+  - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+  - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.

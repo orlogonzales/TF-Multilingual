@@ -315,6 +315,24 @@ class MigrationExecutionReport {
 	}
 
 	/**
+	 * Gets execution start timestamp.
+	 *
+	 * @return string
+	 */
+	public function get_started_at(): string {
+		return $this->started_at;
+	}
+
+	/**
+	 * Gets execution finish timestamp.
+	 *
+	 * @return string|null
+	 */
+	public function get_finished_at(): ?string {
+		return $this->finished_at;
+	}
+
+	/**
 	 * Converts report to serializable array.
 	 *
 	 * @return array<string, mixed>
