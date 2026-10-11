@@ -126,8 +126,10 @@ class MigrationExecutionReport {
 	 * @var array{
 	 *     source_total_groups: int,
 	 *     tfml_imported_groups: int,
+	 *     tfml_imported_elements: int,
 	 *     skipped_groups: int,
 	 *     retained_pending_elements: int,
+	 *     discrepancies: array<int, string>,
 	 *     integrity_verified: bool
 	 * }
 	 */

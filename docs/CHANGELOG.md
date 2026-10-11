@@ -696,10 +696,35 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
   - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
 
+---
 
+## [Fase 3.6] - 2026-10-11
 
-
-
-
+### Endurecimiento del Ejecutor Transaccional, Fencing Tokens y Pruebas de Recuperación
+- **Fencing Tokens y Renovación Segura de Concurrencia:**
+  - Incorporación de métodos `verify_ownership(string $source, string $execution_id): bool` y `renew(string $source, string $execution_id, int $ttl): bool` en `MigrationExecutionLock`.
+  - Verificación estricta de posesión (fencing token) al iniciar cada lote y justo antes de confirmar (`COMMIT`) la transacción SQL en `WpmlMigrationExecutor::execute_batch()`.
+  - Reversión transaccional inmediata (`ROLLBACK`) ante locks expirados o apropiados por otros procesos, evitando escrituras en split-brain o desincronizadas (`MigrationConcurrencyException`).
+- **Huellas Digitales Criptográficas Deterministas del Plan (`MigrationPlan::get_fingerprint`):**
+  - Cálculo de hash SHA-256 inmutable sobre el manifiesto del plan (`source`, `status`, dependencias de idiomas, métricas de resumen, estrategia de medios y grupos planificados).
+  - Método `verify_fingerprint(string $expected): bool` integrado en la validación del plan para asegurar la no alteración del plan entre dry-run y ejecución.
+- **Validación Avanzada de Planes Obsoletos y Divergencias de Datos:**
+  - `WpmlMigrationExecutor::validate_plan()` enriquecido con:
+    - Verificación física de entidades en WordPress Core mediante `WordPressElementValidator`.
+    - Detección y rechazo de publicaciones enviadas a la papelera (`get_post_status() === 'trash'`).
+    - Detección de divergencias en la fuente WPML (validación de correspondencia de TRID e idioma en `icl_translations`).
+    - Detección de colisiones relacionales sobrevenidas en TFML introducidas tras la planificación (asignaciones parciales o conflictivas).
+- **Recuperación Idempotente ante Interrupciones Post-COMMIT:**
+  - Garantía demostrada de recuperación ante cortes abruptos ocurridos tras el `COMMIT` en base de datos pero antes de guardar el checkpoint en `wp_options`.
+  - Detección de grupos persistidos que se clasifican como `idempotent_skipped`, avanzando el checkpoint con cero inserciones duplicadas y cero omisiones.
+- **Reconciliación Profunda de Integridad Relacional (`WpmlMigrationExecutor::reconcile`):**
+  - Verificación exhaustiva grupo a grupo: validación de tipo y subtipo, coincidencia del ID canónico (`get_canonical_element_id`), idioma canónico, paridad numérica y correspondencia exacta de cada traducción (`get_translation`), con reporte estructurado de discrepancias (`discrepancies`).
+- **Verificación Integral y Calidad:**
+  - Suite de pruebas unitarias ampliada: **513 tests, 1,743 assertions, 0 errors, 0 failures, 0 warnings, 0 deprecations**.
+  - Estándares WPCS / PHPCS: **165/165 archivos analizados, 0 errors, 0 warnings**.
+  - Verificación en laboratorio real WordPress (`scratch/verify_fase_3_6.php`): **34/34 assertions passed (100%)**.
+  - Regresiones Core, constructores y migración: Fases 3.5 (31/31), 3.4 (31/31), 3.3 (38/38), 3.2 (35/35), 3.1 (27/27), 2.8 (53/53) **100% PASS**.
+  - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+  - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
 
 

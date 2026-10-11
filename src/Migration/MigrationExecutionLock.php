@@ -62,6 +62,61 @@ class MigrationExecutionLock {
 	}
 
 	/**
+	 * Renews an existing lock for a given migration source if owned by execution ID.
+	 *
+	 * @param string $source       Migration source identifier.
+	 * @param string $execution_id Unique execution token that holds the lock.
+	 * @param int    $ttl          Time-to-live extension in seconds.
+	 * @return bool True if lock was renewed, false if expired or owned by another process.
+	 */
+	public function renew( string $source, string $execution_id, int $ttl = self::DEFAULT_TTL ): bool {
+		$key     = self::OPTION_PREFIX . $source;
+		$current = get_option( $key, null );
+		$now     = time();
+
+		if ( ! is_array( $current ) ) {
+			return false;
+		}
+
+		$owner_id   = (string) ( $current['execution_id'] ?? '' );
+		$expires_at = (int) ( $current['expires_at'] ?? 0 );
+
+		// Fencing: cannot renew if ownership was lost or expired.
+		if ( $owner_id !== $execution_id || $expires_at <= $now ) {
+			return false;
+		}
+
+		$current['expires_at'] = $now + $ttl;
+		$current['renewed_at'] = gmdate( 'Y-m-d H:i:s' );
+
+		return update_option( $key, $current, false );
+	}
+
+	/**
+	 * Verifies that the lock is currently valid and owned by the specified execution ID.
+	 *
+	 * Acts as a fencing token verification to prevent stale processes from writing after losing a lock.
+	 *
+	 * @param string $source       Migration source identifier.
+	 * @param string $execution_id Unique execution token.
+	 * @return bool True if lock is active and owned by execution ID.
+	 */
+	public function verify_ownership( string $source, string $execution_id ): bool {
+		$key     = self::OPTION_PREFIX . $source;
+		$current = get_option( $key, null );
+
+		if ( ! is_array( $current ) ) {
+			return false;
+		}
+
+		$owner_id   = (string) ( $current['execution_id'] ?? '' );
+		$expires_at = (int) ( $current['expires_at'] ?? 0 );
+
+		return $owner_id === $execution_id && $expires_at > time();
+	}
+
+
+	/**
 	 * Releases an acquired lock if owned by the given execution ID.
 	 *
 	 * @param string $source       Migration source identifier.

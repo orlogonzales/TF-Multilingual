@@ -216,6 +216,38 @@ class MigrationPlan {
 	}
 
 	/**
+	 * Computes a deterministic cryptographic fingerprint of the migration plan.
+	 *
+	 * Detects alterations in plan structure, source, language dependencies, or group definitions.
+	 *
+	 * @return string SHA-256 fingerprint.
+	 */
+	public function get_fingerprint(): string {
+		$payload = array(
+			'source'            => $this->source,
+			'status'            => $this->status,
+			'missing_languages' => $this->missing_languages,
+			'summary'           => $this->summary,
+			'media_plan'        => $this->media_plan,
+			'planned_groups'    => $this->planned_groups,
+		);
+
+		$encoded = function_exists( 'wp_json_encode' ) ? wp_json_encode( $payload ) : json_encode( $payload );
+
+		return hash( 'sha256', (string) $encoded );
+	}
+
+	/**
+	 * Verifies whether an expected fingerprint matches this plan.
+	 *
+	 * @param string $expected Expected SHA-256 fingerprint.
+	 * @return bool True if fingerprints match identically.
+	 */
+	public function verify_fingerprint( string $expected ): bool {
+		return hash_equals( $this->get_fingerprint(), $expected );
+	}
+
+	/**
 	 * Convert plan to array for reporting and REST exposure.
 	 *
 	 * @return array<string, mixed>
@@ -228,6 +260,7 @@ class MigrationPlan {
 			'summary'           => $this->summary,
 			'media_plan'        => $this->media_plan,
 			'planned_groups'    => $this->planned_groups,
+			'fingerprint'       => $this->get_fingerprint(),
 		);
 	}
 }

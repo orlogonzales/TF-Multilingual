@@ -471,10 +471,29 @@
 - **JUSTIFICACIÓN:** La ejecución de planes de migración complejos exige garantías matemáticas de atomicidad, control de concurrencia para evitar condiciones de carrera, salvaguardas contra datos obsoletos, y estricta idempotencia para que cualquier reintento o reanudación sea 100% seguro.
 - **CONSECUENCIAS:** Capacidad de procesar lotes, recuperarse de interrupciones y evitar duplicaciones sin poner en riesgo la base de datos real de `cms.ecoterra`.
 
+---
 
-
-
-
-
+### ADR-032: Endurecimiento del Ejecutor Transaccional, Fencing Tokens, Validación Criptográfica y Reconciliación Profunda
+- **DECISIÓN:**
+  1. **Control de Concurrencia y Fencing Tokens (`verify_ownership` & `renew`):**
+     - Incorporación de renovación activa de locks (`renew()`) y verificación de posesión (`verify_ownership()`) como fencing tokens tanto al inicio de cada lote como inmediatamente antes de confirmar cada `COMMIT` transaccional.
+     - Si un proceso pierde el lock por expiración (TTL) o desincronización antes de escribir, la transacción es abortada inmediatamente y revertida (`ROLLBACK`) arrojando `MigrationConcurrencyException`, impidiendo escrituras en conflicto o situaciones split-brain.
+  2. **Huellas Digitales Criptográficas Deterministas del Plan (`MigrationPlan::get_fingerprint`):**
+     - Cálculo de un hash SHA-256 canónico y determinista sobre la totalidad del manifiesto del plan (`source`, `status`, dependencias de idiomas, métricas de resumen, estrategia de medios y grupos planificados).
+     - Validación obligatoria de huella opcional (`verify_fingerprint`) para garantizar que el plan ejecutado sea idéntico al plan auditado durante el dry-run.
+  3. **Detección Rigurosa de Planes Obsoletos y Divergencias de Datos:**
+     - En `validate_plan()`, se comprueba de forma exhaustiva antes de cualquier lote:
+       - Existencia física en WordPress Core mediante `WordPressElementValidator`.
+       - Detección de elementos enviados a la papelera (`get_post_status() === 'trash'`), abortando con error explícito de obsolescencia.
+       - Detección de divergencias en la fuente WPML: verificación de que el elemento conserve el mismo TRID e idioma en `icl_translations`.
+       - Detección de colisiones relacionales sobrevenidas en TFML introducidas tras la fase de planificación (asignaciones parciales o conflictivas).
+  4. **Recuperación Idempotente ante Interrupciones Post-COMMIT:**
+     - En caso de una interrupción abrupta (corte de servidor o timeout) ocurrida tras el `COMMIT` en base de datos pero antes de la persistencia del checkpoint en `wp_options`, la reanudación del proceso identifica que los elementos ya pertenecen al grupo (`count($translations) === $found_count && 1 === count($existing_groups)`), clasifica el lote como `idempotent_skipped` y avanza el checkpoint sin generar inserciones duplicadas en `tfml_groups` ni en `tfml_group_elements`.
+  5. **Reconciliación Profunda de Integridad Relacional:**
+     - El método `reconcile()` valida exhaustivamente elemento por elemento: correspondencia de tipo y subtipo, coincidencia del ID canónico, coincidencia del idioma canónico, paridad numérica de elementos y correspondencia exacta de cada traducción por código de idioma, reportando cualquier anomalía en una lista estructurada de discrepancias (`discrepancies`).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.6 — Endurecimiento del ejecutor y pruebas de recuperación.
+- **JUSTIFICACIÓN:** Antes de realizar importaciones en entornos reales, el ejecutor transaccional debe blindarse frente a interrupciones imprevistas de infraestructura, evitar escrituras obsoletas si los datos en WordPress Core o WPML cambiaron tras el dry-run, y garantizar trazabilidad criptográfica absoluta.
+- **CONSECUENCIAS:** Motor de migración robusto, tolerante a fallos, protegido contra desincronizaciones de concurrencia y completamente verificable mediante reconciliación profunda.
 
 

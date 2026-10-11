@@ -213,17 +213,21 @@ class WpmlMigrationExecutorTest extends TestCase {
 
 		// First pass: find_by_element returns null (elements not yet imported).
 		// Second pass: find_by_element returns persisted_group (already imported).
-		$call_count = 0;
+		$is_imported = false;
 		$group_repo->method( 'find_by_element' )
 			->willReturnCallback(
-				function () use ( &$call_count, $persisted_group ) {
-					++$call_count;
-					// During second pass, return existing group.
-					return $call_count > 2 ? $persisted_group : null;
+				function () use ( &$is_imported, $persisted_group ) {
+					return $is_imported ? $persisted_group : null;
 				}
 			);
 
-		$group_repo->method( 'create_group' )->willReturn( $persisted_group );
+		$group_repo->method( 'create_group' )
+			->willReturnCallback(
+				function () use ( &$is_imported, $persisted_group ) {
+					$is_imported = true;
+					return $persisted_group;
+				}
+			);
 		$group_repo->method( 'add_translation' )->willReturn( TranslationElement::create( 'post', 101, 'en', 42 ) );
 
 		$executor = new WpmlMigrationExecutor(
@@ -467,5 +471,405 @@ class WpmlMigrationExecutorTest extends TestCase {
 		$this->assertTrue( $report->is_completed() );
 		$this->assertSame( 4, $report->get_skipped_groups() );
 		$this->assertSame( 0, $report->get_imported_groups() );
+	}
+
+	/**
+	 * Test 8: Fencing token verification rejects writing if lock was expired or hijacked before COMMIT.
+	 */
+	public function test_fencing_token_rejects_expired_or_stolen_lock_before_commit(): void {
+		$db        = $this->create_mock_db();
+		$registry  = $this->create_test_registry();
+		$validator = $this->createMock( WordPressElementValidator::class );
+		$validator->method( 'exists' )->willReturn( true );
+
+		$group_repo = $this->createMock( TranslationGroupRepository::class );
+		$schema     = $this->createMock( SchemaManager::class );
+		$schema->method( 'is_installed' )->willReturn( true );
+
+		// Simulate lock manager where initial verify succeeds, but right before commit verify_ownership fails (expired/stolen).
+		$lock = $this->createMock( MigrationExecutionLock::class );
+		$lock->method( 'acquire' )->willReturn( true );
+		$lock_calls = 0;
+		$lock->method( 'verify_ownership' )->willReturnCallback(
+			function () use ( &$lock_calls ) {
+				++$lock_calls;
+				// First check during execute_batch passes; second check before COMMIT fails (lock lost).
+				return $lock_calls < 2;
+			}
+		);
+
+		$group_repo->expects( $this->once() )->method( 'begin_transaction' );
+		$group_repo->expects( $this->once() )->method( 'rollback_transaction' );
+		$group_repo->expects( $this->never() )->method( 'commit_transaction' );
+
+		$persisted_group = TranslationGroup::create( 'post', 'post' )->with_id( 42 );
+		$group_repo->method( 'create_group' )->willReturn( $persisted_group );
+		$group_repo->method( 'add_translation' )->willReturn( TranslationElement::create( 'post', 101, 'en', 42 ) );
+
+		$executor = new WpmlMigrationExecutor(
+			$db,
+			$group_repo,
+			$registry,
+			null,
+			$lock,
+			$validator,
+			$schema
+		);
+		$executor->set_authorized( true );
+
+		$plan = new MigrationPlan(
+			array(
+				'source'         => 'wpml',
+				'status'         => MigrationPlan::STATUS_READY,
+				'planned_groups' => array(
+					array(
+						'trid'           => 10,
+						'element_type'   => 'post',
+						'subtype'        => 'post',
+						'canonical_id'   => 100,
+						'canonical_lang' => 'es',
+						'classification' => MigrationPlan::CLASSIFICATION_IMPORTABLE,
+						'translations'   => array(
+							'es' => 100,
+							'en' => 101,
+						),
+					),
+				),
+			)
+		);
+
+		$this->expectException( MigrationConcurrencyException::class );
+		$this->expectExceptionMessageMatches( '/Fencing token inválido o expirado/' );
+
+		$executor->execute_batch( $plan, 50, 'token_stolen' );
+	}
+
+	/**
+	 * Test 9: validate_plan rejects posts moved to trash since planning.
+	 */
+	public function test_validate_plan_rejects_trashed_post(): void {
+		$db        = $this->create_mock_db();
+		$registry  = $this->create_test_registry();
+		$validator = $this->createMock( WordPressElementValidator::class );
+		$validator->method( 'exists' )->willReturn( true );
+
+		$schema = $this->createMock( SchemaManager::class );
+		$schema->method( 'is_installed' )->willReturn( true );
+
+		$executor = new WpmlMigrationExecutor( $db, null, $registry, null, null, $validator, $schema );
+		$executor->set_authorized( true );
+
+		// Set post 100 as trashed.
+		$GLOBALS['wp_test_post_status'][100] = 'trash';
+
+		$plan = new MigrationPlan(
+			array(
+				'source'         => 'wpml',
+				'status'         => MigrationPlan::STATUS_READY,
+				'planned_groups' => array(
+					array(
+						'trid'           => 10,
+						'element_type'   => 'post',
+						'subtype'        => 'post',
+						'classification' => MigrationPlan::CLASSIFICATION_IMPORTABLE,
+						'translations'   => array(
+							'es' => 100,
+							'en' => 101,
+						),
+					),
+				),
+			)
+		);
+
+		$validation = $executor->validate_plan( $plan );
+		$this->assertFalse( $validation['valid'] );
+		$this->assertStringContainsString( 'se encuentra en la papelera (trash)', $validation['errors'][0] );
+
+		unset( $GLOBALS['wp_test_post_status'][100] );
+	}
+
+	/**
+	 * Test 10: validate_plan rejects plan if WPML icl_translations shifted TRID or language.
+	 */
+	public function test_validate_plan_rejects_wpml_source_divergence(): void {
+		$db        = $this->create_mock_db();
+		$registry  = $this->create_test_registry();
+		$validator = $this->createMock( WordPressElementValidator::class );
+		$validator->method( 'exists' )->willReturn( true );
+
+		$schema = $this->createMock( SchemaManager::class );
+		$schema->method( 'is_installed' )->willReturn( true );
+
+		// Table exists in DB.
+		$db->method( 'get_var' )->willReturn( 'wp_icl_translations' );
+
+		// Return row showing TRID in WPML shifted from 10 to 999!
+		$shifted_row = (object) array(
+			'trid'          => 999,
+			'language_code' => 'es',
+		);
+		$db->method( 'get_row' )->willReturn( $shifted_row );
+
+		$executor = new WpmlMigrationExecutor( $db, null, $registry, null, null, $validator, $schema );
+		$executor->set_authorized( true );
+
+		$plan = new MigrationPlan(
+			array(
+				'source'         => 'wpml',
+				'status'         => MigrationPlan::STATUS_READY,
+				'planned_groups' => array(
+					array(
+						'trid'           => 10,
+						'element_type'   => 'post',
+						'subtype'        => 'post',
+						'classification' => MigrationPlan::CLASSIFICATION_IMPORTABLE,
+						'translations'   => array( 'es' => 100 ),
+					),
+				),
+			)
+		);
+
+		$validation = $executor->validate_plan( $plan );
+		$this->assertFalse( $validation['valid'] );
+		$this->assertStringContainsString( 'Divergencia en fuente WPML detectada', $validation['errors'][0] );
+	}
+
+	/**
+	 * Test 11: validate_plan rejects plan if fingerprint mismatch is detected.
+	 */
+	public function test_validate_plan_rejects_fingerprint_mismatch(): void {
+		$db       = $this->create_mock_db();
+		$registry = $this->create_test_registry();
+		$schema   = $this->createMock( SchemaManager::class );
+		$schema->method( 'is_installed' )->willReturn( true );
+
+		$executor = new WpmlMigrationExecutor( $db, null, $registry, null, null, null, $schema );
+
+		$plan = new MigrationPlan(
+			array(
+				'source'         => 'wpml',
+				'status'         => MigrationPlan::STATUS_READY,
+				'planned_groups' => array(
+					array(
+						'trid'           => 1,
+						'classification' => 'SKIPPED',
+					),
+				),
+			)
+		);
+
+		$validation = $executor->validate_plan( $plan, 'tampered_sha256_hash_12345' );
+		$this->assertFalse( $validation['valid'] );
+		$this->assertStringContainsString( 'Huella digital del plan inválida', $validation['errors'][0] );
+	}
+
+	/**
+	 * Test 12: validate_plan rejects overlapping collisions introduced post-planning.
+	 */
+	public function test_validate_plan_rejects_overlapping_collision_post_planning(): void {
+		$db        = $this->create_mock_db();
+		$registry  = $this->create_test_registry();
+		$validator = $this->createMock( WordPressElementValidator::class );
+		$validator->method( 'exists' )->willReturn( true );
+
+		$group_repo = $this->createMock( TranslationGroupRepository::class );
+		$schema     = $this->createMock( SchemaManager::class );
+		$schema->method( 'is_installed' )->willReturn( true );
+
+		// Simulate element 100 already assigned to TFML group 5, but element 101 has no group (partial assignment conflict).
+		$group5 = TranslationGroup::create( 'post', 'post' )->with_id( 5 );
+		$group_repo->method( 'find_by_element' )->willReturnCallback(
+			fn( $type, $id ) => 100 === $id ? $group5 : null
+		);
+
+		$executor = new WpmlMigrationExecutor( $db, $group_repo, $registry, null, null, $validator, $schema );
+		$executor->set_authorized( true );
+
+		$plan = new MigrationPlan(
+			array(
+				'source'         => 'wpml',
+				'status'         => MigrationPlan::STATUS_READY,
+				'planned_groups' => array(
+					array(
+						'trid'           => 10,
+						'element_type'   => 'post',
+						'subtype'        => 'post',
+						'classification' => MigrationPlan::CLASSIFICATION_IMPORTABLE,
+						'translations'   => array(
+							'es' => 100,
+							'en' => 101,
+						),
+					),
+				),
+			)
+		);
+
+		$validation = $executor->validate_plan( $plan );
+		$this->assertFalse( $validation['valid'] );
+		$this->assertStringContainsString( 'Colisión relacional sobrevenida detectada', $validation['errors'][0] );
+	}
+
+	/**
+	 * Test 13: Deep reconciliation verifies canonical ID, language codes, subtype and translations.
+	 */
+	public function test_deep_reconciliation_verifies_canonical_and_translations(): void {
+		$db       = $this->create_mock_db();
+		$registry = $this->create_test_registry();
+
+		$group_repo = $this->createMock( TranslationGroupRepository::class );
+		$schema     = $this->createMock( SchemaManager::class );
+		$schema->method( 'is_installed' )->willReturn( true );
+
+		// Create a fully matched TFML group.
+		$canonical_el  = TranslationElement::create( 'post', 100, 'es', 42 );
+		$trans_el      = TranslationElement::create( 'post', 101, 'en', 42 );
+		$matched_group = TranslationGroup::create( 'post', 'page', 100, 42 );
+		$matched_group->add_element( $canonical_el, true );
+		$matched_group->add_element( $trans_el, false );
+
+		$group_repo->method( 'find_by_element' )->willReturn( $matched_group );
+
+		$executor = new WpmlMigrationExecutor( $db, $group_repo, $registry, null, null, null, $schema );
+
+		$plan = new MigrationPlan(
+			array(
+				'source'         => 'wpml',
+				'status'         => MigrationPlan::STATUS_READY,
+				'summary'        => array(
+					'importable_groups' => 1,
+					'pending_elements'  => 0,
+				),
+				'planned_groups' => array(
+					array(
+						'trid'           => 10,
+						'element_type'   => 'post',
+						'subtype'        => 'page',
+						'canonical_id'   => 100,
+						'canonical_lang' => 'es',
+						'classification' => MigrationPlan::CLASSIFICATION_IMPORTABLE,
+						'translations'   => array(
+							'es' => 100,
+							'en' => 101,
+						),
+					),
+				),
+			)
+		);
+
+		$reconcile_ok = $executor->reconcile( $plan );
+		$this->assertTrue( $reconcile_ok['integrity_verified'] );
+		$this->assertSame( 1, $reconcile_ok['tfml_imported_groups'] );
+		$this->assertSame( 2, $reconcile_ok['tfml_imported_elements'] );
+		$this->assertEmpty( $reconcile_ok['discrepancies'] );
+
+		// Now simulate mismatched canonical ID in plan (expected 999 instead of 100).
+		$mismatched_plan = new MigrationPlan(
+			array(
+				'source'         => 'wpml',
+				'status'         => MigrationPlan::STATUS_READY,
+				'summary'        => array(
+					'importable_groups' => 1,
+					'pending_elements'  => 0,
+				),
+				'planned_groups' => array(
+					array(
+						'trid'           => 10,
+						'element_type'   => 'post',
+						'subtype'        => 'page',
+						'canonical_id'   => 999, // Mismatched!
+						'canonical_lang' => 'es',
+						'classification' => MigrationPlan::CLASSIFICATION_IMPORTABLE,
+						'translations'   => array(
+							'es' => 100,
+							'en' => 101,
+						),
+					),
+				),
+			)
+		);
+
+		$reconcile_bad = $executor->reconcile( $mismatched_plan );
+		$this->assertFalse( $reconcile_bad['integrity_verified'] );
+		$this->assertNotEmpty( $reconcile_bad['discrepancies'] );
+		$this->assertStringContainsString( 'no coincide con el plan', $reconcile_bad['discrepancies'][0] );
+	}
+
+	/**
+	 * Test 14: Post-COMMIT crash resumption executes cleanly without duplicates or omissions.
+	 */
+	public function test_post_commit_interruption_resumes_cleanly_without_duplicates(): void {
+		$db        = $this->create_mock_db();
+		$registry  = $this->create_test_registry();
+		$validator = $this->createMock( WordPressElementValidator::class );
+		$validator->method( 'exists' )->willReturn( true );
+
+		$group_repo = $this->createMock( TranslationGroupRepository::class );
+		$schema     = $this->createMock( SchemaManager::class );
+		$schema->method( 'is_installed' )->willReturn( true );
+
+		// Simulate scenario: Batch 1 committed group 55 in MySQL, but checkpoint was NOT updated (simulated power outage).
+		$already_imported_group = TranslationGroup::create( 'post', 'post' )->with_id( 55 );
+		$group_repo->method( 'find_by_element' )->willReturn( $already_imported_group );
+
+		// create_group must NEVER be called upon resume!
+		$group_repo->expects( $this->never() )->method( 'create_group' );
+
+		$checkpoint_repo = new MigrationCheckpointRepository();
+		// Initial checkpoint stuck at TRID 0.
+		$stuck_checkpoint = new MigrationCheckpoint(
+			array(
+				'source'              => 'wpml',
+				'total_items'         => 1,
+				'processed_items'     => 0,
+				'last_processed_trid' => 0,
+				'status'              => MigrationCheckpoint::STATUS_PENDING,
+			)
+		);
+		$checkpoint_repo->save( $stuck_checkpoint );
+
+		$executor = new WpmlMigrationExecutor(
+			$db,
+			$group_repo,
+			$registry,
+			$checkpoint_repo,
+			null,
+			$validator,
+			$schema
+		);
+		$executor->set_authorized( true );
+
+		$plan = new MigrationPlan(
+			array(
+				'source'         => 'wpml',
+				'status'         => MigrationPlan::STATUS_READY,
+				'planned_groups' => array(
+					array(
+						'trid'           => 10,
+						'element_type'   => 'post',
+						'subtype'        => 'post',
+						'canonical_id'   => 100,
+						'canonical_lang' => 'es',
+						'classification' => MigrationPlan::CLASSIFICATION_IMPORTABLE,
+						'translations'   => array(
+							'es' => 100,
+							'en' => 101,
+						),
+					),
+				),
+			)
+		);
+
+		// Resume execution.
+		$res = $executor->execute_batch( $plan, 50, 'token_resume_after_crash' );
+
+		// Batch succeeds with idempotent_skipped and advances checkpoint to 10.
+		$this->assertTrue( $res['finished'] );
+		$this->assertSame( 'idempotent_skipped', $res['batch_results'][0]['status'] );
+		$this->assertSame( 55, $res['batch_results'][0]['group_id'] );
+
+		$saved_cp = $checkpoint_repo->get( 'wpml' );
+		$this->assertNotNull( $saved_cp );
+		$this->assertSame( 10, $saved_cp->get_last_processed_trid() );
+		$this->assertSame( MigrationCheckpoint::STATUS_COMPLETED, $saved_cp->get_status() );
 	}
 }

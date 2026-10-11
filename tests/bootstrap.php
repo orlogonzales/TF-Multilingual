@@ -671,6 +671,24 @@ if ( ! function_exists( 'delete_post_meta' ) ) {
 	}
 }
 
+if ( ! function_exists( 'get_post_status' ) ) {
+	/**
+	 * Stub for get_post_status.
+	 *
+	 * @param mixed $post Post ID or WP_Post object.
+	 * @return string|false Post status or false.
+	 */
+	function get_post_status( mixed $post = null ): string|false {
+		if ( isset( $GLOBALS['wp_test_post_status'] ) && is_array( $GLOBALS['wp_test_post_status'] ) ) {
+			$post_id = is_object( $post ) ? ( $post->ID ?? 0 ) : (int) $post;
+			if ( isset( $GLOBALS['wp_test_post_status'][ $post_id ] ) ) {
+				return (string) $GLOBALS['wp_test_post_status'][ $post_id ];
+			}
+		}
+		return 'publish';
+	}
+}
+
 if ( ! function_exists( 'metadata_exists' ) ) {
 	/**
 	 * Stub for metadata_exists.

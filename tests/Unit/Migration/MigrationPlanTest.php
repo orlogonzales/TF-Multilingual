@@ -103,5 +103,45 @@ class MigrationPlanTest extends TestCase {
 		$array = $plan->to_array();
 		$this->assertSame( 'wpml', $array['source'] );
 		$this->assertSame( MigrationPlan::STATUS_NEEDS_CONFIGURATION, $array['status'] );
+		$this->assertNotEmpty( $array['fingerprint'] );
+	}
+
+	/**
+	 * Test plan fingerprint is deterministic and detects any plan modification.
+	 */
+	public function test_fingerprint_deterministic_and_verification(): void {
+		$data1 = array(
+			'source'         => 'wpml',
+			'status'         => MigrationPlan::STATUS_READY,
+			'planned_groups' => array(
+				array(
+					'trid'           => 10,
+					'classification' => 'IMPORTABLE',
+				),
+			),
+		);
+		$plan1 = new MigrationPlan( $data1 );
+		$plan2 = new MigrationPlan( $data1 );
+
+		// Deterministic equality.
+		$fp1 = $plan1->get_fingerprint();
+		$fp2 = $plan2->get_fingerprint();
+		$this->assertSame( $fp1, $fp2 );
+		$this->assertTrue( $plan1->verify_fingerprint( $fp1 ) );
+
+		// Any modification changes fingerprint.
+		$data_modified = array(
+			'source'         => 'wpml',
+			'status'         => MigrationPlan::STATUS_READY,
+			'planned_groups' => array(
+				array(
+					'trid'           => 10,
+					'classification' => 'CONFLICT',
+				),
+			),
+		);
+		$plan_modified = new MigrationPlan( $data_modified );
+		$this->assertNotSame( $fp1, $plan_modified->get_fingerprint() );
+		$this->assertFalse( $plan_modified->verify_fingerprint( $fp1 ) );
 	}
 }
