@@ -960,6 +960,56 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Centinela WPML `cms_ect`: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0 absoluto).
   - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
 
+---
+
+## [Fase 3.13] - 2026-10-11
+
+### Planificación Incremental de Migración WPML → TFML, Matriz de Estrés y Resiliencia en Fixtures Aislados, y Verificación de API Funcional (DT-TFML-043)
+- **Planificación Incremental y Catalogación Determinista de los 115 Grupos Restantes:**
+  - Segmentación exhaustiva de los 115 grupos importables pendientes (124 elementos) a partir de la huella matriz certificada `08a93f721373c7fdb5395544faff69684ab1affd9ba7aa1ed1e67fd4a17bb949`.
+  - Estructuración de 9 lotes secuenciales discretos y ordenados por dependencias relacionales, con huellas SHA-256 inmutables:
+    - `batch-02-taxonomy-categories` (3 grupos / 3 elementos, TRIDs 9237, 9367, 9532, huella `9b76d7e38d779a08448474a9c22ef24b88dd3e65da292dbd64e338371a0e1d78`).
+    - `batch-03-taxonomy-woocommerce` (16 grupos / 16 elementos, huella `5910dcf46cd4e9915b787cf6c06e59c87b1b0e7875d488ea0d68325cc3291945`).
+    - `batch-04-taxonomy-tags-1` (23 grupos / 23 elementos, huella `b039d492f187b1fbe59b9089686c148110aa4d8ea0296f3208ea2809b3ed65f7`).
+    - `batch-05-taxonomy-tags-2` (22 grupos / 22 elementos, huella `cd1c0018d1014c36c5430d1ae9aaf0272e32748b094379025fc01c99f3816e1c`).
+    - `batch-06-elementor-templates` (10 grupos / 11 elementos, huella `ee32aff6cc43ea1f334b758bda34d9a9cc271de3a3c76217abd56e6264924a24`).
+    - `batch-07-cpt-tours` (12 grupos / 20 elementos, huella `d24b52d1224564bd745b4bc8032a9607adef5dc00379b2634a50eed08e77888b`).
+    - `batch-08-cpt-products` (7 grupos / 7 elementos, huella `3df3ce6f1a6dac619d203adaf5a31d8eb3fc332493330a5e8b755d4ff1d9136d`).
+    - `batch-09-core-posts-forms` (4 grupos / 4 elementos, huella `6d188e1cbff392deaa030e917d5d43aaed482f915c218a73c87f415d39f53720`).
+    - `batch-10-nav-menu-items` (18 grupos / 18 elementos, huella `19b7f15c730a7f0059b7d6873a37b07ed2bcd63f499c5a30fc921ae5d4957acc`).
+  - Validación de cardinalidad: suma exacta de 115 grupos y 124 elementos, sin solapamiento de TRIDs entre lotes.
+  - Salvaguarda de frontera: ninguno de los 115 grupos fue ejecutado en la base de datos real del laboratorio (`cms_ect_lab`).
+- **Suite de Pruebas Unitarias de Estrés y Resiliencia (`tests/Unit/Migration/WpmlMigrationStressRecoveryTest.php`):**
+  - Implementación de 6 casos de prueba unitarios que cubren interrupción pre-commit con rollback de transacciones anidadas, interrupción post-commit con reanudación por token sin duplicados, expiración de lock y fencing tokens, rechazo concurrente, rollback ante manifiestos manipulados, e idempotencia estricta.
+- **Matriz de Pruebas de Estrés y Resiliencia en Fixtures Aislados (STR-01 a STR-09):**
+  - `STR-01`: Interrupción antes del COMMIT con rollback transaccional automático y liberación de lock.
+  - `STR-02`: Reanudación limpia tras interrupción post-commit sin duplicar registros.
+  - `STR-03`: Pérdida de lock por TTL vencido y recuperación atómica por nuevo worker con fencing token.
+  - `STR-04`: Serialización y recuperación de checkpoints incompletos conservando `last_processed_trid`.
+  - `STR-05`: Reintento de lote duplicado reportando formalmente `idempotent_skipped`.
+  - `STR-06`: Bloqueo atómico ante ejecuciones concurrentes con `MigrationConcurrencyException`.
+  - `STR-07`: Detección en pre-validación de colisiones de asignación relacional con `MigrationPlanValidationException`.
+  - `STR-08`: Rechazo de rollback ante manifiesto manipulado o grupo ajeno reportando `not_owned`.
+  - `STR-09`: Registro detallado de auditoría (`failed`) preservando TRID, timestamp y causa técnica de fallo.
+- **Pruebas Funcionales de API y Dominio sobre Laboratorio Real (`cms_ect_lab`):**
+  - Validación en modo lectura sobre los datos del piloto previo:
+    - `FUN-01` / `FUN-02`: Resolución bidireccional y simétrica de CPT `tours` 5286 [es] ↔ 5287 [en] vía `ContentTranslationResolver`.
+    - `FUN-03`: Resolución idéntica es → es devolviendo el mismo elemento sin colisión.
+    - `FUN-04`: Detección soberana del idioma de entidad vía `language_of()`.
+    - `FUN-05` / `FUN-06`: Resolución de taxonomías dinámicas `tours_cat` (41 ↔ 47, 46 ↔ 48).
+    - `FUN-07`: Página monolingüe 4338 hacia EN devuelve `null` sin fallback espurio.
+    - `FUN-08`: `UrlLanguageResolver` resuelve correctamente rutas canónicas default, secundarias, slugs regulares y prefix inactivo (/fr/).
+    - `FUN-09`: Certificación técnica de aislamiento de entorno CLI frente a peticiones HTTP.
+- **Preservación Inmutable de Estado del Laboratorio y Centinelas:**
+  - `cms_ect_lab`: Conserva estrictamente los 5 grupos de traducción (IDs 6, 7, 8, 9, 10) y 9 elementos del piloto de Fase 3.12, checkpoint completado y lock liberado.
+  - `cms_ect`: Centinela de producción inalterado con 3.403 registros y hash MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0 verificado en pre y post-flight).
+- **Métricas de Calidad:**
+  - PHPUnit: **533 tests, 1.830 assertions, 0 errors, 0 failures, 1 skipped** (100% PASS).
+  - PHPCS / WPCS: **168/168 archivos analizados, 0 errors, 0 warnings** (100% PASS).
+  - Verificación Integral Fase 3.13 (`scratch/verify_fase_3_13.php`): **99/99 controles PASS (100%)**.
+  - `composer validate --strict`: PASS.
+
+
 
 
 

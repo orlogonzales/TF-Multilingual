@@ -737,6 +737,51 @@
 - **JUSTIFICACIÓN:** Cumplir rigurosamente con los estándares de gobernanza y auditoría formal del proyecto, asegurando que ninguna discrepancia quede sin explicar, que cada criterio negativo cuente con evidencia empírica verificable y que el estado del laboratorio refleje con fidelidad matemática el éxito del lote piloto.
 - **CONSECUENCIAS:** La Fase 3.12 queda cerrada y certificada de forma definitiva con calificación unánime de PASS en todos los controles técnicos, de seguridad y de gobernanza.
 
+### ADR-039: Planificación Incremental de Migración WPML → TFML, Matriz de Estrés y Resiliencia en Fixtures Aislados, y Verificación de API Funcional (Fase 3.13)
+- **FECHA:** 2026-10-11
+- **DECISIÓN:**
+  1. **Planificación y Catalogación Incremental de los 115 Grupos Restantes:**
+     - A partir del plan matriz homologado con fingerprint SHA-256 `08a93f721373c7fdb5395544faff69684ab1affd9ba7aa1ed1e67fd4a17bb949`, se extrajo el inventario determinista de los 115 grupos importables restantes (124 elementos) tras aislar el lote piloto inicial de Fase 3.12 (5 grupos, 9 elementos).
+     - Se estructuró un catálogo exhaustivo de 9 lotes funcionales discretos, con dependencias ordenadas y huellas SHA-256 inmutables:
+       - `batch-02-taxonomy-categories`: 3 grupos / 3 elementos (TRIDs 9237, 9367, 9532; taxonomías tours_cat y category; huella `9b76d7e38d779a08448474a9c22ef24b88dd3e65da292dbd64e338371a0e1d78`).
+       - `batch-03-taxonomy-woocommerce`: 16 grupos / 16 elementos (taxonomías product_type, product_visibility; huella `5910dcf46cd4e9915b787cf6c06e59c87b1b0e7875d488ea0d68325cc3291945`).
+       - `batch-04-taxonomy-tags-1`: 23 grupos / 23 elementos (taxonomía post_tag, parte 1; huella `b039d492f187b1fbe59b9089686c148110aa4d8ea0296f3208ea2809b3ed65f7`).
+       - `batch-05-taxonomy-tags-2`: 22 grupos / 22 elementos (taxonomía post_tag, parte 2; huella `cd1c0018d1014c36c5430d1ae9aaf0272e32748b094379025fc01c99f3816e1c`).
+       - `batch-06-elementor-templates`: 10 grupos / 11 elementos (elementor_library templates; huella `ee32aff6cc43ea1f334b758bda34d9a9cc271de3a3c76217abd56e6264924a24`).
+       - `batch-07-cpt-tours`: 12 grupos / 20 elementos (CPT tours restantes; huella `d24b52d1224564bd745b4bc8032a9607adef5dc00379b2634a50eed08e77888b`).
+       - `batch-08-cpt-products`: 7 grupos / 7 elementos (CPT product de WooCommerce; huella `3df3ce6f1a6dac619d203adaf5a31d8eb3fc332493330a5e8b755d4ff1d9136d`).
+       - `batch-09-core-posts-forms`: 4 grupos / 4 elementos (post y wpcf7_contact_form; huella `6d188e1cbff392deaa030e917d5d43aaed482f915c218a73c87f415d39f53720`).
+       - `batch-10-nav-menu-items`: 18 grupos / 18 elementos (nav_menu_item; huella `19b7f15c730a7f0059b7d6873a37b07ed2bcd63f499c5a30fc921ae5d4957acc`).
+     - Suma total de los 9 lotes: exactamente 115 grupos y 124 elementos, con solapamiento cero entre TRIDs.
+     - Ninguno de los 115 grupos fue ejecutado en la base de datos de laboratorio, garantizando el aislamiento estricto solicitado.
+  2. **Matriz de Pruebas de Estrés, Concurrencia y Resiliencia en Fixtures Aislados (STR-01 a STR-09):**
+     - Se crearon pruebas unitarias (`WpmlMigrationStressRecoveryTest.php`) e integradas sobre fixtures simulados y desacoplados de la base de datos real:
+       - **STR-01 (Interrupción pre-commit):** Fallo simulado antes del commit ejecuta `rollback_transaction()` y libera automáticamente el lock sin dejar registros huérfanos.
+       - **STR-02 (Interrupción post-commit y reanudación):** Ejecución por lotes parciales con checkpoint preservado permite reanudar sin duplicar inserciones.
+       - **STR-03 (Expiración de lock y fencing token):** Bloqueo expirado desconoce al worker antiguo y permite la toma segura por un nuevo worker con renovación atómica.
+       - **STR-04 (Checkpoints incompletos):** Serialización y persistencia de checkpoints parciales (`processed_items < total_items`) retienen `last_processed_trid` exacto.
+       - **STR-05 (Reintento de lote duplicado):** Detección de entidades ya existentes reporta formalmente `idempotent_skipped` en lugar de error o re-inserción.
+       - **STR-06 (Concurrencia atómica):** Worker secundario intentando ejecutar bajo lock activo es rechazado inmediatamente con `MigrationConcurrencyException`.
+       - **STR-07 (Colisión relacional):** Detección durante `validate_plan()` de asignaciones contradictorias o parciales entre grupos aborta el plan con `MigrationPlanValidationException`.
+       - **STR-08 (Manifiesto ajeno / despojado):** Rollback bloquea la reversión de grupos que no pertenecen al manifiesto de ejecución con código `not_owned`.
+       - **STR-09 (Registro de auditoría y diagnóstico de fallo):** Checkpoint captura el código de TRID exacto, la marca temporal y el mensaje de error preservando el estado `failed`.
+  3. **Verificación de Dominio y API Funcional sobre Datos Reales (`cms_ect_lab`):**
+     - Se verificó en modo lectura sobre los 5 grupos y 9 elementos migrados en el laboratorio:
+       - `ContentTranslationResolver::resolve_element_id()`: Resolución exacta y simétrica de CPT `tours` (ID 5286 [es] ↔ ID 5287 [en]), taxonomía `tours_cat` (ID 41 [es] ↔ ID 47 [en]; ID 46 [es] ↔ ID 48 [en]) y resolución idéntica (es → es).
+       - `ContentTranslationResolver::resolve()`: Retorno de objetos canónicos `TranslationElement` tipados.
+       - `ContentTranslationResolver::language_of()`: Determinación soberana del idioma a partir de la tabla relacional sin heurísticas de URL o postmeta.
+       - Entidad monolingüe (Page 4338): Retorna `null` estricto al solicitar `en`, sin degradación o fallbacks espurios.
+       - `UrlLanguageResolver`: Resolución correcta de rutas canónicas default sin prefijo (`/tours/...`), secundarias con prefijo (`/en/...`), preservación de rutas estándar (`/blog/...`) y rechazo de prefijos inactivos (`/fr/...`) con estado `STATUS_INACTIVE`.
+       - Distinción arquitectónica CLI vs HTTP: Se certifica que los scripts corren en entorno CLI aislado, sin hooks webhooks salientes, cron o peticiones HTTP activas.
+  4. **Preservación Inmutable de Estado y Centinelas:**
+     - `cms_ect_lab`: Conserva estrictamente los 5 grupos (IDs 6, 7, 8, 9, 10) y 9 elementos del piloto de Fase 3.12, con las demás 3 tablas TFML en 0 filas y lock liberado.
+     - `cms_ect`: Centinela intacto con 3.403 registros en `icl_translations` y checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.13 / Directiva DT-TFML-043 — Migración incremental, pruebas de estrés y recuperación.
+- **JUSTIFICACIÓN:** Establecer un catálogo matemático inmutable para los 115 grupos pendientes, someter la arquitectura de migración a pruebas extremas de concurrencia y recuperación en fixtures aislados sin tocar el laboratorio, y validar que la API funcional de TF Multilingual opera a la perfección sobre los datos ya importados.
+- **CONSECUENCIAS:** Queda formalmente estructurada la secuencia de lotes para las fases subsecuentes, blindada la infraestructura de resiliencia ante cualquier interrupción o concurrencia, y validada al 100% la API soberana de traducción.
+
+
 
 
 
