@@ -49,6 +49,13 @@ class MigrationManager {
 	private PolylangSourceAnalyzer $polylang_analyzer;
 
 	/**
+	 * WPML migration planner.
+	 *
+	 * @var WpmlMigrationPlanner
+	 */
+	private WpmlMigrationPlanner $wpml_planner;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param wpdb             $db                WordPress database instance.
@@ -59,6 +66,7 @@ class MigrationManager {
 		$this->detector          = new MigrationSourceDetector( $db );
 		$this->wpml_analyzer     = new WpmlSourceAnalyzer( $db, $language_registry );
 		$this->polylang_analyzer = new PolylangSourceAnalyzer( $db, $language_registry );
+		$this->wpml_planner      = new WpmlMigrationPlanner( $db, $language_registry );
 	}
 
 	/**
@@ -109,6 +117,40 @@ class MigrationManager {
 				'source_name' => ucfirst( $source ),
 				'status'      => 'blocked',
 				'notes'       => array( "Fuente de migración desconocida: '{$source}'." ),
+			)
+		);
+	}
+
+	/**
+	 * Get WPML migration planner.
+	 *
+	 * @return WpmlMigrationPlanner
+	 */
+	public function get_wpml_planner(): WpmlMigrationPlanner {
+		return $this->wpml_planner;
+	}
+
+	/**
+	 * Generate migration plan for specified source.
+	 *
+	 * @param string $source Source key ('wpml').
+	 * @param int    $limit  Maximum groups limit.
+	 * @param int    $offset Group offset.
+	 * @return MigrationPlan
+	 */
+	public function generate_plan( string $source, int $limit = 0, int $offset = 0 ): MigrationPlan {
+		if ( 'wpml' === $source ) {
+			return $this->wpml_planner->generate_plan( $limit, $offset );
+		}
+
+		return new MigrationPlan(
+			array(
+				'source'            => $source,
+				'status'            => MigrationPlan::STATUS_BLOCKED,
+				'missing_languages' => array(),
+				'summary'           => array(),
+				'media_plan'        => array(),
+				'planned_groups'    => array(),
 			)
 		);
 	}

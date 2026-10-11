@@ -637,6 +637,43 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
   - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
 
+---
+
+## [Fase 3.4] - 2026-10-11
+
+### Planificador Determinista y Motor de Simulación de Migración WPML → TFML (Dry-Run, Idempotencia y Checkpoints)
+- **Planificador Determinista de Migración (`TF\Multilingual\Migration\WpmlMigrationPlanner`):**
+  - Generación de planes de migración inmutables (`MigrationPlan`) basados en análisis exhaustivo y de solo lectura de la base de datos.
+  - Clasificación semántica de grupos y elementos en cinco categorías deterministas:
+    - `IMPORTABLE`: Elementos y grupos íntegros con idiomas activos (`es`, `en`), existentes en Core y sin conflictos.
+    - `BLOCKED_BY_LANGUAGE`: Grupos que dependen de idiomas inactivos o no configurados en TFML (`fr`).
+    - `SKIPPED`: Elementos expresamente excluidos del flujo editorial (comentarios, prioridades técnicas).
+    - `ORPHAN`: Grupos cuyos posts o términos fueron eliminados de `wp_posts` o `wp_terms`.
+    - `CONFLICT`: Elementos previamente mapeados a otros grupos en `tfml_group_elements`.
+  - Paginación y segmentación de lotes mediante parámetros `limit` y `offset`.
+- **Política Soberana de Retención Lingüística de Traducciones en Francés (`fr`):**
+  - Detección explícita de `MISSING_LANGUAGE_DEPENDENCY`.
+  - Cero descarte silencioso: las traducciones en `fr` se retienen formalmente en el diccionario `pending_translations['fr']` de cada grupo para su importación diferida cuando el idioma sea configurado.
+  - Las traducciones en idiomas soportados (`es`, `en`) se proyectan normalmente en `translations`.
+  - Prohibición estricta de auto-registro o activación no autorizada de idiomas en `LanguageRegistry` o `tfml_settings`.
+  - Estado global del plan marcado como `NEEDS_CONFIGURATION`.
+- **Gobernanza de Medios bajo Media Model B Refinado:**
+  - Los 3,033 adjuntos detectados en WPML se excluyen de la creación de posts redundantes y se asignan a la estrategia `MEDIA_MODEL_B_DEDUPLICATION`.
+  - Proyección de localización de metadatos de medios (título, alt, leyenda, descripción) en `tfml_media_translations` asociada a un único attachment compartido.
+- **Subsistema de Checkpoints e Idempotencia (`TF\Multilingual\Migration\MigrationCheckpoint`):**
+  - Objeto inmutable serializable que rastrea `processed_items`, `last_processed_trid`, errores y estado (`PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`).
+  - Capacidad de serialización y reconstrucción determinista (`from_array`) para garantizar la reanudación segura ante interrupciones.
+- **Ampliación de Orquestación en `MigrationManager`:**
+  - Métodos `get_wpml_planner()` y `generate_plan( $source, $limit, $offset )` integrados en el orquestador principal.
+- **Verificación Integral y Calidad:**
+  - Suite de pruebas unitarias ampliada: **491 tests, 1,638 assertions, 0 errors, 0 failures, 0 warnings, 0 deprecations**.
+  - Estándares WPCS / PHPCS: **152/152 archivos analizados, 0 errors, 0 warnings**.
+  - Verificación en laboratorio real WordPress (`scratch/verify_fase_3_4.php`): **31/31 assertions passed (100%)**.
+  - Regresiones Core, constructores y migración: Fases 3.3 (38/38), 3.2 (35/35), 3.1 (27/27), 2.8 (53/53) **100% PASS**.
+  - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+  - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
+
+
 
 
 

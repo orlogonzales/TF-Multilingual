@@ -414,6 +414,36 @@
 - **JUSTIFICACIÓN:** Una migración fiable requiere comprender exactamente el estado relacional de los datos preexistentes, validar los idiomas activos y verificar posibles inconsistencias antes de alterar cualquier tabla de TFML, manteniendo total inmunidad en el centinela WPML.
 - **CONSECUENCIAS:** Capacidad de diagnóstico predictivo y simulaciones de migración 100% seguras; cero riesgo de corrupción en las tablas originales de WPML o Polylang; base sólida para futuros runners de importación por lotes idempotentes.
 
+---
+
+### ADR-030: Planificador Determinista de Migración, Clasificación Semántica, Checkpoints Idempotentes y Política de Retención Lingüística (Dry-Run)
+- **DECISIÓN:**
+  1. **Planificador Determinista (`WpmlMigrationPlanner`, `MigrationPlan`):**
+     - Convierte el inventario de solo lectura en un manifiesto ejecutable inmutable (`MigrationPlan`) que clasifica deterministamente cada grupo de traducción de origen en una de cinco categorías semánticas:
+       - `IMPORTABLE`: Grupos íntegros cuyos elementos existen en WordPress Core, pertenecen a idiomas activos en TFML y no colisionan con asignaciones previas.
+       - `BLOCKED_BY_LANGUAGE`: Grupos que contienen una o más traducciones en idiomas no soportados o inactivos en TFML (ej. francés `fr`).
+       - `SKIPPED`: Elementos expresamente excluidos del modelo editorial soberano (comentarios, prioridades de paquetes, tipos técnicos).
+       - `ORPHAN`: Grupos cuyos elementos referenciados en WPML fueron eliminados de `wp_posts` o `wp_terms`.
+       - `CONFLICT`: Elementos que ya pertenecen a un grupo existente en `tfml_group_elements` con asignación incompatible.
+  2. **Política Soberana de Retención de Idiomas Pendientes (`MISSING_LANGUAGE_DEPENDENCY`):**
+     - La presencia de traducciones en idiomas no activos en TFML (como `fr` en `cms.ecoterra`) **NUNCA** provocará su descarte silencioso ni su pérdida de datos.
+     - El planificador retiene explícitamente estas traducciones en el mapa `pending_translations[<lang>]` del grupo, mientras proyecta en `translations[<lang>]` las pertenecientes a idiomas activos (`es`, `en`).
+     - Queda estrictamente prohibido que el planificador registre o active de manera automática o silenciosa idiomas en `LanguageRegistry` o `tfml_settings`. La configuración lingüística requiere autorización explícita.
+     - El manifiesto declara el estado general `NEEDS_CONFIGURATION` si detecta dependencias lingüísticas no resueltas.
+  3. **Gobernanza de Medios bajo Media Model B Refinado:**
+     - Los 3.033 adjuntos detectados en WPML no se planifican como posts independientes ni como grupos en `tfml_groups`.
+     - Se planifica su deduplicación física hacia un único attachment en WordPress, proyectando sus textos localizados (título, alt, leyenda, descripción) en la tabla `tfml_media_translations`.
+  4. **Arquitectura de Checkpoints e Idempotencia (`MigrationCheckpoint`):**
+     - Objeto de estado inmutable y serializable que registra el progreso de lotes (`processed_items`, `last_processed_trid`, `errors`, `status`).
+     - Garantiza la reanudación segura de procesos por lotes interrumpidos sin duplicar grupos ni corromper relaciones.
+  5. **Modo Estricto de Solo Lectura y Dry-Run:**
+     - La planificación opera enteramente en memoria y consultas `SELECT`. Cero escrituras en la base de datos de WordPress ni en el centinela WPML (`*_icl_*`).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.4 — Planificador y Motor de Simulación Determinista de Migración WPML → TFML.
+- **JUSTIFICACIÓN:** Transformar miles de registros legados sin riesgo de corrupción exige clasificar semánticamente cada grupo, retener sin pérdidas las traducciones en idiomas pendientes, aplicar el modelo de medios deduplicado y asegurar que cualquier lote futuro sea idempotente y reanudable.
+- **CONSECUENCIAS:** Transparencia total antes de cualquier mutación; preservación íntegra de traducciones en francés para su importación futura; cumplimiento de los invariantes de WordPress y del centinela WPML inalterado.
+
+
 
 
 
