@@ -1005,3 +1005,35 @@
 - **JUSTIFICACIÓN:** Ejecutar el séptimo lote incremental WPML -> TFML sobre publicaciones del Custom Post Type `tours` en laboratorio aislado, certificar la inviolabilidad de metadatos nativos y relaciones taxonómicas de tours, validar la resolución bilingüe simétrica cruzada en la API de dominio, y consolidar el acumulado en 91 grupos y 104 elementos.
 - **CONSECUENCIAS:** El laboratorio avanza al estado acumulado de 91 grupos y 104 elementos (75,8% de grupos y 78,2% de elementos importables del universo WPML), y los 3 lotes restantes (29 grupos) permanecen intactos en estado `STATUS_READY`.
 
+### ADR-047: Migración Controlada del Octavo Lote (batch-08-cpt-products), Invarianza Criptográfica de Productos WooCommerce y Metadatos Comerciales, Resolución Monolingüe y Reversibilidad Aislada (Fase 3.21)
+- **FECHA:** 2026-10-11
+- **DECISIÓN:**
+  1. **Ejecución Transaccional del Lote 8 (`batch-08-cpt-products`):**
+     - Se ejecutó la migración de los 7 TRIDs autorizados obtenidos exclusivamente del catálogo oficial de Fase 3.15: `[9224, 9225, 9231, 9431, 9499, 9526, 9540]`.
+     - Subtipo y tipo de post involucrados: exactamente 7 grupos con tipo `post` y subtipo `product` (CPT WooCommerce product correspondientes a habitaciones/alojamiento).
+     - Cardinalidad verificada: exactamente 7 grupos y 7 elementos (7 publicaciones monolingües en idioma español: Posts 5250, 5264, 5275, 5787, 6123, 6178, 6224).
+     - Huella criptográfica inmutable ratificada: `3df3ce6f1a6dac619d203adaf5a31d8eb3fc332493330a5e8b755d4ff1d9136d`.
+     - Nuevo estado acumulado en la base de datos del laboratorio: exactamente **98 grupos** en `etk_t_tfml_groups` (91 previos + 7 nuevos) y **111 elementos** en `etk_t_tfml_group_elements` (104 previos + 7 nuevos), alcanzando el 81,7% de grupos y el 83,5% de elementos importables del universo WPML.
+     - Manifiesto oficial persistido y checkpoint completado con 7 ítems procesados. Lock liberado.
+  2. **Preservación Criptográfica de Integridad de Productos WooCommerce (Delta Cero Absoluto):**
+     - Se capturó un snapshot exhaustivo pre y post-migración sobre los 7 productos WooCommerce (`[5250, 5264, 5275, 5787, 6123, 6178, 6224]`).
+     - Se certificó que las tablas nativas de WordPress (`etk_t_posts`, `etk_t_postmeta`, `etk_t_term_relationships`) permanecen 100% idénticas (Delta = 0 en títulos, slugs, contenido, estados, tipos, precios regulares y vigentes `_price`/`_regular_price`, gestión de inventario `_stock`/`_stock_status`, impuestos `_tax_status`/`_tax_class`, metadatos de reserva `ovabrw_*` y relaciones taxonómicas).
+     - Ausencia absoluta de recálculos automáticos de existencias, precios, ventas o pedidos.
+  3. **Idempotencia y Reversibilidad Aislada en Base de Datos Real:**
+     - Segunda ejecución consecutiva sobre el Lote 8 reportó 7 resultados `idempotent_skipped` (0 duplicados).
+     - Rollback selectivo mediante `rollback_groups` sobre los IDs del manifiesto del Lote 8 revirtió exclusivamente los 7 grupos del Lote 8, retornando la base de datos de manera exacta a 91 grupos y 104 elementos, con los 91 grupos previos (lotes 1 al 7) 100% blindados e inalterados.
+     - Re-ejecución posterior restauró el estado final de 98 grupos y 111 elementos con 100% de reconciliación profunda (`integrity_verified = true`, 7 grupos verificados, 0 discrepancias).
+  4. **Validación de API de Dominio y Ausencia de Fallback Comercial:**
+     - `ContentTranslationResolver`: validación de asignación lingüística en español (`es`) para cada uno de los 7 productos comerciales.
+     - Resolución hacia idioma inglés (`en`): devuelve estrictamente `null` sin fallback espurio hacia canonical ni default.
+     - Preservación íntegra de la capacidad resolutiva de lotes anteriores (tours bilingües de Lote 7, plantillas Elementor de Lote 6, etiquetas, categorías, páginas).
+     - Comprobaciones HTTP reales sobre `http://lab.ecoterra.test` sin errores 500 ni bucles.
+     - Frontera de frontend: se mantiene la designación formal de `BLOCKED` para el renderizado HTML de etiquetas (`<html lang>`, canonical y hreflang en el cuerpo HTML) debido a la ausencia física del tema `ecoCMS` en el laboratorio.
+  5. **Invarianza Absoluta del Centinela en Origen (`cms_ect`):**
+     - Verificación pre y post-flight en `cms_ect`: 3.403 filas exactas y checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (**Delta = 0**).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.21 / Directiva DT-TFML-051 — Migración transaccional del lote 8: Productos WooCommerce.
+- **JUSTIFICACIÓN:** Ejecutar el octavo lote incremental WPML -> TFML sobre publicaciones del Custom Post Type `product` de WooCommerce en laboratorio aislado, certificar la inviolabilidad de metadatos comerciales, de inventario y de reservas, validar la resolución monolingüe limpia en la API de dominio, y consolidar el acumulado en 98 grupos y 111 elementos.
+- **CONSECUENCIAS:** El laboratorio avanza al estado acumulado de 98 grupos y 111 elementos (81,7% de grupos y 83,5% de elementos importables del universo WPML), y los 2 lotes restantes (22 grupos: Lote 9 core-posts-forms [4] y Lote 10 nav-menu-items [18]) permanecen intactos en estado `STATUS_READY`.
+
+

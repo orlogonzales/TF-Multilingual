@@ -1248,3 +1248,36 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Verificación Integral Fase 3.20 (`scratch/verify_fase_3_20.php`): **359/359 controles PASS (100%)**.
   - `composer validate --strict`: PASS.
 
+---
+
+## [Fase 3.21] - 2026-10-11
+
+### Migración Controlada del Octavo Lote: Productos WooCommerce (DT-TFML-051)
+- **Ejecución Transaccional del Lote 8 (`batch-08-cpt-products`):**
+  - Migración exitosa de 7 grupos y 7 elementos correspondientes a publicaciones del tipo personalizado `product` (habitaciones y suites de alojamiento comercial) en `cms_ect_lab` (TRIDs `[9224, 9225, 9231, 9431, 9499, 9526, 9540]`, Posts `[5250, 5264, 5275, 5787, 6123, 6178, 6224]`).
+  - Carácter lingüístico: 7 publicaciones monolingües en idioma español (`es`).
+  - Huella criptográfica inmutable ratificada: `3df3ce6f1a6dac619d203adaf5a31d8eb3fc332493330a5e8b755d4ff1d9136d`.
+  - Nuevo estado acumulado en la base de datos: exactamente **98 grupos** en `etk_t_tfml_groups` (91 previos + 7 de lote 8) y **111 elementos** en `etk_t_tfml_group_elements` (104 previos + 7 de lote 8), alcanzando el 81,7% de grupos y el 83,5% de elementos importables del universo WPML.
+  - Manifiesto de ejecución persistido y checkpoint actualizado a `completed` con 7 ítems procesados. Lock liberado.
+- **Invarianza Criptográfica de Productos WooCommerce y Metadatos Comerciales:**
+  - Captura y comparación de snapshots pre y post-migración sobre los 7 productos: certificación de Delta Cero absoluto en `etk_t_posts`, `etk_t_postmeta` (precios regulares `_regular_price`, precios vigentes `_price`, gestión de stock `_stock`/`_stock_status`, impuestos `_tax_status`/`_tax_class`, metadatos de reserva `ovabrw_*`) y relaciones taxonómicas en `etk_t_term_relationships`. Cero recálculos automáticos de existencias, ventas o pedidos.
+- **Idempotencia y Reversibilidad Aislada del Lote 8:**
+  - Re-ejecución inmediata del Lote 8 sobre el laboratorio evalúa los 7 grupos sin generar duplicados: los 7 TRIDs reportan formalmente `idempotent_skipped` y los conteos de base de datos se mantienen inmutables en 98 grupos y 111 elementos.
+  - Rollback selectivo mediante `rollback_groups` sobre los IDs del Lote 8 revierte exclusivamente este lote, retornando la base de datos a 91 grupos y 104 elementos.
+  - Los 91 grupos acumulados de los lotes 1 al 7 permanecen 100% blindados e intactos.
+  - Re-ejecución posterior restaura el estado final de 98 grupos y 111 elementos, con certificación profunda de reconciliación (`reconcile()`) al 100% (`integrity_verified = true`, 0 discrepancias).
+- **Validación de API de Dominio y Comprobación HTTP:**
+  - Validación funcional de `ContentTranslationResolver` sobre Productos WooCommerce: reconocimiento de idioma `es` para cada producto y resolución hacia `en` devolviendo estrictamente `null` (sin fallback indebido a default ni canonical).
+  - Preservación íntegra de la capacidad de resolución de lotes anteriores (tours bilingües de Lote 7, plantillas Elementor de Lote 6, etiquetas, categorías, páginas).
+  - Comprobaciones HTTP reales contra `http://lab.ecoterra.test` sin errores 500 ni bucles.
+  - Frontera de frontend: se mantiene la designación formal de `BLOCKED` para el renderizado HTML de etiquetas (`<html lang>`, canonical y hreflang en el cuerpo HTML) debido a la ausencia física del tema `ecoCMS` en el laboratorio.
+- **Preservación Inmutable de Centinelas:**
+  - `cms_ect_lab`: Conserva exactamente 98 grupos acumulados y 111 elementos, lock liberado.
+  - `cms_ect`: Centinela intacto con 3.403 registros y hash MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0 verificado en pre y post-flight).
+- **Métricas de Calidad:**
+  - PHPUnit: **532 tests (533 total), 1.830 assertions, 0 errors, 0 failures, 1 skipped** (100% PASS).
+  - PHPCS / WPCS: **168/168 archivos analizados, 0 errors, 0 warnings** (100% PASS).
+  - Verificación Integral Fase 3.21 (`scratch/verify_fase_3_21.php`): **299/299 controles PASS (100%)**.
+  - `composer validate --strict`: PASS.
+
+

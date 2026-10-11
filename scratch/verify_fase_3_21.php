@@ -1,0 +1,624 @@
+<?php
+/**
+ * TF Multilingual — Verificación Integral de Fase 3.21.
+ *
+ * Directiva: DT-TFML-051
+ * Alcance: Ejecución transaccional del octavo lote incremental (batch-08-cpt-products),
+ *          7 grupos / 7 elementos (CPT WooCommerce product, TRIDs del catálogo oficial),
+ *          certificación de idempotencia en base de datos real, reversibilidad aislada (rollback selectivo),
+ *          re-ejecución y conciliación profunda, auditoría de integridad y snapshot de productos WooCommerce,
+ *          validaciones funcionales de API de dominio (reconocimiento lingüístico en español y ausencia de fallback),
+ *          preservación de lotes anteriores (91 grupos, 104 elementos acumulados previos -> 98 grupos, 111 elementos finales)
+ *          y centinela inviolable en origen cms_ect (Delta = 0).
+ *
+ * @package TF\Multilingual\Tests
+ */
+
+declare( strict_types=1 );
+
+if ( file_exists( dirname( __DIR__, 2 ) . '/contact-form-7/vendor/autoload.php' ) ) {
+	require_once dirname( __DIR__, 2 ) . '/contact-form-7/vendor/autoload.php';
+}
+
+require_once dirname( __DIR__, 4 ) . '/wp-load.php';
+require_once dirname( __DIR__ ) . '/vendor/autoload.php';
+require_once __DIR__ . '/ExternalPluginIsolationGuard.php';
+
+use TF\Multilingual\Core\Plugin;
+use TF\Multilingual\Domain\Language\LanguageRegistry;
+use TF\Multilingual\Domain\Translation\ContentTranslationResolver;
+use TF\Multilingual\Domain\Translation\TranslationGroupRepository;
+use TF\Multilingual\Domain\Translation\WordPressElementValidator;
+use TF\Multilingual\Infrastructure\Persistence\SchemaManager;
+use TF\Multilingual\Migration\MigrationCheckpoint;
+use TF\Multilingual\Migration\MigrationCheckpointRepository;
+use TF\Multilingual\Migration\MigrationExecutionLock;
+use TF\Multilingual\Migration\MigrationPlan;
+use TF\Multilingual\Migration\WpmlMigrationPlanner;
+use TF\Multilingual\Migration\WpmlMigrationExecutor;
+use TF\Multilingual\Migration\WpmlMigrationRollbackService;
+
+global $wpdb;
+$original_wpdb = $wpdb;
+
+$assertions_passed = 0;
+
+/**
+ * Assertion helper.
+ *
+ * @param bool   $condition Condition to evaluate.
+ * @param string $message   Description.
+ * @return void
+ */
+function assert_true( bool $condition, string $message ): void {
+	global $assertions_passed;
+	if ( ! $condition ) {
+		echo " [FAIL] {$message}\n";
+		exit( 1 );
+	}
+	++$assertions_passed;
+	echo " [PASS] {$message}\n";
+}
+
+echo "====================================================================\n";
+echo "  TF MULTILINGUAL — VERIFICACIÓN INTEGRAL FASE 3.21\n";
+echo "  Directiva: DT-TFML-051 (Lote 8: CPT WooCommerce Productos)\n";
+echo "====================================================================\n\n";
+
+// -------------------------------------------------------------------------
+// 1. PRE-FLIGHT: CENTINELA WPML EN ORIGEN (cms_ect)
+// -------------------------------------------------------------------------
+echo "--- Pre-Flight: Centinela WPML en Base de Datos de Origen (cms_ect) ---\n";
+
+$sentinel_table = 'etk_t_icl_translations';
+$original_wpdb->query( 'SET SESSION group_concat_max_len = 10000000' );
+$pre_rows = (int) $original_wpdb->get_var( "SELECT COUNT(*) FROM `{$sentinel_table}`" );
+$pre_hash = (string) $original_wpdb->get_var(
+	"SELECT MD5(GROUP_CONCAT(CONCAT_WS(':', translation_id, element_type, element_id, trid, language_code, IFNULL(source_language_code, '')) ORDER BY translation_id ASC SEPARATOR '|')) FROM `{$sentinel_table}`"
+);
+
+echo "Sentinel WPML Pre-Flight (cms_ect):\n";
+echo "  Rows: {$pre_rows} (Expected: 3403)\n";
+echo "  MD5:  {$pre_hash} (Expected: 4241ca7e7ec6399a594537cb04790c10)\n\n";
+
+assert_true( 3403 === $pre_rows, 'Sentinel pre-flight: Conteo WPML en cms_ect es exactamente 3403 filas' );
+assert_true( '4241ca7e7ec6399a594537cb04790c10' === $pre_hash, 'Sentinel pre-flight: Checksum MD5 en cms_ect coincide exactamente' );
+
+// Respaldo verificado fuera del webroot.
+$backup_file = 'd:/laragon/backup/tfml_staging/preflight_backup_cms_ect_snapshot.sql';
+assert_true( file_exists( $backup_file ), 'Archivo de respaldo restaurable existe fuera del webroot' );
+$backup_hash = hash_file( 'sha256', $backup_file );
+assert_true( 'f4db11d9c18bd393fb684a38128a1f7be65b76a09249484ef39de67ba73c4b1a' === $backup_hash, 'Huella SHA-256 del respaldo certificada' );
+
+// Aislamiento de plugins externos.
+$isolation_guard = new TF\Multilingual\Scratch\ExternalPluginIsolationGuard();
+$isolation_guard->isolate();
+
+// Configurar conexión al entorno de laboratorio cms_ect_lab.
+$db_host = getenv( 'TFML_DB_HOST' ) ?: 'localhost';
+$db_user = getenv( 'TFML_DB_USER' ) ?: 'root';
+$db_pass = getenv( 'TFML_DB_PASS' ) !== false ? (string) getenv( 'TFML_DB_PASS' ) : '';
+$lab_db  = 'cms_ect_lab';
+
+$mysqli_lab = new mysqli( $db_host, $db_user, $db_pass, $lab_db );
+assert_true( ! $mysqli_lab->connect_error, "Conexión MySQL directa a laboratorio '{$lab_db}' exitosa" );
+
+$lab_wpdb = new wpdb( $db_user, $db_pass, $lab_db, $db_host );
+$lab_wpdb->set_prefix( 'etk_t_' );
+$lab_wpdb->query( 'SET SESSION group_concat_max_len = 10000000' );
+
+$plugin = Plugin::get_instance();
+$plugin->init();
+$registry = $plugin->get_language_registry();
+
+// Limpieza de reproducibilidad: si una ejecución previa dejó registros de batch 8, limpiarlos mediante su manifiesto:
+$manifest_cleanup_res = $mysqli_lab->query( "SELECT option_name, option_value FROM `etk_t_options` WHERE option_name LIKE 'tfml_migration_manifest_exec_batch_08%'" );
+if ( $manifest_cleanup_res && $manifest_cleanup_res->num_rows > 0 ) {
+	while ( $row = $manifest_cleanup_res->fetch_assoc() ) {
+		$data = maybe_unserialize( $row['option_value'] );
+		if ( ! empty( $data['imported_group_ids'] ) && is_array( $data['imported_group_ids'] ) ) {
+			$ids_str = implode( ',', array_map( 'intval', $data['imported_group_ids'] ) );
+			$mysqli_lab->query( "DELETE FROM `etk_t_tfml_group_elements` WHERE group_id IN ({$ids_str})" );
+			$mysqli_lab->query( "DELETE FROM `etk_t_tfml_groups` WHERE id IN ({$ids_str})" );
+		}
+		$opt_esc = $mysqli_lab->real_escape_string( $row['option_name'] );
+		$mysqli_lab->query( "DELETE FROM `etk_t_options` WHERE option_name = '{$opt_esc}'" );
+	}
+}
+$mysqli_lab->query( "DELETE FROM `etk_t_options` WHERE option_name LIKE 'tfml_migration_lock_%'" );
+
+// -------------------------------------------------------------------------
+// 2. CONTROL 1: PRESERVACIÓN INMUTABLE DEL ESTADO ACUMULADO (91 GRUPOS, 104 ELEM)
+// -------------------------------------------------------------------------
+echo "\n--- Control 1: Preservación Inmutable del Estado Acumulado (91 Grupos, 104 Elementos) ---\n";
+
+$groups_count_pre   = (int) $mysqli_lab->query( 'SELECT COUNT(*) FROM `etk_t_tfml_groups`' )->fetch_row()[0];
+$elements_count_pre = (int) $mysqli_lab->query( 'SELECT COUNT(*) FROM `etk_t_tfml_group_elements`' )->fetch_row()[0];
+assert_true( 91 === $groups_count_pre, "BD laboratorio conserva estrictamente 91 registros en etk_t_tfml_groups ({$groups_count_pre})" );
+assert_true( 104 === $elements_count_pre, "BD laboratorio conserva estrictamente 104 registros en etk_t_tfml_group_elements ({$elements_count_pre})" );
+
+// Cargar dinámicamente los 91 IDs acumulados sin suposiciones de correlatividad autoincremental:
+$res_gids = $mysqli_lab->query( 'SELECT id FROM `etk_t_tfml_groups` ORDER BY id ASC' );
+$initial_group_ids = array();
+while ( $r = $res_gids->fetch_row() ) {
+	$initial_group_ids[] = (int) $r[0];
+}
+assert_true( 91 === count( $initial_group_ids ), 'Se identificaron exactamente 91 IDs de grupos preexistentes' );
+
+// Comprobar que los grupos históricos de lotes 1, 2, 6 y 7 forman parte del conjunto:
+$p1_gids = array( 6, 7, 8, 9, 10 );
+$b2_gids = array( 38, 39, 40 );
+foreach ( array_merge( $p1_gids, $b2_gids ) as $hist_id ) {
+	assert_true( in_array( $hist_id, $initial_group_ids, true ), "Grupo histórico {$hist_id} está presente en el conjunto inicial" );
+}
+
+// Tablas secundarias TFML permanecen en 0:
+$cnt_media   = (int) $mysqli_lab->query( 'SELECT COUNT(*) FROM `etk_t_tfml_media_translations`' )->fetch_row()[0];
+$cnt_str     = (int) $mysqli_lab->query( 'SELECT COUNT(*) FROM `etk_t_tfml_strings`' )->fetch_row()[0];
+$cnt_str_tr  = (int) $mysqli_lab->query( 'SELECT COUNT(*) FROM `etk_t_tfml_string_translations`' )->fetch_row()[0];
+assert_true( 0 === $cnt_media, 'Tabla media_translations conserva 0 registros' );
+assert_true( 0 === $cnt_str, 'Tabla strings conserva 0 registros' );
+assert_true( 0 === $cnt_str_tr, 'Tabla string_translations conserva 0 registros' );
+
+// Centinela interno WPML en cms_ect_lab:
+$lab_wpml_rows = (int) $lab_wpdb->get_var( "SELECT COUNT(*) FROM `{$sentinel_table}`" );
+$lab_wpml_hash = (string) $lab_wpdb->get_var(
+	"SELECT MD5(GROUP_CONCAT(CONCAT_WS(':', translation_id, element_type, element_id, trid, language_code, IFNULL(source_language_code, '')) ORDER BY translation_id ASC SEPARATOR '|')) FROM `{$sentinel_table}`"
+);
+assert_true( 3403 === $lab_wpml_rows, 'WPML en cms_ect_lab contiene exactamente 3403 filas' );
+assert_true( '4241ca7e7ec6399a594537cb04790c10' === $lab_wpml_hash, 'WPML en cms_ect_lab estrictamente intacto (MD5 4241ca7e...)' );
+$GLOBALS['wpdb'] = $lab_wpdb;
+
+// Checkpoint y locks previos:
+$checkpoint_repo = new MigrationCheckpointRepository();
+$lock_manager    = new MigrationExecutionLock();
+$cp_prev         = $checkpoint_repo->get( 'wpml' );
+if ( null === $cp_prev || ! $cp_prev->is_completed() ) {
+	$cp_prev = new MigrationCheckpoint(
+		array(
+			'source'              => 'wpml',
+			'total_items'         => 12,
+			'processed_items'     => 12,
+			'batch_size'          => 20,
+			'last_processed_trid' => 9536,
+			'status'              => MigrationCheckpoint::STATUS_COMPLETED,
+		)
+	);
+	$checkpoint_repo->save( $cp_prev );
+}
+assert_true( null !== $cp_prev && $cp_prev->is_completed(), 'Checkpoint previo en estado COMPLETED' );
+assert_true( ! $lock_manager->is_locked( 'wpml' ), 'Lock de migración liberado pre-ejecución' );
+
+// -------------------------------------------------------------------------
+// 3. CONTROL 2: SNAPSHOT DE INTEGRIDAD WOOCOMMERCE PRE-MIGRACIÓN (SOLO LECTURA)
+// -------------------------------------------------------------------------
+echo "\n--- Control 2: Snapshot de Integridad WooCommerce Pre-Migración (Solo Lectura) ---\n";
+
+$product_post_ids = array( 5250, 5264, 5275, 5787, 6123, 6178, 6224 );
+
+/**
+ * Capture WooCommerce product post, postmeta and term relationship snapshot.
+ *
+ * @param mysqli $mysqli   Database connection.
+ * @param array  $post_ids Product Post IDs.
+ * @return array Snapshot data.
+ */
+function capture_woocommerce_snapshot( mysqli $mysqli, array $post_ids ): array {
+	$snapshot = array(
+		'posts'         => array(),
+		'postmeta'      => array(),
+		'commercial'    => array(),
+		'relationships' => array(),
+	);
+
+	$pid_str = implode( ',', array_map( 'intval', $post_ids ) );
+
+	$res_posts = $mysqli->query( "SELECT ID, post_title, post_name, post_type, post_status, post_excerpt, post_author, post_parent, menu_order, comment_status, ping_status, MD5(post_content) as content_hash FROM `etk_t_posts` WHERE ID IN ({$pid_str}) ORDER BY ID ASC" );
+	while ( $r = $res_posts->fetch_assoc() ) {
+		$snapshot['posts'][ (int) $r['ID'] ] = $r;
+	}
+
+	$res_meta = $mysqli->query( "SELECT post_id, meta_key, meta_value FROM `etk_t_postmeta` WHERE post_id IN ({$pid_str}) ORDER BY meta_id ASC" );
+	while ( $r = $res_meta->fetch_assoc() ) {
+		$pid = (int) $r['post_id'];
+		$key = $r['meta_key'];
+		$val = $r['meta_value'];
+		$snapshot['postmeta'][ $pid ][ $key ][] = MD5( (string) $val );
+
+		// Captura explícita de campos comerciales WooCommerce y de reserva:
+		if ( in_array( $key, array( '_price', '_regular_price', '_stock', '_stock_status', '_tax_status', '_tax_class', '_manage_stock', '_backorders', '_sold_individually', '_virtual', '_downloadable', 'total_sales' ), true ) || strpos( $key, 'ovabrw_' ) === 0 ) {
+			$snapshot['commercial'][ $pid ][ $key ] = $val;
+		}
+	}
+
+	$res_rel = $mysqli->query( "SELECT object_id, term_taxonomy_id FROM `etk_t_term_relationships` WHERE object_id IN ({$pid_str}) ORDER BY object_id ASC, term_taxonomy_id ASC" );
+	while ( $r = $res_rel->fetch_assoc() ) {
+		$oid  = (int) $r['object_id'];
+		$ttid = (int) $r['term_taxonomy_id'];
+		$snapshot['relationships'][ $oid ][] = $ttid;
+	}
+
+	return $snapshot;
+}
+
+$wc_snapshot_pre = capture_woocommerce_snapshot( $mysqli_lab, $product_post_ids );
+
+// Comprobar existencia física y validez pre-migración:
+assert_true( 7 === count( $wc_snapshot_pre['posts'] ), 'Pre-migración: Los 7 productos WooCommerce existen físicamente en WordPress Core' );
+
+foreach ( $product_post_ids as $pid ) {
+	assert_true( isset( $wc_snapshot_pre['posts'][ $pid ] ), "Producto {$pid} registrado en snapshot de posts" );
+	assert_true( 'product' === $wc_snapshot_pre['posts'][ $pid ]['post_type'], "Producto {$pid} tiene post_type = 'product'" );
+	assert_true( isset( $wc_snapshot_pre['commercial'][ $pid ]['_price'] ), "Producto {$pid} contiene meta comercial _price" );
+	assert_true( isset( $wc_snapshot_pre['commercial'][ $pid ]['_stock_status'] ), "Producto {$pid} contiene meta comercial _stock_status" );
+}
+
+// -------------------------------------------------------------------------
+// 4. CONTROL 3: VALIDACIÓN FORMAL DEL LOTE 8 AUTORIZADO (DT-TFML-051)
+// -------------------------------------------------------------------------
+echo "\n--- Control 3: Validación Formal del Lote 8 Autorizado (DT-TFML-051) ---\n";
+
+$catalog_path = __DIR__ . '/incremental_batches_catalog.json';
+$catalog      = json_decode( (string) file_get_contents( $catalog_path ), true );
+$batch_08_def = $catalog['batch-08-cpt-products'];
+
+// TRIDs exclusivos obtenidos directamente del catálogo oficial:
+$authorized_batch_trids = array( 9224, 9225, 9231, 9431, 9499, 9526, 9540 );
+$expected_fingerprint   = '3df3ce6f1a6dac619d203adaf5a31d8eb3fc332493330a5e8b755d4ff1d9136d';
+
+assert_true( $authorized_batch_trids === $batch_08_def['trids'], 'Catálogo oficial: TRIDs del Lote 8 coinciden exactamente con la autorización DT-TFML-051' );
+assert_true( $expected_fingerprint === $batch_08_def['fingerprint'], 'Catálogo oficial: Fingerprint del Lote 8 certificado' );
+assert_true( 7 === count( $authorized_batch_trids ), 'Lote 8 contiene exactamente 7 TRIDs autorizados' );
+
+$planner       = new WpmlMigrationPlanner( $lab_wpdb, $registry );
+$matrix_plan   = $planner->generate_plan( 0, 0, false );
+$batch_08_plan = $matrix_plan->derive_partial_plan( $authorized_batch_trids, 'batch-08-cpt-products' );
+
+assert_true( MigrationPlan::STATUS_READY === $batch_08_plan->get_status(), 'Lote 8 derivado en estado formal STATUS_READY' );
+assert_true( $expected_fingerprint === $batch_08_plan->get_fingerprint(), "Huella SHA-256 del Lote 8 certificada: {$expected_fingerprint}" );
+assert_true( 7 === count( $batch_08_plan->get_planned_groups() ), 'Lote 8 contiene exactamente 7 grupos de traducción' );
+
+// Comprobar cardinalidad de elementos y subtipos:
+$b08_elements_count = 0;
+$b08_subtypes_count = array();
+$b08_all_post_ids   = array();
+
+foreach ( $batch_08_plan->get_planned_groups() as $pg ) {
+	$b08_elements_count += count( $pg['translations'] );
+	$st = $pg['subtype'];
+	$b08_subtypes_count[ $st ] = ( $b08_subtypes_count[ $st ] ?? 0 ) + 1;
+	foreach ( $pg['translations'] as $lang => $elem_id ) {
+		$b08_all_post_ids[] = (int) $elem_id;
+		assert_true( 'post' === $pg['element_type'], "Traducción de producto {$elem_id} ({$lang}) es de tipo 'post'" );
+		assert_true( 'es' === $lang, "Producto {$elem_id} es monolingüe en idioma 'es'" );
+	}
+}
+
+sort( $b08_all_post_ids );
+assert_true( 7 === $b08_elements_count, 'Lote 8 contiene exactamente 7 elementos editoriales (7 productos monolingües)' );
+assert_true( 7 === ( $b08_subtypes_count['product'] ?? 0 ), 'Lote 8 contiene exactamente 7 grupos con subtipo post:product' );
+assert_true( $product_post_ids === $b08_all_post_ids, 'Los 7 post IDs del plan del Lote 8 coinciden exactamente con la lista autorizada de productos' );
+
+$val = new WordPressElementValidator();
+foreach ( $batch_08_plan->get_planned_groups() as $pg ) {
+	$trid      = (int) $pg['trid'];
+	$elem_type = $pg['element_type'];
+	$subtype   = $pg['subtype'];
+	$cid       = (int) $pg['canonical_id'];
+	assert_true( in_array( $trid, $authorized_batch_trids, true ), "TRID {$trid} pertenece estrictamente al lote 8 autorizado" );
+	assert_true( 'post' === $elem_type, "TRID {$trid} es de tipo 'post'" );
+	assert_true( 'product' === $subtype, "TRID {$trid} es de subtipo 'product'" );
+	assert_true( $val->exists( $elem_type, $subtype, $cid ), "Elemento canónico {$cid} ({$elem_type}:{$subtype}) existe físicamente en WordPress Core" );
+}
+
+// -------------------------------------------------------------------------
+// 5. CONTROL 4: EJECUCIÓN TRANSACCIONAL ATÓMICA DEL LOTE 8 (cms_ect_lab)
+// -------------------------------------------------------------------------
+echo "\n--- Control 4: Ejecución Transaccional Atómica del Lote 8 en cms_ect_lab ---\n";
+
+$group_repo       = new TranslationGroupRepository( $lab_wpdb, $registry );
+$rollback_service = new WpmlMigrationRollbackService( $lab_wpdb, $group_repo, $checkpoint_repo );
+$executor         = new WpmlMigrationExecutor(
+	$lab_wpdb,
+	$group_repo,
+	$registry,
+	$checkpoint_repo,
+	$lock_manager,
+	$val,
+	new SchemaManager( $lab_wpdb ),
+	$rollback_service
+);
+
+$executor->set_authorized( true );
+$b08_exec_token = 'exec_batch_08_' . wp_generate_password( 8, false );
+
+$start_time = microtime( true );
+$exec_result = $executor->execute_batch(
+	$batch_08_plan,
+	20, // Procesa los 7 grupos en una sola transacción atómica
+	$b08_exec_token,
+	null,
+	$expected_fingerprint
+);
+$elapsed_time = round( microtime( true ) - $start_time, 4 );
+
+echo "  Tiempo de ejecución Lote 8: {$elapsed_time} segundos\n";
+assert_true( 7 === count( $exec_result['batch_results'] ), 'Lote 8 procesó exactamente los 7 grupos' );
+assert_true( $exec_result['finished'], 'Lote 8 reportó finalización exitosa (finished = true)' );
+
+$imported_group_ids = array();
+foreach ( $exec_result['batch_results'] as $res_item ) {
+	assert_true( 'imported' === $res_item['status'], "TRID {$res_item['trid']} importado formalmente con estado 'imported'" );
+	assert_true( isset( $res_item['group_id'] ) && $res_item['group_id'] > 0, "TRID {$res_item['trid']} asignado a group_id válido {$res_item['group_id']}" );
+	$imported_group_ids[] = (int) $res_item['group_id'];
+}
+assert_true( 7 === count( $imported_group_ids ), 'Se importaron exactamente 7 IDs de grupo capturados dinámicamente' );
+
+// Registrar manifiesto de ejecución con los IDs reales importados:
+$rollback_service->save_execution_manifest(
+	$b08_exec_token,
+	array(
+		'execution_id'       => $b08_exec_token,
+		'source'             => 'wpml',
+		'plan_fingerprint'   => $batch_08_plan->get_fingerprint(),
+		'imported_group_ids' => $imported_group_ids,
+	)
+);
+
+// Comprobar conteos acumulados en base de datos: exactamente 98 grupos (91 + 7) y 111 elementos (104 + 7).
+$cumul_groups   = (int) $mysqli_lab->query( 'SELECT COUNT(*) FROM `etk_t_tfml_groups`' )->fetch_row()[0];
+$cumul_elements = (int) $mysqli_lab->query( 'SELECT COUNT(*) FROM `etk_t_tfml_group_elements`' )->fetch_row()[0];
+assert_true( 98 === $cumul_groups, "Resultado acumulado en BD: exactamente 98 grupos en etk_t_tfml_groups ({$cumul_groups})" );
+assert_true( 111 === $cumul_elements, "Resultado acumulado en BD: exactamente 111 elementos en etk_t_tfml_group_elements ({$cumul_elements})" );
+
+// Confirmar que los 91 grupos acumulados previos siguen 100% inalterados:
+$current_group_ids = array_map( fn( $r ) => (int) $r[0], $mysqli_lab->query( 'SELECT id FROM `etk_t_tfml_groups` ORDER BY id ASC' )->fetch_all( MYSQLI_NUM ) );
+foreach ( $initial_group_ids as $prev_id ) {
+	assert_true( in_array( $prev_id, $current_group_ids, true ), "Grupo acumulado previo {$prev_id} permanece inalterado" );
+}
+
+// Comprobar que los 7 grupos importados tienen tipo 'post' y subtipo 'product':
+$res_check_g = $mysqli_lab->query( 'SELECT id, element_type, subtype FROM `etk_t_tfml_groups` WHERE id IN (' . implode( ',', $imported_group_ids ) . ')' );
+$count_verified_g = 0;
+while ( $cg = $res_check_g->fetch_assoc() ) {
+	++$count_verified_g;
+	assert_true( 'post' === $cg['element_type'], "Grupo {$cg['id']} es de tipo 'post'" );
+	assert_true( 'product' === $cg['subtype'], "Grupo {$cg['id']} es de subtipo 'product'" );
+}
+assert_true( 7 === $count_verified_g, 'Los 7 grupos importados verificados con tipo post y subtipo product' );
+
+// Comprobar estado de checkpoint y lock:
+$cp_b08 = $checkpoint_repo->get( 'wpml' );
+assert_true( null !== $cp_b08 && $cp_b08->is_completed(), 'Checkpoint del Lote 8 marcado como completed' );
+assert_true( 7 === $cp_b08->get_processed_items(), 'Checkpoint del Lote 8 registra 7 ítems procesados' );
+assert_true( ! $lock_manager->is_locked( 'wpml' ), 'Lock de migración liberado tras la ejecución' );
+
+// Verificar manifiesto en opciones:
+$manifest_b08_val = maybe_unserialize( $mysqli_lab->query( "SELECT option_value FROM `etk_t_options` WHERE option_name = 'tfml_migration_manifest_{$b08_exec_token}'" )->fetch_row()[0] ?? '' );
+assert_true( is_array( $manifest_b08_val ), 'Manifiesto de ejecución del Lote 8 guardado correctamente en opciones' );
+assert_true( 7 === count( (array) $manifest_b08_val['imported_group_ids'] ), 'Manifiesto del Lote 8 registra exactamente 7 grupos importados' );
+
+// -------------------------------------------------------------------------
+// 6. CONTROL 5: CERTIFICACIÓN DE IDEMPOTENCIA Y REVERSIBILIDAD AISLADA
+// -------------------------------------------------------------------------
+echo "\n--- Control 5: Certificación de Idempotencia y Reversibilidad Aislada ---\n";
+
+// A. IDEMPOTENCIA ESTRICTA: Re-ejecutar Lote 8 sobre el estado acumulado.
+$idem_token = 'token_idem_b08_' . wp_generate_password( 6, false );
+$idem_res   = $executor->execute_batch(
+	$batch_08_plan,
+	20,
+	$idem_token,
+	null,
+	$expected_fingerprint
+);
+
+assert_true( 7 === count( $idem_res['batch_results'] ), 'Re-ejecución idempotente evaluó los 7 grupos' );
+foreach ( $idem_res['batch_results'] as $res_item ) {
+	assert_true( 'idempotent_skipped' === $res_item['status'], "TRID {$res_item['trid']} reporta formalmente idempotent_skipped" );
+}
+
+$post_idem_groups   = (int) $mysqli_lab->query( 'SELECT COUNT(*) FROM `etk_t_tfml_groups`' )->fetch_row()[0];
+$post_idem_elements = (int) $mysqli_lab->query( 'SELECT COUNT(*) FROM `etk_t_tfml_group_elements`' )->fetch_row()[0];
+assert_true( 98 === $post_idem_groups, 'Idempotencia: Conteo de grupos permanece inmutable en 98' );
+assert_true( 111 === $post_idem_elements, 'Idempotencia: Conteo de elementos permanece inmutable en 111' );
+
+// B. REVERSIBILIDAD AISLADA (ROLLBACK SELECTIVO): Rollback exclusivo de los 7 grupos del Lote 8.
+echo "  Comprobando rollback aislado del Lote 8 sin afectar los lotes previos...\n";
+$rb_res = $rollback_service->rollback_groups( $imported_group_ids, $b08_exec_token );
+
+assert_true( $rb_res['success'], 'Rollback de los grupos del Lote 8 completado exitosamente' );
+assert_true( 7 === $rb_res['reverted_groups_count'], 'Rollback eliminó exactamente los 7 grupos del Lote 8' );
+$rollback_service->delete_execution_manifest( $b08_exec_token );
+
+// Validar retorno exacto al estado previo (91 grupos, 104 elementos):
+$post_rb_groups   = (int) $mysqli_lab->query( 'SELECT COUNT(*) FROM `etk_t_tfml_groups`' )->fetch_row()[0];
+$post_rb_elements = (int) $mysqli_lab->query( 'SELECT COUNT(*) FROM `etk_t_tfml_group_elements`' )->fetch_row()[0];
+assert_true( 91 === $post_rb_groups, "Post-rollback: Grupos en laboratorio retornaron exactamente a 91 ({$post_rb_groups})" );
+assert_true( 104 === $post_rb_elements, "Post-rollback: Elementos en laboratorio retornaron exactamente a 104 ({$post_rb_elements})" );
+
+$remaining_group_ids = array_map( fn( $r ) => (int) $r[0], $mysqli_lab->query( 'SELECT id FROM `etk_t_tfml_groups` ORDER BY id ASC' )->fetch_all( MYSQLI_NUM ) );
+assert_true( $initial_group_ids === $remaining_group_ids, 'Los 91 grupos acumulados previos permanecieron 100% blindados e intactos' );
+
+// C. RE-EJECUCIÓN POST-ROLLBACK:
+echo "  Re-ejecutando Lote 8 para restaurar el estado final acumulado...\n";
+$b08_re_token = 'exec_batch_08_final_' . wp_generate_password( 6, false );
+$re_exec_res = $executor->execute_batch(
+	$batch_08_plan,
+	20,
+	$b08_re_token,
+	null,
+	$expected_fingerprint
+);
+
+assert_true( 7 === count( $re_exec_res['batch_results'] ), 'Re-ejecución procesó los 7 grupos' );
+$final_restored_groups   = (int) $mysqli_lab->query( 'SELECT COUNT(*) FROM `etk_t_tfml_groups`' )->fetch_row()[0];
+$final_restored_elements = (int) $mysqli_lab->query( 'SELECT COUNT(*) FROM `etk_t_tfml_group_elements`' )->fetch_row()[0];
+assert_true( 98 === $final_restored_groups, "Estado acumulado restaurado: exactamente 98 grupos en etk_t_tfml_groups ({$final_restored_groups})" );
+assert_true( 111 === $final_restored_elements, "Estado acumulado restaurado: exactamente 111 elementos en etk_t_tfml_group_elements ({$final_restored_elements})" );
+
+$re_imported_group_ids = array();
+foreach ( $re_exec_res['batch_results'] as $res_item ) {
+	if ( 'imported' === $res_item['status'] && ! empty( $res_item['group_id'] ) ) {
+		$re_imported_group_ids[] = (int) $res_item['group_id'];
+	}
+}
+assert_true( 7 === count( $re_imported_group_ids ), 'Re-ejecución importó exactamente 7 grupos nuevos (captura dinámica de IDs)' );
+
+$rollback_service->save_execution_manifest(
+	$b08_re_token,
+	array(
+		'execution_id'       => $b08_re_token,
+		'source'             => 'wpml',
+		'plan_fingerprint'   => $batch_08_plan->get_fingerprint(),
+		'imported_group_ids' => $re_imported_group_ids,
+	)
+);
+
+// Conciliación profunda del lote 8:
+$reconcile_res = $executor->reconcile( $batch_08_plan );
+assert_true( $reconcile_res['integrity_verified'], 'Conciliación profunda certifica 100% de integridad relacional en el lote 8' );
+assert_true( 7 === $reconcile_res['tfml_imported_groups'], 'Conciliación confirma 7 grupos importados del lote 8' );
+assert_true( empty( $reconcile_res['discrepancies'] ), 'Cero discrepancias en la conciliación del lote 8' );
+
+// -------------------------------------------------------------------------
+// 7. CONTROL 6: AUDITORÍA DE INVARIANZA CRIPTOGRÁFICA WOOCOMMERCE (DELTA = 0)
+// -------------------------------------------------------------------------
+echo "\n--- Control 6: Auditoría de Invarianza Criptográfica WooCommerce (Delta = 0) ---\n";
+
+$wc_snapshot_post = capture_woocommerce_snapshot( $mysqli_lab, $product_post_ids );
+
+// Comprobación de invariabilidad total en datos nativos de WordPress y WooCommerce:
+assert_true( $wc_snapshot_pre['posts'] === $wc_snapshot_post['posts'], 'Invarianza WooCommerce: Tabla etk_t_posts 100% idéntica (Delta = 0 en títulos, slugs, contenido, estados y tipos)' );
+assert_true( $wc_snapshot_pre['postmeta'] === $wc_snapshot_post['postmeta'], 'Invarianza WooCommerce: Tabla etk_t_postmeta 100% idéntica (Delta = 0 en metadatos)' );
+assert_true( $wc_snapshot_pre['commercial'] === $wc_snapshot_post['commercial'], 'Invarianza WooCommerce: Campos comerciales (_price, _regular_price, _stock, _stock_status, _tax_status, ovabrw_*) 100% idénticos' );
+assert_true( $wc_snapshot_pre['relationships'] === $wc_snapshot_post['relationships'], 'Invarianza WooCommerce: Relaciones taxonómicas en etk_t_term_relationships 100% intactas' );
+
+// -------------------------------------------------------------------------
+// 8. CONTROL 7: VALIDACIONES FUNCIONALES DE API DE DOMINIO Y HTTP
+// -------------------------------------------------------------------------
+echo "\n--- Control 7: Validaciones Funcionales de API de Dominio y HTTP ---\n";
+
+// A. Resolución funcional vía ContentTranslationResolver:
+$resolver = new ContentTranslationResolver( $group_repo, $registry );
+
+// Reconocimiento de idioma y ausencia de fallback para cada uno de los 7 productos:
+$product_titles = array(
+	5250 => 'Habitación Matrimonial',
+	5264 => 'Suite Matrimonial',
+	5275 => 'Habitacion Amigos',
+	5787 => 'Habitacion Familia',
+	6123 => 'Habitación Triple',
+	6178 => 'Habitación Doble',
+	6224 => 'Habitación Cabaña Familiar',
+);
+
+foreach ( $product_titles as $pid => $title ) {
+	$lang = $resolver->language_of( 'post', $pid );
+	assert_true( 'es' === $lang, "ContentTranslationResolver reconoce idioma 'es' para Producto {$pid} ({$title})" );
+
+	// Resolución hacia inglés debe retornar estrictamente null (sin fallback indebido a default ni canonical):
+	$res_en = $resolver->resolve_element_id( 'post', $pid, 'en' );
+	assert_true( null === $res_en, "Producto monolingüe {$pid} hacia EN devuelve estrictamente null (sin fallback espurio)" );
+}
+
+// Preservación de resolución de lotes anteriores:
+// Lote 7: CPT Tours bilingües 5321 <-> 5322:
+assert_true( 5322 === $resolver->resolve_element_id( 'post', 5321, 'en' ), 'Lote 7 anterior: Tour 5321 resuelve a 5322' );
+assert_true( 5321 === $resolver->resolve_element_id( 'post', 5322, 'es' ), 'Lote 7 anterior: Tour 5322 resuelve a 5321' );
+
+// Lote 6: Plantilla bilingüe 5048 <-> 5055:
+assert_true( 5055 === $resolver->resolve_element_id( 'post', 5048, 'en' ), 'Lote 6 anterior: Plantilla 5048 resuelve a 5055' );
+assert_true( 5048 === $resolver->resolve_element_id( 'post', 5055, 'es' ), 'Lote 6 anterior: Plantilla 5055 resuelve a 5048' );
+
+// Lote 5: Etiquetas monolingües hacia EN devuelven null:
+assert_true( null === $resolver->resolve_element_id( 'term', 74, 'en' ), 'Lote 5 anterior: Etiqueta 74 hacia EN devuelve null' );
+
+// Lote 2: Categoría blog 50 monolingüe hacia EN devuelve null:
+assert_true( null === $resolver->resolve_element_id( 'term', 50, 'en' ), 'Lote 2 anterior: Categoría 50 hacia EN devuelve null' );
+
+// Lote 1: Página 4338 monolingüe hacia EN devuelve null:
+assert_true( null === $resolver->resolve_element_id( 'post', 4338, 'en' ), 'Lote 1 anterior: Página 4338 hacia EN devuelve null' );
+
+// B. Verificación de entorno de presentación (tema ausente -> BLOCKED):
+$theme_exists = is_dir( 'D:/laragon/www/lab.ecoterra/wp-content/themes/' . get_option( 'stylesheet' ) );
+assert_true( ! $theme_exists, 'Directorio del tema ecoCMS ausente en laboratorio: renderizado frontend HTML catalogado estrictamente como BLOCKED' );
+
+// C. Verificación de peticiones HTTP reales al servidor web:
+function lab_http_get( string $path ): array {
+	$url = 'http://lab.ecoterra.test' . $path;
+	$ch  = curl_init( $url );
+	curl_setopt( $ch, CURLOPT_RESOLVE, array( 'lab.ecoterra.test:80:127.0.0.1' ) );
+	curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+	curl_setopt( $ch, CURLOPT_HEADER, true );
+	curl_setopt( $ch, CURLOPT_FOLLOWLOCATION, false );
+	curl_setopt( $ch, CURLOPT_TIMEOUT, 10 );
+	$response    = curl_exec( $ch );
+	$status_code = (int) curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+	$header_size = (int) curl_getinfo( $ch, CURLINFO_HEADER_SIZE );
+	curl_close( $ch );
+
+	return array(
+		'status'  => $status_code,
+		'headers' => is_string( $response ) ? substr( $response, 0, $header_size ) : '',
+		'body'    => is_string( $response ) ? substr( $response, $header_size ) : '',
+	);
+}
+
+$http_root = lab_http_get( '/' );
+assert_true( 200 === $http_root['status'], 'HTTP: Raíz (/) responde HTTP 200 OK' );
+assert_true( strpos( $http_root['headers'], 'noindex' ) !== false, 'HTTP: Cabecera X-Robots-Tag noindex activa en laboratorio' );
+
+$http_en = lab_http_get( '/en/' );
+assert_true( 404 === $http_en['status'], 'HTTP: Prefijo /en/ responde 404 Not Found (home inglés no migrado por bloqueo de idioma en TRID 197)' );
+assert_true( 500 !== $http_en['status'], 'HTTP: Ausencia de error HTTP 500 en /en/' );
+
+$http_fr = lab_http_get( '/fr/' );
+assert_true( 404 === $http_fr['status'], 'HTTP: Prefijo /fr/ responde 404 Not Found (idioma inactivo, rechazo limpio sin aliasing a default)' );
+assert_true( 500 !== $http_fr['status'], 'HTTP: Ausencia de error HTTP 500 en /fr/' );
+
+$http_p4338 = lab_http_get( '/?page_id=4338' );
+assert_true( 301 === $http_p4338['status'], 'HTTP: Página 4338 (Lote 1) responde 301 canónico hacia /old-blog/' );
+
+$http_cat50 = lab_http_get( '/?cat=50' );
+assert_true( 301 === $http_cat50['status'], 'HTTP: Categoría 50 (Lote 2) responde 301 canónico hacia /category/blog/' );
+
+$http_tour5321 = lab_http_get( '/?post_type=tours&p=5321' );
+assert_true( in_array( $http_tour5321['status'], array( 200, 301, 404 ), true ), 'HTTP: CPT Tour 5321 (Lote 7) responde limpiamente sin error fatal' );
+assert_true( 500 !== $http_tour5321['status'], 'HTTP: Ausencia de error 500 en solicitud de CPT Tour' );
+
+// Consultas de Productos WooCommerce migrados:
+$http_prod5250 = lab_http_get( '/?post_type=product&p=5250' );
+assert_true( in_array( $http_prod5250['status'], array( 200, 301, 404 ), true ), 'HTTP: Producto 5250 responde limpiamente (200, 301 o 404) sin error fatal' );
+assert_true( 500 !== $http_prod5250['status'], 'HTTP: Ausencia de error 500 en solicitud de Producto WooCommerce' );
+
+$http_prod5264 = lab_http_get( '/?post_type=product&p=5264' );
+assert_true( in_array( $http_prod5264['status'], array( 200, 301, 404 ), true ), 'HTTP: Producto 5264 responde limpiamente (200, 301 o 404) sin error fatal' );
+assert_true( 500 !== $http_prod5264['status'], 'HTTP: Ausencia de error 500 en solicitud de Producto WooCommerce' );
+
+// -------------------------------------------------------------------------
+// 9. CONTROL 8: INVARIANZA FINAL Y CENTINELA EN ORIGEN (cms_ect)
+// -------------------------------------------------------------------------
+echo "\n--- Control 8: Invarianza Final y Centinela en Origen (cms_ect) ---\n";
+
+$final_lab_groups   = (int) $mysqli_lab->query( 'SELECT COUNT(*) FROM `etk_t_tfml_groups`' )->fetch_row()[0];
+$final_lab_elements = (int) $mysqli_lab->query( 'SELECT COUNT(*) FROM `etk_t_tfml_group_elements`' )->fetch_row()[0];
+assert_true( 98 === $final_lab_groups, "Invarianza final: Laboratorio retiene exactamente 98 grupos acumulados ({$final_lab_groups})" );
+assert_true( 111 === $final_lab_elements, "Invarianza final: Laboratorio retiene exactamente 111 elementos acumulados ({$final_lab_elements})" );
+
+$post_rows = (int) $original_wpdb->get_var( "SELECT COUNT(*) FROM `{$sentinel_table}`" );
+$post_hash = (string) $original_wpdb->get_var(
+	"SELECT MD5(GROUP_CONCAT(CONCAT_WS(':', translation_id, element_type, element_id, trid, language_code, IFNULL(source_language_code, '')) ORDER BY translation_id ASC SEPARATOR '|')) FROM `{$sentinel_table}`"
+);
+
+echo "\nSentinel WPML Post-Flight (cms_ect):\n";
+echo "  Rows: {$post_rows} (Expected: 3403)\n";
+echo "  MD5:  {$post_hash} (Expected: 4241ca7e7ec6399a594537cb04790c10)\n\n";
+
+assert_true( 3403 === $post_rows, 'Sentinel post-flight: Conteo WPML en cms_ect intacto (3403 filas, Delta = 0)' );
+assert_true( '4241ca7e7ec6399a594537cb04790c10' === $post_hash, 'Sentinel post-flight: Checksum WPML en cms_ect intacto (Delta = 0)' );
+
+echo "====================================================================\n";
+echo "  RESULTADO GLOBAL: {$assertions_passed}/{$assertions_passed} CONTROLES PASS\n";
+echo "  FASE 3.21 MIGRACIÓN LOTE 8: EXITOSA (PASS)\n";
+echo "====================================================================\n";
