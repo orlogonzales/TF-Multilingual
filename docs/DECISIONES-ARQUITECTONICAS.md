@@ -949,8 +949,8 @@
 - **DECISIÓN:**
   1. **Ejecución Transaccional del Lote 6 (`batch-06-elementor-templates`):**
      - Se ejecutó la migración de los 10 TRIDs autorizados obtenidos exclusivamente del catálogo oficial de Fase 3.15: `[6, 1300, 1713, 1723, 2365, 3423, 4130, 4532, 4533, 9208]`.
-     - Subtipos taxonómicos y tipos de post involucrados: 8 grupos de `elementor_library` (posts) y 2 grupos de `elementor_library_type` (terms).
-     - Cardinalidad verificada: 10 grupos y 11 elementos (incluye el primer grupo bilingüe de plantillas: TRID 9208 con Post 5048 en español y Post 5055 en inglés).
+     - Subtipos taxonómicos y tipos de post involucrados: exactamente 8 grupos de plantillas `elementor_library` (posts: 7 grupos monolingües [7 elementos] + 1 grupo bilingüe TRID 9208 [2 elementos] = 9 elementos) y 2 grupos de términos `elementor_library_type` (terms: 2 grupos monolingües = 2 elementos).
+     - Cardinalidad verificada: exactamente 10 grupos y 11 elementos (incluye el primer grupo bilingüe de plantillas: TRID 9208 con Post 5048 en español y Post 5055 en inglés).
      - Huella criptográfica inmutable ratificada: `ee32aff6cc43ea1f334b758bda34d9a9cc271de3a3c76217abd56e6264924a24`.
      - Nuevo estado acumulado en la base de datos del laboratorio: exactamente **79 grupos** en `etk_t_tfml_groups` (69 previos + 10 nuevos) y **84 elementos** en `etk_t_tfml_group_elements` (73 previos + 11 nuevos).
      - Manifiesto oficial persistido y checkpoint completado con 10 ítems procesados. Lock liberado.
@@ -974,3 +974,34 @@
 - **CONTEXTO:** Fase 3.19 / Directiva DT-TFML-049 — Migración controlada del lote 6 (Plantillas Elementor).
 - **JUSTIFICACIÓN:** Ejecutar el sexto lote incremental WPML -> TFML sobre plantillas y tipos de Elementor en laboratorio aislado, certificar la inviolabilidad de metadatos y estructuras JSON de Elementor, validar la resolución bilingüe simétrica cruzada de plantillas en la API de dominio, y consolidar el acumulado en 79 grupos y 84 elementos (65,8% de grupos importables).
 - **CONSECUENCIAS:** El laboratorio avanza al estado acumulado de 79 grupos y 84 elementos, se certifica que la migración no contamina las configuraciones visuales ni estructuras JSON de Elementor, y los 4 lotes restantes (41 grupos) permanecen intactos en estado `STATUS_READY`.
+
+### ADR-046: Migración Controlada del Séptimo Lote (batch-07-cpt-tours), Invarianza Criptográfica de Custom Post Types y Metadatos, Resolución Simétrica Bilingüe de Tours y Reversibilidad Aislada (Fase 3.20)
+- **FECHA:** 2026-10-11
+- **DECISIÓN:**
+  1. **Ejecución Transaccional del Lote 7 (`batch-07-cpt-tours`):**
+     - Se ejecutó la migración de los 12 TRIDs autorizados obtenidos exclusivamente del catálogo oficial de Fase 3.15: `[9256, 9285, 9287, 9293, 9303, 9313, 9318, 9428, 9533, 9534, 9535, 9536]`.
+     - Subtipo y tipo de post involucrados: exactamente 12 grupos con tipo `post` y subtipo `tours` (CPT tours).
+     - Cardinalidad verificada: exactamente 12 grupos y 20 elementos (8 grupos bilingües de 2 elementos [español/inglés] y 4 grupos monolingües de 1 elemento [español]).
+     - Huella criptográfica inmutable ratificada: `d24b52d1224564bd745b4bc8032a9607adef5dc00379b2634a50eed08e77888b`.
+     - Nuevo estado acumulado en la base de datos del laboratorio: exactamente **91 grupos** en `etk_t_tfml_groups` (79 previos + 12 nuevos) y **104 elementos** en `etk_t_tfml_group_elements` (84 previos + 20 nuevos), alcanzando el 75,8% de grupos y 78,2% de elementos importables del universo WPML.
+     - Manifiesto oficial persistido y checkpoint completado con 12 ítems procesados. Lock liberado.
+  2. **Preservación Criptográfica de Integridad de Tours (Delta Cero Absoluto):**
+     - Se capturó un snapshot exhaustivo pre y post-migración sobre los 20 posts CPT `tours` involucrados en el Lote 7 (`[5321, 5322, 5380, 5381, 5384, 5385, 5396, 5397, 5416, 5417, 5436, 5437, 5446, 5447, 5772, 5773, 6198, 6204, 6210, 6212]`).
+     - Se certificó que las tablas nativas de WordPress (`etk_t_posts`, `etk_t_postmeta`, `etk_t_term_relationships`) permanecen 100% idénticas (Delta = 0 en títulos, slugs, contenido, tipos, campos personalizados, configuraciones de tours y relaciones taxonómicas).
+  3. **Idempotencia y Reversibilidad Aislada en Base de Datos Real:**
+     - Segunda ejecución consecutiva sobre el Lote 7 reportó 12 resultados `idempotent_skipped` (0 duplicados).
+     - Rollback selectivo mediante `rollback_groups` sobre los IDs del manifiesto del Lote 7 revirtió exclusivamente los 12 grupos del Lote 7, retornando la base de datos de manera exacta a 79 grupos y 84 elementos, con los 79 grupos previos (lotes 1 al 6) 100% blindados e inalterados.
+     - Re-ejecución posterior restauró el estado final de 91 grupos y 104 elementos con 100% de reconciliación profunda (`integrity_verified = true`, 12 grupos verificados, 0 discrepancias).
+  4. **Validación de API de Dominio y Resolución Bilingüe Cruzada:**
+     - `ContentTranslationResolver`: validación de resolución simétrica cruzada ES <-> EN en los 8 pares de tours bilingües (TRID 9256: 5321 <-> 5322; TRID 9285: 5380 <-> 5381; TRID 9287: 5384 <-> 5385; TRID 9293: 5396 <-> 5397; TRID 9303: 5416 <-> 5417; TRID 9313: 5436 <-> 5437; TRID 9318: 5446 <-> 5447; TRID 9428: 5772 <-> 5773).
+     - Tours monolingües en español (TRID 9533: 6198; TRID 9534: 6204; TRID 9535: 6210; TRID 9536: 6212) resuelven hacia EN devolviendo estrictamente `null` (sin fallback espurio).
+     - Preservación íntegra de la capacidad resolutiva de lotes anteriores (Elementor, etiquetas, categorías, páginas).
+     - Comprobaciones HTTP reales sobre `http://lab.ecoterra.test` sin errores 500 ni bucles.
+     - Frontera de frontend: se mantiene la designación formal de `BLOCKED` para el renderizado HTML de etiquetas (`<html lang>`, canonical y hreflang en el cuerpo HTML) debido a la ausencia física del tema `ecoCMS` en el laboratorio.
+  5. **Invarianza Absoluta del Centinela en Origen (`cms_ect`):**
+     - Verificación pre y post-flight en `cms_ect`: 3.403 filas exactas y checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (**Delta = 0**).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.20 / Directiva DT-TFML-050 — Migración transaccional del lote 7: CPT Tours.
+- **JUSTIFICACIÓN:** Ejecutar el séptimo lote incremental WPML -> TFML sobre publicaciones del Custom Post Type `tours` en laboratorio aislado, certificar la inviolabilidad de metadatos nativos y relaciones taxonómicas de tours, validar la resolución bilingüe simétrica cruzada en la API de dominio, y consolidar el acumulado en 91 grupos y 104 elementos.
+- **CONSECUENCIAS:** El laboratorio avanza al estado acumulado de 91 grupos y 104 elementos (75,8% de grupos y 78,2% de elementos importables del universo WPML), y los 3 lotes restantes (29 grupos) permanecen intactos en estado `STATUS_READY`.
+

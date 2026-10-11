@@ -1186,7 +1186,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
 
 ### Migración Controlada del Sexto Lote: Plantillas y Tipos Elementor (DT-TFML-049)
 - **Ejecución Transaccional del Lote 6 (`batch-06-elementor-templates`):**
-  - Migración exitosa de 10 grupos y 11 elementos correspondientes a plantillas y tipos de Elementor (`elementor_library` y `elementor_library_type`) en `cms_ect_lab` (TRIDs `[6, 1300, 1713, 1723, 2365, 3423, 4130, 4532, 4533, 9208]`).
+  - Migración exitosa de 10 grupos y 11 elementos correspondientes a plantillas y tipos de Elementor (`elementor_library` y `elementor_library_type`) en `cms_ect_lab` (TRIDs `[6, 1300, 1713, 1723, 2365, 3423, 4130, 4532, 4533, 9208]`). Desglose exacto: 8 grupos de plantillas `elementor_library` (9 elementos: 7 grupos monolingües de 1 elemento + 1 grupo bilingüe TRID 9208 de 2 elementos) y 2 grupos de términos `elementor_library_type` (2 elementos: 2 grupos monolingües de 1 elemento).
   - Incorporación del primer grupo bilingüe de plantillas: TRID 9208 con Post 5048 en español ("Testimonios") y Post 5055 en inglés ("Testimonial").
   - Huella criptográfica inmutable ratificada: `ee32aff6cc43ea1f334b758bda34d9a9cc271de3a3c76217abd56e6264924a24`.
   - Nuevo estado acumulado en la base de datos: exactamente **79 grupos** en `etk_t_tfml_groups` (69 previos + 10 de lote 6) y **84 elementos** en `etk_t_tfml_group_elements` (73 previos + 11 de lote 6), alcanzando el 65,8% de cobertura de grupos importables del universo WPML.
@@ -1211,3 +1211,40 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - PHPCS / WPCS: **168/168 archivos analizados, 0 errors, 0 warnings** (100% PASS).
   - Verificación Integral Fase 3.19 (`scratch/verify_fase_3_19.php`): **250/250 controles PASS (100%)**.
   - `composer validate --strict`: PASS.
+
+---
+
+## [Fase 3.20] - 2026-10-11
+
+### Migración Controlada del Séptimo Lote: CPT Tours (DT-TFML-050)
+- **Subsanación Documental Fase 3.19:**
+  - Ratificación en documentación canónica (`docs/DECISIONES-ARQUITECTONICAS.md`, `docs/CHANGELOG.md`, `docs/ROADMAP.md`) del desglose exacto de Elementor: 8 grupos de plantillas `elementor_library` (9 elementos: 7 monolingües de 1 elemento + 1 bilingüe TRID 9208 de 2 elementos) y 2 grupos de términos `elementor_library_type` (2 elementos: 2 monolingües de 1 elemento), totalizando 10 grupos y 11 elementos.
+  - Subtipo formal del Lote 7 ratificado como `tours` (CPT `tours`), tal como está catalogado en WordPress Core.
+- **Ejecución Transaccional del Lote 7 (`batch-07-cpt-tours`):**
+  - Migración exitosa de 12 grupos y 20 elementos correspondientes a publicaciones del tipo personalizado `tours` en `cms_ect_lab` (TRIDs `[9256, 9285, 9287, 9293, 9303, 9313, 9318, 9428, 9533, 9534, 9535, 9536]`).
+  - Desglose de traducciones de tours: 8 grupos bilingües español-inglés (16 elementos) y 4 grupos monolingües en español (4 elementos).
+  - Huella criptográfica inmutable ratificada: `d24b52d1224564bd745b4bc8032a9607adef5dc00379b2634a50eed08e77888b`.
+  - Nuevo estado acumulado en la base de datos: exactamente **91 grupos** en `etk_t_tfml_groups` (79 previos + 12 de lote 7) y **104 elementos** en `etk_t_tfml_group_elements` (84 previos + 20 de lote 7), alcanzando el 75,8% de grupos y 78,2% de elementos importables del universo WPML.
+  - Manifiesto de ejecución persistido y checkpoint actualizado a `completed` con 12 ítems procesados. Lock liberado.
+- **Invarianza Criptográfica de Custom Post Types y Metadatos de Tours:**
+  - Captura y comparación de snapshots pre y post-migración sobre los 20 posts `tours`: certificación de Delta Cero absoluto en `etk_t_posts`, `etk_t_postmeta` (campos personalizados, itinerarios, configuraciones de tours) y relaciones taxonómicas en `etk_t_term_relationships`.
+- **Idempotencia y Reversibilidad Aislada del Lote 7:**
+  - Re-ejecución inmediata del Lote 7 sobre el laboratorio evalúa los 12 grupos sin generar duplicados: los 12 TRIDs reportan formalmente `idempotent_skipped` y los conteos de base de datos se mantienen inmutables en 91 grupos y 104 elementos.
+  - Rollback selectivo mediante `rollback_groups` sobre los IDs del Lote 7 revierte exclusivamente este lote, retornando la base de datos a 79 grupos y 84 elementos.
+  - Los 79 grupos acumulados de los lotes 1 al 6 permanecen 100% blindados e intactos.
+  - Re-ejecución posterior restaura el estado final de 91 grupos y 104 elementos, con certificación profunda de reconciliación (`reconcile()`) al 100% (`integrity_verified = true`, 0 discrepancias).
+- **Validación de API de Dominio y Comprobación HTTP:**
+  - Validación funcional de `ContentTranslationResolver` sobre CPT Tours: resolución simétrica cruzada ES <-> EN en los 8 pares de tours bilingües (TRID 9256: 5321 <-> 5322; TRID 9285: 5380 <-> 5381; TRID 9287: 5384 <-> 5385; TRID 9293: 5396 <-> 5397; TRID 9303: 5416 <-> 5417; TRID 9313: 5436 <-> 5437; TRID 9318: 5446 <-> 5447; TRID 9428: 5772 <-> 5773).
+  - Tours monolingües (TRIDs 9533, 9534, 9535, 9536) devuelven estrictamente `null` hacia EN (sin fallback espurio).
+  - Preservación íntegra de la capacidad de resolución de lotes anteriores (Elementor, etiquetas, categorías, páginas).
+  - Comprobaciones HTTP reales contra `http://lab.ecoterra.test` sin errores 500 ni bucles.
+  - Frontera de frontend: se mantiene la designación formal de `BLOCKED` para el renderizado HTML de etiquetas (`<html lang>`, canonical y hreflang en el cuerpo HTML) debido a la ausencia física del tema `ecoCMS` en el laboratorio.
+- **Preservación Inmutable de Centinelas:**
+  - `cms_ect_lab`: Conserva exactamente 91 grupos acumulados y 104 elementos, lock liberado.
+  - `cms_ect`: Centinela intacto con 3.403 registros y hash MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0 verificado en pre y post-flight).
+- **Métricas de Calidad:**
+  - PHPUnit: **532 tests (533 total), 1.830 assertions, 0 errors, 0 failures, 1 skipped** (100% PASS).
+  - PHPCS / WPCS: **168/168 archivos analizados, 0 errors, 0 warnings** (100% PASS).
+  - Verificación Integral Fase 3.20 (`scratch/verify_fase_3_20.php`): **359/359 controles PASS (100%)**.
+  - `composer validate --strict`: PASS.
+
