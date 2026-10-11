@@ -875,3 +875,37 @@
 - **CONTEXTO:** Fase 3.16 / Directiva DT-TFML-046 — Migración transaccional del tercer lote piloto WooCommerce.
 - **JUSTIFICACIÓN:** Ejecutar el tercer lote de migración incremental WPML -> TFML sobre taxonomías WooCommerce en laboratorio aislado, certificar idempotencia y rollback selectivo en entorno de persistencia real sin afectar lotes previos, y consolidar el estado de 24 grupos y 28 elementos.
 - **CONSECUENCIAS:** El laboratorio avanza al estado acumulado de 24 grupos y 28 elementos, el motor demuestra una vez más su solidez transaccional y reversibilidad granular, y los 7 lotes restantes (99 grupos) permanecen intactos en estado `STATUS_READY`.
+
+### ADR-043: Migración Controlada del Cuarto Lote (batch-04-taxonomy-tags-1), Trazabilidad Dinámica de IDs Autoincrementales, Idempotencia y Reversibilidad Aislada (Fase 3.17)
+- **FECHA:** 2026-10-11
+- **DECISIÓN:**
+  1. **Ejecución Transaccional del Lote 4 (`batch-04-taxonomy-tags-1`):**
+     - Se ejecutó la migración transaccional de los 23 TRIDs autorizados en el laboratorio aislado `cms_ect_lab`: `[9368, 9369, 9370, 9371, 9372, 9373, 9374, 9375, 9376, 9377, 9378, 9379, 9380, 9381, 9382, 9383, 9384, 9385, 9386, 9387, 9388, 9389, 9390]`.
+     - Subtipo taxonómico involucrado: 23 grupos de etiquetas WordPress (`post_tag`) con cardinalidad de 23 grupos y 23 elementos.
+     - Huella criptográfica inmutable ratificada: `b039d492f187b1fbe59b9089686c148110aa4d8ea0296f3208ea2809b3ed65f7`.
+     - Nuevo estado acumulado en la base de datos del laboratorio: exactamente **47 grupos** en `etk_t_tfml_groups` (24 previos + 23 nuevos) y **51 elementos** en `etk_t_tfml_group_elements` (28 previos + 23 nuevos).
+     - Registro de manifiesto transaccional y checkpoint actualizado a `completed` con 23 ítems procesados. Lock liberado.
+  2. **Trazabilidad Dinámica de IDs Autoincrementales y Titularidad por Manifiesto:**
+     - En conformidad con la directiva DT-TFML-047 y la auditoría de la Dirección Técnica, se eliminó cualquier suposición de que los IDs autoincrementales de MySQL sean correlativos, continuos o reutilizables tras operaciones de rollback.
+     - La titularidad y delimitación de los grupos creados se determina exclusivamente a partir de los IDs devueltos por el ejecutor y persistidos en el manifiesto de ejecución (`save_execution_manifest`).
+     - El conjunto previo de 24 grupos se identifica dinámicamente al inicio del ciclo y se verifica su inviolabilidad formal (100% preservados tras migración, idempotencia, rollback y re-ejecución).
+  3. **Idempotencia Estricta en Base de Datos Real:**
+     - Segunda ejecución consecutiva sobre el Lote 4 evalúa los 23 grupos sin realizar escrituras redundantes ni generar duplicados.
+     - Los 23 grupos devuelven formalmente el estado `idempotent_skipped` (0 duplicados).
+     - Los conteos de la base de datos se mantienen inmutables en exactamente 47 grupos y 51 elementos.
+  4. **Reversibilidad Aislada y Re-ejecución Post-Rollback:**
+     - Ejecución de `rollback_groups` sobre los IDs capturados en el manifiesto del Lote 4 revierte exclusivamente el cuarto lote.
+     - La base de datos regresa de manera exacta al estado acumulado previo de 24 grupos y 28 elementos.
+     - Los 24 grupos acumulados de los lotes 1, 2 y 3 permanecen 100% blindados e intactos.
+     - Re-ejecución posterior restaura el estado acumulado final de 47 grupos y 51 elementos.
+     - Verificación profunda mediante `reconcile()` certifica integridad estructural plena (`integrity_verified = true`, 0 discrepancias).
+  5. **Validación de API de Dominio y Comprobación HTTP:**
+     - Se verificó la resolución mediante `ContentTranslationResolver` sobre términos de etiquetas migradas (términos 51 'Cusco', 52 'Machu Picchu', 53 'Eco Lodges' en idioma `es`; resolución hacia `en` devuelve `null` sin fallback espurio).
+     - Comprobación HTTP sobre `http://lab.ecoterra.test`: ruta raíz responde HTTP 200 OK; `/en/` responde 404 (sin home traducida migrada); `/fr/` responde 404 (idioma inactivo sin aliasing ni degradación a default); páginas y categorías de lotes previos responden 301 canónico a 200 OK; consultas de etiquetas migradas responden limpiamente (HTTP 200 o 301 canónico); ausencia de errores 500 ni bucles.
+     - Frontera de frontend: se mantiene la designación formal de `BLOCKED` para el renderizado HTML de etiquetas (`<html lang>`, canonical y hreflang en el cuerpo HTML) debido a la ausencia física del directorio del tema `ecoCMS` en el laboratorio.
+  6. **Invarianza Absoluta del Centinela en Origen (`cms_ect`):**
+     - Verificación pre y post-flight en `cms_ect`: 3.403 filas exactas y checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (**Delta = 0**).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.17 / Directiva DT-TFML-047 — Migración controlada del lote 4 (Etiquetas WordPress).
+- **JUSTIFICACIÓN:** Ejecutar el cuarto lote de migración incremental WPML -> TFML sobre taxonomías de etiquetas estándar de WordPress en laboratorio aislado, certificar idempotencia y reversibilidad aislada sin tocar lotes previos, consolidar la gobernanza de IDs autoincrementales dinámicos, y avanzar el acumulado a 47 grupos y 51 elementos.
+- **CONSECUENCIAS:** El laboratorio avanza al estado acumulado de 47 grupos y 51 elementos, se ratifica la resiliencia del motor transaccional ante contadores autoincrementales no consecutivos, y los 6 lotes restantes (76 grupos) permanecen intactos en estado `STATUS_READY`.
