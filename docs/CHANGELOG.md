@@ -665,13 +665,37 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Capacidad de serialización y reconstrucción determinista (`from_array`) para garantizar la reanudación segura ante interrupciones.
 - **Ampliación de Orquestación en `MigrationManager`:**
   - Métodos `get_wpml_planner()` y `generate_plan( $source, $limit, $offset )` integrados en el orquestador principal.
+---
+
+## [Fase 3.5] - 2026-10-11
+
+### Ejecutor Transaccional de Migraciones, Idempotencia y Recuperación ante Fallos
+- **Ejecutor Transaccional de Migraciones (`TF\Multilingual\Migration\WpmlMigrationExecutor`):**
+  - Procesamiento por lotes atómicos (`batch_size`) coordinados transaccionalmente con niveles de anidamiento y `SAVEPOINT`s en `TranslationGroupRepository`.
+  - Mecanismo de rollback limpio: cualquier interrupción o colisión revierte en su totalidad el lote sin dejar filas huérfanas en las tablas maestras.
+- **Seguridad y Gobernanza de Entorno:**
+  - El ejecutor inicia cerrado por defecto (`is_authorized() = false`), arrojando `MigrationAuthorizationException` ante cualquier intento no autorizado.
+  - Verificación previa de frescura y vigencia del plan (`validate_plan`): detecta alteraciones o eliminaciones en `wp_posts`/`wp_terms` desde la planificación, abortando con `MigrationPlanValidationException`.
+  - Cero exposición pública: sin rutas REST, AJAX, WP-CLI ni botones de administración que expongan la ejecución en `cms.ecoterra`.
+- **Control de Concurrencia (`TF\Multilingual\Migration\MigrationExecutionLock`):**
+  - Sistema de exclusión mutua por fuente en Options API con token de ejecución y TTL, bloqueando ejecuciones paralelas con `MigrationConcurrencyException`.
+- **Gobernanza de Checkpoints y Recuperabilidad (`TF\Multilingual\Migration\MigrationCheckpointRepository`):**
+  - Persistencia de checkpoints coordinada transaccionalmente con el progreso de los lotes (`save`, `get`, `delete`).
+  - Capacidad de reanudación exacta desde el último TRID procesado tras pausas o caídas de servidor.
+- **Idempotencia Comprobada:**
+  - Verificación previa de asignaciones: re-ejecutar el mismo lote detecta las asignaciones existentes y marca `idempotent_skipped`, garantizando delta cero en la base de datos.
+- **Gobernanza de Medios bajo Media Model B Refinado:**
+  - Exclusión estricta de adjuntos de los grupos editoriales, preservando la política de adjunto compartido con metadatos independientes.
+- **Trazabilidad de Idiomas Pendientes (`fr`):**
+  - Documentación de la relación entre los 52 grupos `BLOCKED_BY_LANGUAGE` y los 53 elementos franceses retenidos (1 elemento perteneciente al grupo técnico de prioridad de traducción `tax_translation_priority` clasificado como `SKIPPED`).
 - **Verificación Integral y Calidad:**
-  - Suite de pruebas unitarias ampliada: **491 tests, 1,638 assertions, 0 errors, 0 failures, 0 warnings, 0 deprecations**.
-  - Estándares WPCS / PHPCS: **152/152 archivos analizados, 0 errors, 0 warnings**.
-  - Verificación en laboratorio real WordPress (`scratch/verify_fase_3_4.php`): **31/31 assertions passed (100%)**.
-  - Regresiones Core, constructores y migración: Fases 3.3 (38/38), 3.2 (35/35), 3.1 (27/27), 2.8 (53/53) **100% PASS**.
+  - Suite de pruebas unitarias ampliada: **503 tests, 1,707 assertions, 0 errors, 0 failures, 0 warnings, 0 deprecations**.
+  - Estándares WPCS / PHPCS: **165/165 archivos analizados, 0 errors, 0 warnings**.
+  - Verificación en laboratorio real WordPress (`scratch/verify_fase_3_5.php`): **31/31 assertions passed (100%)**.
+  - Regresiones Core, constructores y migración: Fases 3.4 (31/31), 3.3 (38/38), 3.2 (35/35), 3.1 (27/27), 2.8 (53/53) **100% PASS**.
   - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
   - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
+
 
 
 

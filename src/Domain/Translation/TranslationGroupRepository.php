@@ -855,12 +855,33 @@ class TranslationGroupRepository {
 	}
 
 	/**
+	 * Transaction nesting depth.
+	 *
+	 * @var int
+	 */
+	private static int $transaction_depth = 0;
+
+	/**
+	 * Resets transaction depth (primarily for test tear-downs).
+	 *
+	 * @return void
+	 */
+	public static function reset_transaction_depth(): void {
+		self::$transaction_depth = 0;
+	}
+
+	/**
 	 * Starts a database transaction if supported.
 	 *
 	 * @return void
 	 */
-	protected function begin_transaction(): void {
-		$this->db->query( 'START TRANSACTION' );
+	public function begin_transaction(): void {
+		if ( 0 === self::$transaction_depth ) {
+			$this->db->query( 'START TRANSACTION' );
+		} else {
+			$this->db->query( 'SAVEPOINT tfml_tx_' . self::$transaction_depth );
+		}
+		++self::$transaction_depth;
 	}
 
 	/**
@@ -868,8 +889,13 @@ class TranslationGroupRepository {
 	 *
 	 * @return void
 	 */
-	protected function commit_transaction(): void {
-		$this->db->query( 'COMMIT' );
+	public function commit_transaction(): void {
+		self::$transaction_depth = max( 0, self::$transaction_depth - 1 );
+		if ( 0 === self::$transaction_depth ) {
+			$this->db->query( 'COMMIT' );
+		} else {
+			$this->db->query( 'RELEASE SAVEPOINT tfml_tx_' . ( self::$transaction_depth + 1 ) );
+		}
 	}
 
 	/**
@@ -877,7 +903,12 @@ class TranslationGroupRepository {
 	 *
 	 * @return void
 	 */
-	protected function rollback_transaction(): void {
-		$this->db->query( 'ROLLBACK' );
+	public function rollback_transaction(): void {
+		self::$transaction_depth = max( 0, self::$transaction_depth - 1 );
+		if ( 0 === self::$transaction_depth ) {
+			$this->db->query( 'ROLLBACK' );
+		} else {
+			$this->db->query( 'ROLLBACK TO SAVEPOINT tfml_tx_' . ( self::$transaction_depth + 1 ) );
+		}
 	}
 }

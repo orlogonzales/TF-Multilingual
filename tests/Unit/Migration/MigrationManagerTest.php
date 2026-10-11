@@ -38,6 +38,9 @@ class MigrationManagerTest extends TestCase {
 		$this->assertNotNull( $manager->get_wpml_analyzer() );
 		$this->assertNotNull( $manager->get_polylang_analyzer() );
 		$this->assertNotNull( $manager->get_wpml_planner() );
+		$this->assertNotNull( $manager->get_checkpoint_repository() );
+		$this->assertNotNull( $manager->get_execution_lock() );
+		$this->assertNotNull( $manager->get_wpml_executor() );
 
 		$sources = $manager->get_available_sources();
 		$this->assertArrayHasKey( 'wpml', $sources );
@@ -52,5 +55,10 @@ class MigrationManagerTest extends TestCase {
 		$unknown_plan = $manager->generate_plan( 'unknown_plugin' );
 		$this->assertSame( 'unknown_plugin', $unknown_plan->get_source() );
 		$this->assertSame( \TF\Multilingual\Migration\MigrationPlan::STATUS_BLOCKED, $unknown_plan->get_status() );
+
+		// Execute unknown source.
+		$exec_report = $manager->execute_plan( $unknown_plan );
+		$this->assertSame( 'unknown_plugin', $exec_report->get_source() );
+		$this->assertSame( \TF\Multilingual\Migration\MigrationExecutionReport::STATUS_FAILED, $exec_report->get_status() );
 	}
 }

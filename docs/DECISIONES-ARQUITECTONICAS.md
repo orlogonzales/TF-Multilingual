@@ -443,6 +443,35 @@
 - **JUSTIFICACIÓN:** Transformar miles de registros legados sin riesgo de corrupción exige clasificar semánticamente cada grupo, retener sin pérdidas las traducciones en idiomas pendientes, aplicar el modelo de medios deduplicado y asegurar que cualquier lote futuro sea idempotente y reanudable.
 - **CONSECUENCIAS:** Transparencia total antes de cualquier mutación; preservación íntegra de traducciones en francés para su importación futura; cumplimiento de los invariantes de WordPress y del centinela WPML inalterado.
 
+---
+
+### ADR-031: Ejecutor Transaccional de Migraciones, Idempotencia, Checkpoints Coordinados y Control de Concurrencia
+- **DECISIÓN:**
+  1. **Ejecutor Transaccional Desacoplado (`WpmlMigrationExecutor`):**
+     - Procesamiento de lotes (`batch_size`) configurables envueltos atómicamente dentro de transacciones de base de datos (`START TRANSACTION`, `COMMIT`, `ROLLBACK`), coordinadas con niveles de anidamiento y `SAVEPOINT`s en `TranslationGroupRepository`.
+     - Garantiza que cualquier fallo o colisión relacional revierta de forma limpia e íntegra el lote en curso, evitando residuos, huérfanos o estados corruptos.
+  2. **Gobernanza y Autorización Estricta de Entorno:**
+     - El ejecutor permanece cerrado por defecto (`is_authorized() = false`). Requiere autorización explícita (`set_authorized(true)` o constante `TFML_MIGRATION_EXECUTION_AUTHORIZED = true`) previa a cualquier operación de mutación.
+     - Verificación de frescura e integridad previa al lote: detecta si publicaciones o términos referenciados en grupos `IMPORTABLE` han sido modificados o eliminados de Core entre la planificación y la ejecución, abortando de inmediato (`MigrationPlanValidationException`).
+     - Cero exposición pública: no se añade interfaz REST, AJAX, WP-CLI ni acción administrativa que permita invocar la migración sobre `cms.ecoterra`.
+  3. **Idempotencia y Preservación de Asignaciones:**
+     - Antes de crear un grupo, inspecciona si los elementos ya pertenecen a `tfml_group_elements`.
+     - Si todos los elementos del grupo ya están asignados al mismo grupo en TFML, omite la creación (`idempotent_skipped`) sin duplicar filas.
+     - Si los elementos se encuentran divididos o asignados a otros grupos, detecta la colisión y genera una excepción relacional.
+  4. **Control de Concurrencia (`MigrationExecutionLock`):**
+     - Sistema de bloqueo exclusivo por fuente basado en Options API con token de ejecución y expiración (TTL).
+     - Bloquea intentos concurrentes arrojando `MigrationConcurrencyException`.
+  5. **Gobernanza de Medios bajo Media Model B Refinado:**
+     - Los adjuntos (`attachment`, `post_attachment`) quedan terminantemente excluidos de la creación de posts editoriales en `tfml_groups`.
+  6. **Trazabilidad y Retención de Idiomas Pendientes:**
+     - Se documenta formalmente la diferencia técnica entre los 52 grupos `BLOCKED_BY_LANGUAGE` y los 53 elementos franceses retenidos: los 52 grupos corresponden a contenido editorial/taxonomías estándar, mientras que el elemento 53 (ID 106) pertenece a un grupo técnico `tax_translation_priority` clasificado como `SKIPPED`, cuya traducción francesa se retiene intacta en `pending_translations` para prevenir pérdidas de datos.
+     - El idioma francés (`fr`) se mantiene pendiente de configuración sin registrarse ni activarse automáticamente.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.5 — Ejecutor transaccional de migraciones, idempotencia y recuperación ante fallos.
+- **JUSTIFICACIÓN:** La ejecución de planes de migración complejos exige garantías matemáticas de atomicidad, control de concurrencia para evitar condiciones de carrera, salvaguardas contra datos obsoletos, y estricta idempotencia para que cualquier reintento o reanudación sea 100% seguro.
+- **CONSECUENCIAS:** Capacidad de procesar lotes, recuperarse de interrupciones y evitar duplicaciones sin poner en riesgo la base de datos real de `cms.ecoterra`.
+
+
 
 
 

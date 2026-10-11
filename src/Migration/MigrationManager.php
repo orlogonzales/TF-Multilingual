@@ -56,17 +56,58 @@ class MigrationManager {
 	private WpmlMigrationPlanner $wpml_planner;
 
 	/**
+	 * Language registry.
+	 *
+	 * @var LanguageRegistry
+	 */
+	private LanguageRegistry $language_registry;
+
+	/**
+	 * Checkpoint repository.
+	 *
+	 * @var MigrationCheckpointRepository
+	 */
+	private MigrationCheckpointRepository $checkpoint_repository;
+
+	/**
+	 * Concurrency lock manager.
+	 *
+	 * @var MigrationExecutionLock
+	 */
+	private MigrationExecutionLock $lock;
+
+	/**
+	 * WPML migration executor.
+	 *
+	 * @var WpmlMigrationExecutor|null
+	 */
+	private ?WpmlMigrationExecutor $wpml_executor = null;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param wpdb             $db                WordPress database instance.
-	 * @param LanguageRegistry $language_registry Language registry.
+	 * @param wpdb                               $db                    WordPress database instance.
+	 * @param LanguageRegistry                  $language_registry     Language registry.
+	 * @param MigrationCheckpointRepository|null $checkpoint_repository Checkpoint repository.
+	 * @param MigrationExecutionLock|null        $lock                  Lock manager.
+	 * @param WpmlMigrationExecutor|null         $wpml_executor         WPML executor.
 	 */
-	public function __construct( wpdb $db, LanguageRegistry $language_registry ) {
-		$this->db                = $db;
-		$this->detector          = new MigrationSourceDetector( $db );
-		$this->wpml_analyzer     = new WpmlSourceAnalyzer( $db, $language_registry );
-		$this->polylang_analyzer = new PolylangSourceAnalyzer( $db, $language_registry );
-		$this->wpml_planner      = new WpmlMigrationPlanner( $db, $language_registry );
+	public function __construct(
+		wpdb $db,
+		LanguageRegistry $language_registry,
+		?MigrationCheckpointRepository $checkpoint_repository = null,
+		?MigrationExecutionLock $lock = null,
+		?WpmlMigrationExecutor $wpml_executor = null
+	) {
+		$this->db                    = $db;
+		$this->language_registry     = $language_registry;
+		$this->detector              = new MigrationSourceDetector( $db );
+		$this->wpml_analyzer         = new WpmlSourceAnalyzer( $db, $language_registry );
+		$this->polylang_analyzer     = new PolylangSourceAnalyzer( $db, $language_registry );
+		$this->wpml_planner          = new WpmlMigrationPlanner( $db, $language_registry );
+		$this->checkpoint_repository = null !== $checkpoint_repository ? $checkpoint_repository : new MigrationCheckpointRepository();
+		$this->lock                  = null !== $lock ? $lock : new MigrationExecutionLock();
+		$this->wpml_executor         = $wpml_executor;
 	}
 
 	/**
@@ -162,5 +203,70 @@ class MigrationManager {
 	 */
 	public function get_available_sources(): array {
 		return $this->detector->detect_sources();
+	}
+
+	/**
+	 * Gets the checkpoint repository instance.
+	 *
+	 * @return MigrationCheckpointRepository
+	 */
+	public function get_checkpoint_repository(): MigrationCheckpointRepository {
+		return $this->checkpoint_repository;
+	}
+
+	/**
+	 * Gets the migration execution lock manager.
+	 *
+	 * @return MigrationExecutionLock
+	 */
+	public function get_execution_lock(): MigrationExecutionLock {
+		return $this->lock;
+	}
+
+	/**
+	 * Gets or creates the WPML migration executor.
+	 *
+	 * @return WpmlMigrationExecutor
+	 */
+	public function get_wpml_executor(): WpmlMigrationExecutor {
+		if ( null === $this->wpml_executor ) {
+			$this->wpml_executor = new WpmlMigrationExecutor(
+				$this->db,
+				null,
+				$this->language_registry,
+				$this->checkpoint_repository,
+				$this->lock
+			);
+		}
+
+		return $this->wpml_executor;
+	}
+
+	/**
+	 * Executes a validated migration plan via the appropriate executor.
+	 *
+	 * @param MigrationPlan $plan         Validated migration plan.
+	 * @param int           $batch_size   Batch size per iteration.
+	 * @param string|null   $execution_id Unique execution token.
+	 * @return MigrationExecutionReport
+	 */
+	public function execute_plan(
+		MigrationPlan $plan,
+		int $batch_size = 50,
+		?string $execution_id = null
+	): MigrationExecutionReport {
+		if ( 'wpml' === $plan->get_source() ) {
+			return $this->get_wpml_executor()->run( $plan, $batch_size, $execution_id );
+		}
+
+		return new MigrationExecutionReport(
+			array(
+				'execution_id'         => $execution_id ?? uniqid( 'exec_', true ),
+				'source'               => $plan->get_source(),
+				'status'               => MigrationExecutionReport::STATUS_FAILED,
+				'errors'               => array( array( 'message' => sprintf( 'No existe ejecutor para la fuente "%s".', $plan->get_source() ) ) ),
+				'total_planned_groups' => count( $plan->get_planned_groups() ),
+			)
+		);
 	}
 }

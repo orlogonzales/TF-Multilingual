@@ -96,6 +96,15 @@ class SchemaManager {
 	}
 
 	/**
+	 * Checks if the schema is currently installed and up to date.
+	 *
+	 * @return bool True if installed and up to date.
+	 */
+	public function is_installed(): bool {
+		return null !== $this->get_installed_schema_version() && ! $this->needs_upgrade();
+	}
+
+	/**
 	 * Resolves the full table name for a canonical suffix using the current table prefix.
 	 *
 	 * @param string $suffix Table key or suffix (e.g. 'groups' or 'tfml_groups').
