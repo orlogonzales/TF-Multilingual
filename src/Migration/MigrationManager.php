@@ -84,6 +84,13 @@ class MigrationManager {
 	private ?WpmlMigrationExecutor $wpml_executor = null;
 
 	/**
+	 * WPML migration rollback service.
+	 *
+	 * @var WpmlMigrationRollbackService|null
+	 */
+	private ?WpmlMigrationRollbackService $wpml_rollback_service = null;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param wpdb                               $db                    WordPress database instance.
@@ -267,6 +274,42 @@ class MigrationManager {
 				'errors'               => array( array( 'message' => sprintf( 'No existe ejecutor para la fuente "%s".', $plan->get_source() ) ) ),
 				'total_planned_groups' => count( $plan->get_planned_groups() ),
 			)
+		);
+	}
+
+	/**
+	 * Get WPML migration rollback service.
+	 *
+	 * @return WpmlMigrationRollbackService
+	 */
+	public function get_wpml_rollback_service(): WpmlMigrationRollbackService {
+		if ( null === $this->wpml_rollback_service ) {
+			$this->wpml_rollback_service = new WpmlMigrationRollbackService(
+				$this->db,
+				null,
+				$this->checkpoint_repository,
+				$this->lock
+			);
+		}
+
+		return $this->wpml_rollback_service;
+	}
+
+	/**
+	 * Reverts a previously executed migration run safely.
+	 *
+	 * @param MigrationExecutionReport $report Execution report to revert.
+	 * @param bool                     $force  Whether to force rollback ignoring detected post-migration edits.
+	 * @return array<string, mixed>
+	 */
+	public function rollback_plan( MigrationExecutionReport $report, bool $force = false ): array {
+		if ( 'wpml' === $report->get_source() ) {
+			return $this->get_wpml_rollback_service()->rollback_execution( $report, $force );
+		}
+
+		return array(
+			'success' => false,
+			'message' => sprintf( 'No existe servicio de rollback para la fuente "%s".', $report->get_source() ),
 		);
 	}
 }

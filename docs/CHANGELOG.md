@@ -728,3 +728,31 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
 
 
+
+---
+
+## [Fase 3.7] - 2026-10-11
+
+### Validación Integral del Migrador, Reversibilidad, Motor de Rollback y Atomicidad de Locks
+- **Evaluación Formal de Staging y Cumplimiento de Precondiciones:**
+  - Inspección exhaustiva de entornos y bases de datos locales: se confirmó la inexistencia de una base de datos clonada/staging dedicada para `cms.ecoterra` (`cms_ect`).
+  - En estricto cumplimiento con la Directiva DT-TFML-037, se detuvo formalmente la ejecución de migraciones con datos reales sobre el entorno de producción, circunscribiendo la fase a validación arquitectónica, motor de reversibilidad y pruebas sintéticas de laboratorio.
+- **Motor de Rollback Transaccional (`WpmlMigrationRollbackService`):**
+  - Implementación del servicio de rollback no destructivo: `rollback_execution()` y `rollback_groups()`.
+  - Reversión atómica y selectiva que elimina los grupos y elementos registrados en `tfml_groups` y `tfml_group_elements` sin tocar las tablas de WordPress Core (`wp_posts`, `wp_terms`) ni las tablas de WPML (`icl_translations` permanece de solo lectura).
+  - Limpieza coordinada del checkpoint (`MigrationCheckpointRepository::delete()`) y liberación forzada del lock de ejecución.
+  - Integración en `MigrationManager::rollback_plan( MigrationExecutionReport $report, bool $force = false ): array`.
+- **Protección contra Modificaciones Editoriales Posteriores:**
+  - Detección proactiva en `inspect_dependencies()`: si un elemento importado fue editado posteriormente por redactores (`current_content_version > source_version_at_translation`), el rollback estándar (`force = false`) es bloqueado automáticamente para evitar pérdida accidental del trabajo editorial.
+  - Soporte de parámetro explícito `$force = true` para que los administradores puedan forzar la reversión cuando sea necesario.
+- **Atomicidad y Mitigación de Carreras en Locks:**
+  - `MigrationExecutionLock::acquire()` implementa fast-path atómico mediante `add_option()`, garantizando exclusión mutua directa a nivel de base de datos MySQL frente a adquisiciones concurrentes simultáneas.
+- **Enriquecimiento del Reporte de Ejecución:**
+  - Método `MigrationExecutionReport::get_imported_group_ids(): array` para extraer eficientemente los IDs de grupos creados durante la ejecución.
+- **Verificación Integral y Calidad:**
+  - Suite de pruebas unitarias ampliada: **517 tests, 1,765 assertions, 0 errors, 0 failures, 0 warnings, 0 deprecations**.
+  - Estándares WPCS / PHPCS: **167/167 archivos analizados, 0 errors, 0 warnings**.
+  - Verificación en laboratorio real WordPress (`scratch/verify_fase_3_7.php`): **49/49 assertions passed (100%)**.
+  - Regresiones Core, constructores y migración: Fases 3.6 (34/34), 3.5 (31/31), 3.4 (31/31), 3.3 (38/38), 3.2 (35/35), 3.1 (27/27), 2.8 (53/53) **100% PASS** (216/216 regresiones).
+  - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+  - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.

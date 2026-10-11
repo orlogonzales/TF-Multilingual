@@ -497,3 +497,28 @@
 - **CONSECUENCIAS:** Motor de migración robusto, tolerante a fallos, protegido contra desincronizaciones de concurrencia y completamente verificable mediante reconciliación profunda.
 
 
+
+---
+
+### ADR-033: Motor de Rollback Transaccional, Reversibilidad No Destructiva y Atomicidad en Bloqueos de Migración
+- **DECISIÓN:**
+  1. **Motor de Rollback Transaccional No Destructivo (`WpmlMigrationRollbackService`):**
+     - Capacidad de revertir completamente las ejecuciones de migración mediante `rollback_execution()` y `rollback_groups()`.
+     - Reversión atómica y acotada estrictamente a las tablas de TF Multilingual (`tfml_groups` y `tfml_group_elements`).
+     - Cero modificaciones y cero eliminaciones en las tablas y entidades del WordPress Core (`wp_posts`, `wp_postmeta`, `wp_terms`, `wp_term_taxonomy`).
+     - Cero escrituras (0 INSERT / UPDATE / DELETE) en las tablas de WPML (`icl_translations` permanece 100% de solo lectura e intocada).
+     - Limpieza automática del checkpoint de migración asociado y liberación forzada del lock tras reversión exitosa.
+  2. **Protección contra Modificaciones Editoriales Posteriores:**
+     - Detección previa en `inspect_dependencies()` comparando la versión de contenido del elemento (`current_content_version > source_version_at_translation`).
+     - Si un grupo ha sido editado por redactores tras la migración, el rollback estándar (`force = false`) es bloqueado automáticamente para evitar pérdida accidental del trabajo editorial posterior.
+     - Posibilidad de forzado explícito (`force = true`) por parte del administrador cuando se requiere reversión incondicional.
+  3. **Atomicidad de Locks con Fast-Path `add_option`:**
+     - Endurecimiento de `MigrationExecutionLock::acquire()` implementando inserción atómica directa vía `add_option()`.
+     - Garantía de exclusión mutua a nivel de almacenamiento MySQL, eliminando carreras en adquisición en frío entre múltiples workers concurrentes.
+  4. **Inspección de Entorno y Salvaguarda de Producción:**
+     - En conformidad con las precondiciones de la Directiva DT-TFML-037, se formaliza la regla de detención si no existe un clon independiente de staging provisto.
+     - La validación integral del motor se ejecuta en laboratorio sintético aislado con fixtures efímeros, preservando la base de datos viva de `cms.ecoterra` intacta.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.7 — Validación integral del migrador en entorno aislado y reversibilidad.
+- **JUSTIFICACIÓN:** Toda migración debe ser inherentemente reversible sin dejar basura residual en TFML ni dañar las entidades del sitio origen, proporcionando un canal de marcha atrás seguro si se detectan anomalías tras la migración.
+- **CONSECUENCIAS:** Seguridad operacional garantizada: la migración puede ejecutarse sabiendo que existe un mecanismo formal y probado de reversión total sin impacto en WordPress Core ni en WPML.

@@ -30,33 +30,51 @@ class MigrationExecutionLock {
 	/**
 	 * Acquires an exclusive lock for a given migration source.
 	 *
+	 * Utilizes atomic add_option insertion to avoid race conditions. If an active lock exists,
+	 * verifies ownership or expiration before allowing acquisition.
+	 *
 	 * @param string $source       Migration source identifier ('wpml', 'polylang').
 	 * @param string $execution_id Unique execution UUID/token.
 	 * @param int    $ttl          Time-to-live in seconds.
 	 * @return bool True if lock was acquired, false if already locked by another process.
 	 */
 	public function acquire( string $source, string $execution_id, int $ttl = self::DEFAULT_TTL ): bool {
-		$key     = self::OPTION_PREFIX . $source;
-		$current = get_option( $key, null );
-		$now     = time();
-
-		if ( is_array( $current ) ) {
-
-			$expires_at = (int) ( $current['expires_at'] ?? 0 );
-			$owner_id   = (string) ( $current['execution_id'] ?? '' );
-
-			// If current lock is still valid and owned by someone else, acquire fails.
-			if ( $expires_at > $now && $owner_id !== $execution_id ) {
-				return false;
-			}
-		}
-
+		$key       = self::OPTION_PREFIX . $source;
+		$now       = time();
 		$lock_data = array(
 			'execution_id' => $execution_id,
 			'source'       => $source,
 			'acquired_at'  => gmdate( 'Y-m-d H:i:s' ),
 			'expires_at'   => $now + $ttl,
 		);
+
+		// Fast path: Atomic insert via add_option when key does not exist.
+		if ( function_exists( 'add_option' ) && add_option( $key, $lock_data, '', false ) ) {
+			return true;
+		}
+
+		$current = get_option( $key, null );
+
+		if ( is_array( $current ) ) {
+			$expires_at = (int) ( $current['expires_at'] ?? 0 );
+			$owner_id   = (string) ( $current['execution_id'] ?? '' );
+
+			// Re-acquiring by same owner succeeds.
+			if ( $owner_id === $execution_id ) {
+				return update_option( $key, $lock_data, false );
+			}
+
+			// If current lock is still active and owned by someone else, acquire fails.
+			if ( $expires_at > $now ) {
+				return false;
+			}
+		}
+
+		// Lock expired: delete expired lock and atomically re-insert.
+		delete_option( $key );
+		if ( function_exists( 'add_option' ) && add_option( $key, $lock_data, '', false ) ) {
+			return true;
+		}
 
 		return update_option( $key, $lock_data, false );
 	}

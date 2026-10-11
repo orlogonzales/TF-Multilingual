@@ -251,6 +251,25 @@ if ( ! function_exists( 'update_option' ) ) {
 	}
 }
 
+if ( ! function_exists( 'add_option' ) ) {
+	/**
+	 * Stub for add_option.
+	 *
+	 * @param string $option     Option key.
+	 * @param mixed  $value      Option value.
+	 * @param string $deprecated Deprecated.
+	 * @param mixed  $autoload   Autoload flag.
+	 * @return bool
+	 */
+	function add_option( string $option, mixed $value = '', string $deprecated = '', mixed $autoload = 'yes' ): bool {
+		if ( array_key_exists( $option, $GLOBALS['wp_test_options'] ) ) {
+			return false;
+		}
+		$GLOBALS['wp_test_options'][ $option ] = $value;
+		return true;
+	}
+}
+
 if ( ! function_exists( 'delete_option' ) ) {
 	/**
 	 * Stub for delete_option.

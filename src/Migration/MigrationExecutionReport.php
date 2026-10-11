@@ -281,6 +281,22 @@ class MigrationExecutionReport {
 	}
 
 	/**
+	 * Gets list of TFML group IDs created during this execution.
+	 *
+	 * @return array<int, int>
+	 */
+	public function get_imported_group_ids(): array {
+		$ids = array();
+		foreach ( $this->group_results as $res ) {
+			if ( 'imported' === ( $res['status'] ?? '' ) && ! empty( $res['group_id'] ) ) {
+				$ids[] = (int) $res['group_id'];
+			}
+		}
+
+		return array_values( array_unique( $ids ) );
+	}
+
+	/**
 	 * Gets reconciliation summary.
 	 *
 	 * @return array<string, mixed>
