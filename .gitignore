@@ -23,6 +23,10 @@ Thumbs.db
 # Logs and scratch
 *.log
 /scratch/*
+!/scratch/verify_fase_3_14.php
+!/scratch/verify_fase_3_13.php
+!/scratch/incremental_batches_catalog.json
+!/scratch/plan_incremental_fase_3_13.php
 !/scratch/verify_fase_3_12.php
 !/scratch/verify_fase_3_11.php
 !/scratch/verify_fase_3_10.php
