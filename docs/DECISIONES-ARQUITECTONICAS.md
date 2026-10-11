@@ -562,20 +562,27 @@
      - Prohibición estricta de asumir prefijos estándar `wp_`.
      - Descubrimiento programático del prefijo real del sitio origen (`etk_t_`) desde `wp-config.php` y comprobación de las 72 tablas del esquema.
      - Configuración consistente de `$table_prefix = 'etk_t_';` en el `wp-config.php` del laboratorio `lab.ecoterra`.
-  3. **Respaldo Streaming de Solo Lectura Fuera del Repositorio:**
+  3. **Respaldo Streaming de Solo Lectura y Protección contra Acceso HTTP:**
      - Extracción streaming de bajo consumo de memoria (MYSQLI_USE_RESULT) de las 22 tablas relacionales de WPML (`etk_t_icl_*`), 5 tablas de contenido de WordPress Core (`etk_t_posts`, `etk_t_postmeta`, `etk_t_terms`, `etk_t_term_taxonomy`, `etk_t_term_relationships`) y la tabla de configuración (`etk_t_options`).
      - Almacenamiento del respaldo SQL en directorio protegido `d:\laragon\www\lab.ecoterra\backups\preflight_backup_cms_ect_snapshot.sql`, estrictamente fuera del repositorio Git del plugin y con `.gitignore` propio.
-  4. **Anonimización Estricta y Sanitización de Datos en `cms_ect_lab`:**
+     - Blindaje integral del directorio de respaldos contra peticiones web directas mediante salvaguardas concurrentes: `.htaccess` (`Require all denied` y `Deny from all`), `index.php` con respuesta forzada HTTP 403 Forbidden, y `web.config` (`<deny users="*"/>` para entornos IIS).
+  4. **Anonimización Estricta, Sanitización Profunda y Blindaje en `cms_ect_lab` (DT-TFML-039A):**
      - Purgado total de usuarios productivos (`etk_t_users` y `etk_t_usermeta`). Generación de un único usuario administrador sintético de pruebas: `admin_lab` (`admin@lab.ecoterra.test`).
-     - Reescritura segura de correos electrónicos en `etk_t_postmeta` hacia `@lab.ecoterra.test`, preservando la consistencia de cadenas serializadas en PHP (`s:XX:...`).
-     - Eliminación de pasarelas de pago y credenciales de terceros en `etk_t_options` (`stripe_%`, `paypal_%`, `woocommerce_%_settings` con tokens/secretos).
+     - Anonimización profunda de pedidos y metadatos de clientes en `etk_t_postmeta`: campos `_billing_%` y `_shipping_%` sobrescritos con datos ficticios (`_billing_first_name = 'Lab'`, `_billing_email = 'customer@lab.ecoterra.test'`, etc.).
+     - Sanitización universal de correos electrónicos en `etk_t_postmeta` (incluyendo arrays serializados PHP con recálculo de longitudes y JSON de `_elementor_data`), reescritos a `@lab.ecoterra.test`.
+     - Anonimización de correos electrónicos en `etk_t_posts` (`post_content` y `post_excerpt`), eliminando direcciones corporativas o personales en páginas legales y formularios de contacto.
+     - Purgado de claves API, tokens y secretos de opciones en `etk_t_options` (`stripe_%`, `paypal_%`, `%token%`, `%secret%`, etc.).
+     - Exclusión confirmada de la tabla `etk_t_comments` del entorno de laboratorio.
      - Validación matemática de invariancia de WPML en `cms_ect_lab`: exactamente 3.403 filas en `etk_t_icl_translations` con MD5 `4241ca7e7ec6399a594537cb04790c10`.
-  5. **Frontera Estricta de Fase (Migración WPML → TFML No Ejecutada):**
+  5. **Trazabilidad y Versionado Seguro de Herramientas de Laboratorio (DT-TFML-039A):**
+     - Configuración de `.gitignore` para registrar formalmente los scripts certificados de la fase: `scratch/verify_fase_3_9.php`, `scratch/clonar_a_lab_aislado.php`, `scratch/preflight_discovery.php` y `scratch/ExternalPluginIsolationGuard.php`.
+     - Parametrización segura de credenciales de base de datos vía variables de entorno (`TFML_DB_*`) con valores predeterminados seguros para desarrollo local, sin credenciales de producción ni datos reales embebidos en el repositorio.
+  6. **Frontera Estricta de Fase (Migración WPML → TFML No Ejecutada):**
      - Creación e inicialización del esquema TFML (`etk_t_tfml_*`) en `cms_ect_lab` con conteo verificado de 0 filas.
      - Prohibición categórica de ejecutar la migración transaccional en la Fase 3.9; la ejecución con datos reales queda reservada exclusivamente para la Fase 3.10.
      - Cero escrituras en la base de datos de producción `cms_ect` (Delta = 0 verificado por centinela pre y post-flight).
 - **ESTADO:** **ACEPTADA**
-- **CONTEXTO:** Fase 3.9 — Preflight, aislamiento físico, respaldo y clonación controlada.
-- **JUSTIFICACIÓN:** El paso a pruebas con datos relacionales reales requiere aislamiento absoluto de código (para que pruebas en lab no alteren Git de desarrollo), respaldo verificable antes de cualquier operación, y anonimización para respetar la privacidad sin degradar la topología relacional de WPML.
-- **CONSECUENCIAS:** El laboratorio `lab.ecoterra` cuenta con una réplica exacta, anonimizada y fiel de los 3.403 registros de WPML sobre base de datos `cms_ect_lab`, código físico independiente y respaldo completo, sin que se haya alterado un solo byte en la producción `cms_ect`.
+- **CONTEXTO:** Fase 3.9 / Directiva DT-TFML-039A — Cierre correctivo de preflight, aislamiento físico, respaldo, anonimización profunda y clonación controlada.
+- **JUSTIFICACIÓN:** El paso a pruebas con datos relacionales reales requiere aislamiento absoluto de código, respaldo blindado contra acceso web, anonimización profunda en metadatos y contenido para garantizar la privacidad, y versionado formal de scripts para asegurar la reproducibilidad de las pruebas sin exponer credenciales.
+- **CONSECUENCIAS:** El laboratorio `lab.ecoterra` cuenta con una réplica exacta, completamente anonimizada y fiel de los 3.403 registros de WPML sobre base de datos `cms_ect_lab`, código físico independiente, respaldo blindado y herramientas versionadas, sin que se haya alterado un solo byte en la producción `cms_ect`.
 

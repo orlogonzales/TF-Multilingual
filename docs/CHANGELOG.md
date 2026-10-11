@@ -798,24 +798,31 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
 - **Descubrimiento Dinámico de Prefijo y Estructuras:**
   - Descubrimiento programático del prefijo real de tablas (`etk_t_`) en el sitio origen `cms.ecoterra` (`cms_ect`), prohibiendo asunciones sobre el prefijo `wp_`.
   - Configuración consistente de `$table_prefix = 'etk_t_';` en `d:\laragon\www\lab.ecoterra\wp-config.php`.
-- **Respaldo Streaming de Solo Lectura y Protección Fuera del Repositorio:**
+- **Respaldo Streaming de Solo Lectura y Protección contra Acceso HTTP:**
   - Extracción consistente en streaming (17.19 MB) de 28 tablas seleccionadas de `cms_ect`: 22 tablas relacionales de WPML (`etk_t_icl_*`), 5 tablas Core (`etk_t_posts`, `etk_t_postmeta`, `etk_t_terms`, `etk_t_term_taxonomy`, `etk_t_term_relationships`) y configuración (`etk_t_options`).
   - Almacenamiento seguro en `d:\laragon\www\lab.ecoterra\backups\preflight_backup_cms_ect_snapshot.sql` con `.gitignore` propio, protegido fuera del repositorio del plugin.
-- **Restauración y Anonimización Estricta en `cms_ect_lab`:**
+  - Blindaje integral contra acceso HTTP en el directorio de respaldos mediante `.htaccess` (`Require all denied` / `Deny from all`), `index.php` (HTTP 403 Forbidden forzado) y `web.config` (`<deny users="*"/>` para IIS).
+- **Restauración, Anonimización Profunda y Blindaje en `cms_ect_lab` (DT-TFML-039A):**
   - Restauración íntegra de las 22 tablas de WPML y 5 tablas Core en la base de datos exclusiva `cms_ect_lab`.
   - Purgado total de usuarios productivos en `etk_t_users` y generación de único administrador sintético `admin_lab` (`admin@lab.ecoterra.test`).
-  - Anonimización de correos electrónicos en `etk_t_postmeta` reescribiendo hacia `@lab.ecoterra.test` con recálculo exacto de longitudes serializadas PHP.
-  - Purgado de claves API y secretos de pasarelas de pago en `etk_t_options` (`stripe_%`, `paypal_%`, etc.).
+  - Anonimización profunda de pedidos y metadatos de clientes en `etk_t_postmeta`: sobreescritura de campos `_billing_%` y `_shipping_%` (`_billing_first_name`, `_billing_last_name`, `_billing_phone`, `_billing_email`, `_billing_address_index`, etc.) con datos sintéticos no identificables.
+  - Sanitización universal de correos electrónicos en `etk_t_postmeta` (incluyendo arrays serializados PHP con recálculo de longitudes y JSON crudo de `_elementor_data`), reescritos a `@lab.ecoterra.test`.
+  - Anonimización de correos electrónicos en `etk_t_posts` (`post_content` y `post_excerpt`), eliminando direcciones corporativas o personales en páginas legales y formularios de contacto.
+  - Purgado de claves API, tokens y secretos de opciones en `etk_t_options` (`stripe_%`, `paypal_%`, `%token%`, `%secret%`, etc.).
+  - Exclusión confirmada de la tabla `etk_t_comments` del entorno de laboratorio.
   - Preservación matemática de los datos WPML: exactamente 3.403 registros en `etk_t_icl_translations` con checksum MD5 `4241ca7e7ec6399a594537cb04790c10`.
   - Paridad de contenido Core: 4.021 posts y 82 términos restaurados exactamente.
 - **Frontera Estricta de Fase y Bloqueo de Migración:**
   - Esquema maestro TFML (`etk_t_tfml_*`) inicializado en `cms_ect_lab` con exactamente 0 filas en todas las tablas (`groups`, `elements`, `media`, `strings`).
   - Bloqueo categórico de ejecución de migración: la importación con datos reales queda reservada exclusivamente para la Fase 3.10.
   - Cero alteraciones en el origen de producción `cms_ect`: Delta = 0 absoluto en centinela pre y post-flight.
+- **Trazabilidad y Versionado de Herramientas (DT-TFML-039A):**
+  - Actualización de `.gitignore` para registrar formalmente los scripts certificados de la fase: `scratch/verify_fase_3_9.php`, `scratch/clonar_a_lab_aislado.php`, `scratch/preflight_discovery.php` y `scratch/ExternalPluginIsolationGuard.php`.
+  - Parametrización segura de credenciales de base de datos vía variables de entorno (`TFML_DB_*`) con valores predeterminados seguros para entornos locales de desarrollo, sin credenciales de producción ni datos reales embebidos en el repositorio.
 - **Verificación Integral y Calidad:**
   - Suite de pruebas unitarias: **519 tests, 1.777 assertions, 0 errors, 0 failures, 0 warnings, 0 deprecations**.
   - Estándares WPCS / PHPCS: **167/167 archivos analizados, 0 errors, 0 warnings**.
-  - Verificación en laboratorio real WordPress (`scratch/verify_fase_3_9.php`): **60/60 assertions passed (100%)**.
+  - Verificación en laboratorio real WordPress (`scratch/verify_fase_3_9.php`): **73/73 assertions passed (100%)**.
   - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
   - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
 

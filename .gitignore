@@ -22,4 +22,18 @@ Thumbs.db
 
 # Logs and scratch
 *.log
-/scratch/
+/scratch/*
+!/scratch/verify_fase_3_9.php
+!/scratch/clonar_a_lab_aislado.php
+!/scratch/preflight_discovery.php
+!/scratch/ExternalPluginIsolationGuard.php
+!/scratch/verify_fase_3_8.php
+!/scratch/verify_fase_3_7.php
+!/scratch/verify_fase_3_6.php
+!/scratch/verify_fase_3_5.php
+!/scratch/verify_fase_3_4.php
+!/scratch/verify_fase_3_3.php
+!/scratch/verify_fase_3_2.php
+!/scratch/verify_fase_3_1.php
+!/scratch/verify_fase_2_8.php
+
