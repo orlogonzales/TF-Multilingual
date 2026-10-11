@@ -781,6 +781,41 @@
 - **JUSTIFICACIÓN:** Establecer un catálogo matemático inmutable para los 115 grupos pendientes, someter la arquitectura de migración a pruebas extremas de concurrencia y recuperación en fixtures aislados sin tocar el laboratorio, y validar que la API funcional de TF Multilingual opera a la perfección sobre los datos ya importados.
 - **CONSECUENCIAS:** Queda formalmente estructurada la secuencia de lotes para las fases subsecuentes, blindada la infraestructura de resiliencia ante cualquier interrupción o concurrencia, y validada al 100% la API soberana de traducción.
 
+### ADR-040: Ejecución Transaccional del Segundo Lote Piloto (batch-02-taxonomy-categories), Reversibilidad Aislada y Certificación HTTP Real (Fase 3.14)
+- **FECHA:** 2026-10-11
+- **DECISIÓN:**
+  1. **Gate de Reproducibilidad de Fase 3.13 Certificado:**
+     - Se versionaron e incorporaron formalmente a Git los artefactos `scratch/verify_fase_3_13.php`, `scratch/incremental_batches_catalog.json` y `scratch/plan_incremental_fase_3_13.php` mediante el micro-commit `6f1f1b3`.
+     - Re-ejecución al 100% de la suite de 99 controles de Fase 3.13 con resultado PASS.
+     - Certificación de huella inmutable del Lote 2: `9b76d7e38d779a08448474a9c22ef24b88dd3e65da292dbd64e338371a0e1d78` y TRIDs `9237, 9367, 9532`.
+  2. **Ejecución Transaccional Acotada al Lote 2 (`batch-02-taxonomy-categories`):**
+     - Migración exitosa de 3 grupos y 3 elementos correspondientes a categorías (`tours_cat` y `category`) en `cms_ect_lab` (TRIDs 9237, 9367, 9532).
+     - Resultado acumulado en la base de datos: exactamente 8 grupos en `etk_t_tfml_groups` (5 de piloto 1 + 3 de lote 2) y 12 elementos en `etk_t_tfml_group_elements` (9 de piloto 1 + 3 de lote 2).
+     - Inalterabilidad de los 5 grupos originales (IDs 6, 7, 8, 9, 10). Tablas restantes de TFML (`media_translations`, `strings`, `string_translations`) se mantienen en 0 filas.
+     - Registro de manifiesto de ejecución y actualización de checkpoint a `completed` con 3 ítems procesados. Lock liberado.
+  3. **Idempotencia y Reversibilidad Aislada del Lote 2:**
+     - **Idempotencia:** Re-ejecución del Lote 2 no genera duplicados; los 3 TRIDs reportan formalmente `idempotent_skipped` y los conteos de BD permanecen inmutables en 8 grupos y 12 elementos.
+     - **Rollback Aislado:** `WpmlMigrationRollbackService::rollback_groups()` revierte exclusivamente los 3 grupos del Lote 2. La base de datos retorna a 5 grupos y 9 elementos, con los 5 grupos del piloto previo 100% blindados e intactos.
+     - **Re-ejecución Posterior:** Re-ejecución del Lote 2 restaura el estado acumulado final de 8 grupos y 12 elementos con 100% de conciliación profunda sin discrepancias.
+  4. **Certificación HTTP Real sobre Servidor Web (`http://lab.ecoterra.test`):**
+     - Se configuró el VirtualHost de Apache y el enrutador `.htaccess` de WordPress en `d:\laragon\www\lab.ecoterra\`.
+     - Se ejecutaron solicitudes HTTP reales mediante cURL:
+       - `HTTP-01`: Ruta raíz (`/`) responde HTTP 200 OK en idioma predeterminado.
+       - `HTTP-02`: Prefijo secundario (`/en/`) es procesado limpiamente sin errores 500.
+       - `HTTP-03`: Prefijo inactivo (`/fr/`) es procesado limpiamente sin errores 500 ni degradación silenciosa.
+       - `HTTP-04`: Solicitudes a entidades reales de contenido migrado:
+         - Página 4338 (Lote 1): `/?page_id=4338` responde HTTP 301 redirigiendo canónicamente a `/old-blog/` (HTTP 200 OK).
+         - Categoría 50 (Lote 2): `/?cat=50` responde HTTP 301 redirigiendo canónicamente a `/category/blog/` (HTTP 200 OK).
+       - `HTTP-05`: Ausencia absoluta de bucles de redirección (`CURLE_TOO_MANY_REDIRECTS = false`).
+       - `HTTP-06`: Cabecera de aislamiento `X-Robots-Tag: noindex, nofollow, noarchive` activa en todas las respuestas.
+  5. **Invarianza Absoluta del Centinela en Origen (`cms_ect`):**
+     - Verificación pre y post-flight en `cms_ect`: 3.403 filas exactas y checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (**Delta = 0**).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.14 / Directiva DT-TFML-044 — Segundo lote piloto y certificación HTTP.
+- **JUSTIFICACIÓN:** Certificar la reproducibilidad de la Fase 3.13, avanzar con la migración controlada del Lote 2 demostrando rollback e idempotencia, y validar por primera vez el comportamiento integral del plugin sirviendo contenido real vía HTTP en WordPress.
+- **CONSECUENCIAS:** El laboratorio cuenta ahora con 8 grupos y 12 elementos migrados, la capacidad de reversibilidad granular por lote queda empíricamente comprobada, y la respuesta HTTP de WordPress con TF Multilingual queda formalmente certificada sin errores 500 ni bucles.
+
+
 
 
 

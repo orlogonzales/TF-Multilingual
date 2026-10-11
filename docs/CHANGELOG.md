@@ -1009,6 +1009,42 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Verificación Integral Fase 3.13 (`scratch/verify_fase_3_13.php`): **99/99 controles PASS (100%)**.
   - `composer validate --strict`: PASS.
 
+---
+
+## [Fase 3.14] - 2026-10-11
+
+### Segundo Lote Piloto y Certificación HTTP (DT-TFML-044)
+- **Gate de Reproducibilidad de Fase 3.13 Superado (Micro-commit 6f1f1b3):**
+  - Versionado oficial e inclusión en git de `scratch/verify_fase_3_13.php`, `scratch/incremental_batches_catalog.json` y `scratch/plan_incremental_fase_3_13.php`.
+  - Re-ejecución íntegra y exitosa de los 99 controles de Fase 3.13.
+  - Certificación de huella criptográfica inmutable del Lote 2: `9b76d7e38d779a08448474a9c22ef24b88dd3e65da292dbd64e338371a0e1d78`.
+- **Ejecución Transaccional del Lote 2 (`batch-02-taxonomy-categories`):**
+  - Migración exitosa de 3 grupos y 3 elementos correspondientes a categorías (`tours_cat` y `category`) en `cms_ect_lab` (TRIDs 9237, 9367, 9532).
+  - Resultado acumulado en la base de datos: exactamente 8 grupos en `etk_t_tfml_groups` (5 de piloto 1 + 3 de lote 2) y 12 elementos en `etk_t_tfml_group_elements` (9 de piloto 1 + 3 de lote 2).
+  - Inalterabilidad de los 5 grupos originales (IDs 6, 7, 8, 9, 10). Tablas restantes de TFML (`media_translations`, `strings`, `string_translations`) se mantienen en 0 filas.
+  - Registro de manifiesto de ejecución y actualización de checkpoint a `completed` con 3 ítems procesados. Lock liberado.
+- **Idempotencia y Reversibilidad Aislada del Lote 2:**
+  - Re-ejecución del Lote 2 no genera duplicados; los 3 TRIDs reportan formalmente `idempotent_skipped` y los conteos de BD permanecen inmutables en 8 grupos y 12 elementos.
+  - Rollback granular de los grupos del Lote 2 devuelve la base de datos a 5 grupos y 9 elementos, con los 5 grupos del piloto previo 100% blindados e intactos.
+  - Re-ejecución posterior restaura el estado acumulado final de 8 grupos y 12 elementos con 100% de conciliación profunda sin discrepancias.
+- **Certificación HTTP Real sobre Servidor Web (`http://lab.ecoterra.test`):**
+  - Configuración de VirtualHost Apache y router `.htaccess` de WordPress en `d:\laragon\www\lab.ecoterra\`.
+  - Pruebas HTTP reales mediante cURL:
+    - Ruta raíz (`/`) responde HTTP 200 OK en idioma predeterminado.
+    - Prefijos `/en/` y `/fr/` son procesados limpiamente sin errores 500.
+    - Solicitudes a entidades reales: Página 4338 (Lote 1) responde 301 redirigiendo canónicamente a `/old-blog/` (HTTP 200 OK); Categoría 50 (Lote 2) responde 301 redirigiendo canónicamente a `/category/blog/` (HTTP 200 OK).
+    - Ausencia absoluta de bucles de redirección (`CURLE_TOO_MANY_REDIRECTS = false`).
+    - Cabecera de aislamiento `X-Robots-Tag: noindex, nofollow, noarchive` activa en todas las respuestas.
+- **Preservación Inmutable de Centinelas:**
+  - `cms_ect_lab`: Conserva exactamente 8 grupos acumulados y 12 elementos en `cms_ect_lab`.
+  - `cms_ect`: Centinela intacto con 3.403 registros y hash MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0 verificado en pre y post-flight).
+- **Métricas de Calidad:**
+  - PHPUnit: **533 tests, 1.830 assertions, 0 errors, 0 failures, 1 skipped** (100% PASS).
+  - PHPCS / WPCS: **168/168 archivos analizados, 0 errors, 0 warnings** (100% PASS).
+  - Verificación Integral Fase 3.14 (`scratch/verify_fase_3_14.php`): **85/85 controles PASS (100%)**.
+  - `composer validate --strict`: PASS.
+
+
 
 
 
