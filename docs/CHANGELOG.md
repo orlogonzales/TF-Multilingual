@@ -1142,3 +1142,40 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - PHPCS / WPCS: **168/168 archivos analizados, 0 errors, 0 warnings** (100% PASS).
   - Verificación Integral Fase 3.17 (`scratch/verify_fase_3_17.php`): **260/260 controles PASS (100%)**.
   - `composer validate --strict`: PASS.
+
+---
+
+## [Fase 3.18] - 2026-10-11
+
+### Migración Controlada del Quinto Lote: Etiquetas WordPress Parte 2 (DT-TFML-048 y DT-TFML-048-R1)
+- **Activación de STOP Preventivo y Ratificación del Catálogo:**
+  - Detención inmediata preflight tras detectar divergencia entre el rango continuo 9391-9412 y el catálogo oficial de Fase 3.15.
+  - Ratificación por la Dirección Técnica mediante DT-TFML-048-R1, consagrando la regla de oro: los TRID de cada lote proceden siempre directamente del catálogo oficial versionado, sin deducción por rangos.
+- **Ejecución Transaccional del Lote 5 (`batch-05-taxonomy-tags-2`):**
+  - Migración exitosa de 22 grupos y 22 elementos correspondientes a etiquetas de WordPress (`post_tag`) en `cms_ect_lab` (TRIDs `[9392, 9393, 9394, 9395, 9396, 9397, 9398, 9400, 9401, 9402, 9403, 9404, 9407, 9408, 9409, 9410, 9412, 9413, 9414, 9415, 9416, 9417]`).
+  - Huella criptográfica inmutable ratificada: `cd1c0018d1014c36c5430d1ae9aaf0272e32748b094379025fc01c99f3816e1c`.
+  - Nuevo estado acumulado en la base de datos: exactamente **69 grupos** en `etk_t_tfml_groups` (47 previos + 22 de lote 5) y **73 elementos** en `etk_t_tfml_group_elements` (51 previos + 22 de lote 5), alcanzando el 57,5% de cobertura de grupos importables del universo WPML.
+  - Manifiesto de ejecución persistido y checkpoint actualizado a `completed` con 22 ítems procesados. Lock liberado.
+- **Idempotencia y Reversibilidad Aislada del Lote 5:**
+  - Re-ejecución inmediata del Lote 5 sobre el laboratorio evalúa los 22 grupos sin generar duplicados: los 22 TRIDs reportan formalmente `idempotent_skipped` y los conteos de base de datos se mantienen inmutables en 69 grupos y 73 elementos.
+  - Rollback selectivo mediante `rollback_groups` sobre los IDs del Lote 5 revierte exclusivamente este lote, retornando la base de datos a 47 grupos y 51 elementos.
+  - Los 47 grupos acumulados de los lotes 1 al 4 permanecen 100% blindados e intactos.
+  - Re-ejecución posterior restaura el estado final de 69 grupos y 73 elementos, con certificación profunda de reconciliación (`reconcile()`) al 100% (`integrity_verified = true`, 0 discrepancias).
+- **Validación de API de Dominio y Comprobación HTTP:**
+  - Validación funcional de `ContentTranslationResolver` sobre términos de etiquetas migradas (e.g. términos 74, 75, 95 en idioma `es`; resolución hacia `en` devuelve `null` sin fallback espurio).
+  - Comprobaciones HTTP reales contra `http://lab.ecoterra.test`:
+    - Ruta raíz (`/`) responde HTTP 200 OK en idioma predeterminado.
+    - Prefijos `/en/` y `/fr/` responden limpiamente 404 (sin página traducida en EN, e idioma inactivo en FR) sin errores 500 ni degradación espuria.
+    - Entidades migradas de lotes anteriores responden HTTP 301 redirigiendo canónicamente a 200 OK.
+    - Consulta de etiqueta migrada responde limpiamente sin error 500.
+    - Ausencia absoluta de bucles de redirección (`CURLE_TOO_MANY_REDIRECTS = false`).
+    - Cabecera de aislamiento `X-Robots-Tag: noindex, nofollow, noarchive` activa en todas las respuestas.
+  - Frontera de frontend: se mantiene la designación formal de `BLOCKED` para el renderizado HTML de etiquetas (`<html lang>`, canonical y hreflang en el cuerpo HTML) debido a la ausencia física del tema `ecoCMS` en el laboratorio.
+- **Preservación Inmutable de Centinelas:**
+  - `cms_ect_lab`: Conserva exactamente 69 grupos acumulados y 73 elementos, lock liberado.
+  - `cms_ect`: Centinela intacto con 3.403 registros y hash MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0 verificado en pre y post-flight).
+- **Métricas de Calidad:**
+  - PHPUnit: **532 tests (533 total), 1.830 assertions, 0 errors, 0 failures, 1 skipped** (100% PASS).
+  - PHPCS / WPCS: **168/168 archivos analizados, 0 errors, 0 warnings** (100% PASS).
+  - Verificación Integral Fase 3.18 (`scratch/verify_fase_3_18.php`): **281/281 controles PASS (100%)**.
+  - `composer validate --strict`: PASS.

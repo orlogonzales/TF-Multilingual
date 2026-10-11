@@ -909,3 +909,37 @@
 - **CONTEXTO:** Fase 3.17 / Directiva DT-TFML-047 — Migración controlada del lote 4 (Etiquetas WordPress).
 - **JUSTIFICACIÓN:** Ejecutar el cuarto lote de migración incremental WPML -> TFML sobre taxonomías de etiquetas estándar de WordPress en laboratorio aislado, certificar idempotencia y reversibilidad aislada sin tocar lotes previos, consolidar la gobernanza de IDs autoincrementales dinámicos, y avanzar el acumulado a 47 grupos y 51 elementos.
 - **CONSECUENCIAS:** El laboratorio avanza al estado acumulado de 47 grupos y 51 elementos, se ratifica la resiliencia del motor transaccional ante contadores autoincrementales no consecutivos, y los 6 lotes restantes (76 grupos) permanecen intactos en estado `STATUS_READY`.
+
+### ADR-044: Ratificación y Migración Controlada del Quinto Lote (batch-05-taxonomy-tags-2), Levantamiento de STOP Preventivo, Vinculación Estricta al Catálogo y Reversibilidad Aislada (Fase 3.18)
+- **FECHA:** 2026-10-11
+- **DECISIÓN:**
+  1. **Activación Justificada de STOP y Regla de Vinculación Estricta al Catálogo:**
+     - Durante el preflight inicial de DT-TFML-048 se detuvo inmediatamente la ejecución transaccional al detectar una divergencia entre el rango continuo descrito en el texto de la directiva (9391 a 9412) y el catálogo oficial de Fase 3.15.
+     - Dicho rango continuo incluía 5 TRIDs ajenos (3 entradas y 2 adjuntos de medios) y omitía 5 etiquetas legítimas (TRIDs 9413 a 9417).
+     - La Dirección Técnica ratificó el STOP preventivo mediante DT-TFML-048-R1 e instituyó la regla soberana de gobernanza: **Los TRID de cada lote se obtendrán siempre directamente del catálogo oficial versionado, prohibiéndose inferencias por rangos numéricos, secuencias aparentes o descripciones abreviadas.**
+  2. **Ejecución Transaccional del Lote 5 (`batch-05-taxonomy-tags-2`):**
+     - Se ejecutó la migración de los 22 TRIDs ratificados del catálogo oficial: `[9392, 9393, 9394, 9395, 9396, 9397, 9398, 9400, 9401, 9402, 9403, 9404, 9407, 9408, 9409, 9410, 9412, 9413, 9414, 9415, 9416, 9417]`.
+     - Subtipo taxonómico involucrado: 22 grupos de etiquetas WordPress (`post_tag`) con cardinalidad de 22 grupos y 22 elementos.
+     - Huella criptográfica inmutable ratificada: `cd1c0018d1014c36c5430d1ae9aaf0272e32748b094379025fc01c99f3816e1c`.
+     - Nuevo estado acumulado en la base de datos del laboratorio: exactamente **69 grupos** en `etk_t_tfml_groups` (47 previos + 22 nuevos) y **73 elementos** en `etk_t_tfml_group_elements` (51 previos + 22 nuevos).
+     - Registro de manifiesto transaccional y checkpoint actualizado a `completed` con 22 ítems procesados. Lock liberado.
+  3. **Idempotencia Estricta en Base de Datos Real:**
+     - Segunda ejecución consecutiva sobre el Lote 5 evalúa los 22 grupos sin realizar escrituras redundantes ni generar duplicados.
+     - Los 22 grupos devuelven formalmente el estado `idempotent_skipped` (0 duplicados).
+     - Los conteos de la base de datos se mantienen inmutables en exactamente 69 grupos y 73 elementos.
+  4. **Reversibilidad Aislada y Re-ejecución Post-Rollback:**
+     - Rollback selectivo mediante `rollback_groups` sobre los IDs del manifiesto del Lote 5 revierte exclusivamente el quinto lote.
+     - La base de datos regresa de manera exacta al estado previo de 47 grupos y 51 elementos.
+     - Los 47 grupos acumulados de los lotes 1 al 4 permanecen 100% blindados e intactos.
+     - Re-ejecución posterior restaura el estado final de 69 grupos y 73 elementos.
+     - Verificación profunda mediante `reconcile()` certifica integridad relacional al 100% (`integrity_verified = true`, 0 discrepancias).
+  5. **Validación de API de Dominio y Comprobación HTTP:**
+     - Se verificó la resolución mediante `ContentTranslationResolver` sobre términos de etiquetas migradas (términos 74, 75, 95 en idioma `es`; resolución hacia `en` devuelve `null` sin fallback espurio).
+     - Comprobación HTTP sobre `http://lab.ecoterra.test`: ruta raíz responde HTTP 200 OK; `/en/` responde 404 (sin home traducida migrada); `/fr/` responde 404 (idioma inactivo sin aliasing ni degradación a default); páginas y categorías de lotes previos responden 301 canónico a 200 OK; consultas de etiquetas migradas responden limpiamente; ausencia de errores 500 ni bucles.
+     - Frontera de frontend: se mantiene la designación formal de `BLOCKED` para el renderizado HTML de etiquetas (`<html lang>`, canonical y hreflang en el cuerpo HTML) debido a la ausencia física del directorio del tema `ecoCMS` en el laboratorio.
+  6. **Invarianza Absoluta del Centinela en Origen (`cms_ect`):**
+     - Verificación pre y post-flight en `cms_ect`: 3.403 filas exactas y checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (**Delta = 0**).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.18 / Directivas DT-TFML-048 y DT-TFML-048-R1 — Migración controlada del lote 5 (Etiquetas WordPress, segunda parte).
+- **JUSTIFICACIÓN:** Ejecutar el quinto lote de migración incremental WPML -> TFML sobre taxonomías de etiquetas estándar en laboratorio aislado, certificar el valor preventivo del mecanismo de STOP ante divergencias textuales, formalizar la regla de autoridad soberana del catálogo, y avanzar el acumulado a 69 grupos y 73 elementos.
+- **CONSECUENCIAS:** El laboratorio avanza al estado acumulado de 69 grupos y 73 elementos (57,5% de los grupos importables del universo WPML), la gobernanza de catálogo queda formalmente blindada contra inferencias, y los 5 lotes restantes (54 grupos) permanecen intactos en estado `STATUS_READY`.

@@ -78,7 +78,7 @@ El desarrollo de TF Multilingual estÃ¡ estructurado en microfases controladas 
 - Columnas personalizadas en listados de posts y tÃ©rminos.
 - Endpoints REST de soporte editorial bajo `/wp-json/tf-multilingual/v1/`.
 
-### Fase 13.0: Motor de Migración Desacoplado (Fases 3.1 a 3.17 Certificadas)
+### Fase 13.0: Motor de Migración Desacoplado (Fases 3.1 a 3.18 Certificadas)
 - Implementación del motor transaccional reanudable, con control de concurrencia e idempotencia (`MigrationManager`, `WpmlMigrationPlanner`, `WpmlMigrationExecutor`, `WpmlMigrationRollbackService`).
 - Adaptador de migración de solo lectura para WPML validado contra el laboratorio real `cms_ect_lab` (22 tablas WPML, 3.403 registros, 4.021 posts, 82 terms).
 - Preflight dinámico, aislamiento físico, respaldo seguro fuera de DocumentRoot, certificación de restauración verificable y plan piloto determinista dry-run completados al 100% (Fase 3.10).
@@ -89,6 +89,7 @@ El desarrollo de TF Multilingual estÃ¡ estructurado en microfases controladas 
 - Saneamiento integral del catálogo de migración incremental en 9 lotes disjuntos (115 grupos / 124 elementos con cobertura del 100% del universo importable), conciliación anatómica certificada del Lote 3 WooCommerce (`product_type`, `product_visibility`, `product_cat`), verificación de existencia física de entidades en WordPress Core, y auditoría funcional de enrutamiento frontend `/en/` y `/fr/` (Fase 3.15).
 - Ejecución transaccional del tercer lote piloto (`batch-03-taxonomy-woocommerce`: 16 grupos, 16 elementos), consolidación del estado acumulado en laboratorio (24 grupos, 28 elementos), verificación de idempotencia estricta (16 saltados, 0 duplicados), reversibilidad selectiva aislada (`rollback_groups` revertido a 8/12 sin tocar lotes previos y re-ejecutado a 24/28 con 100% de reconciliación) y validación de API de dominio y comprobación HTTP (Fase 3.16).
 - Migración controlada del cuarto lote (`batch-04-taxonomy-tags-1`: 23 grupos, 23 elementos), consolidación acumulada en laboratorio (47 grupos, 51 elementos), trazabilidad dinámica de IDs autoincrementales y titularidad por manifiesto, verificación de idempotencia estricta (23 saltados, 0 duplicados), reversibilidad aislada comprobada (`rollback_groups` a 24/28 con preservación de 24 grupos previos y re-ejecución a 47/51 con 100% de conciliación), y validación de API de dominio y HTTP (Fase 3.17).
+- Ratificación y migración controlada del quinto lote (`batch-05-taxonomy-tags-2`: 22 grupos, 22 elementos), levantamiento de STOP preventivo por divergencia textual, institucionalización de la regla soberana de catálogo inmutable, consolidación acumulada en laboratorio (69 grupos, 73 elementos, 57,5% de cobertura importable), verificación de idempotencia estricta (22 saltados, 0 duplicados), reversibilidad selectiva comprobada (`rollback_groups` a 47/51 con preservación íntegra de lotes 1 al 4 y re-ejecución a 69/73 con 100% de conciliación), y validaciones de API de dominio y HTTP (Fase 3.18).
 - Adaptador de migración para Polylang (inventario analizado).
 
 ### Fase 14.0: Hardening, AuditorÃ­a y Cierre MVP
