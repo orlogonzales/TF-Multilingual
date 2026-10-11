@@ -1044,6 +1044,35 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Verificación Integral Fase 3.14 (`scratch/verify_fase_3_14.php`): **85/85 controles PASS (100%)**.
   - `composer validate --strict`: PASS.
 
+---
+
+## [Fase 3.15] - 2026-10-11
+
+### Saneamiento Integral del Catálogo y Preparación del Lote 3 (DT-TFML-045)
+- **Reconstrucción y Saneamiento del Catálogo Incremental:**
+  - Auditoría exhaustiva sobre el plan matriz de `cms_ect_lab` (249 grupos totales, 120 importables, 115 incrementales).
+  - Partición matemática disjunta de los 9 lotes incrementales (lotes 02 al 10): 0 colisiones de TRID y 0 duplicados.
+  - Validación del 100% de los 124 elementos editoriales confirmando su existencia en las tablas nativas de WordPress Core (`etk_t_posts`, `etk_t_terms`, `etk_t_term_taxonomy`).
+  - Generación de `scratch/incremental_batches_catalog.json` y del desglose relacional completo `scratch/incremental_batches_catalog_detailed.json`.
+- **Conciliación Anatómica del Lote 3 (`batch-03-taxonomy-woocommerce`):**
+  - Subsanación de erratas de tipado previas: exclusión de supuestos grupos `product_tag` y `pa_attribute`.
+  - Aclaración de la errata referencial sobre TRIDs 9342..9357 (pertenecientes en realidad a `post_attachment`).
+  - Certificación formal de los 16 TRIDs reales: `[4578, 4579, 4580, 4581, 4607, 4614, 4615, 4616, 4617, 4618, 4619, 4620, 4621, 4622, 4638, 9544]`.
+  - Desglose verificado: 5 grupos `product_type`, 9 grupos `product_visibility` y 2 grupos `product_cat` (16 grupos / 16 elementos).
+  - Huella criptográfica inmutable ratificada: `5910dcf46cd4e9915b787cf6c06e59c87b1b0e7875d488ea0d68325cc3291945`.
+- **Auditoría Funcional de Rutas Frontend:**
+  - Investigación de `/en/`: responde `404 Not Found` debido a que la página de inicio configurada (ID 197) tiene su traducción en inglés (Post 8356) dentro de un TRID bloqueado por francés (`BLOCKED_BY_LANGUAGE`), por lo que no está migrado a TFML.
+  - Confirmación de `/fr/`: responde `404 Not Found` en la ejecución real; el reporte anterior tuvo una errata clerical de transcripción (`200 OK`). El router de TFML rechaza rutas de idiomas inactivos sin aliasing.
+  - Clasificación honesta de renderizado HTML frontend como `BLOCKED` por ausencia física del directorio del tema `ecoCMS` en el laboratorio.
+- **Preservación Inmutable de Estado:**
+  - `cms_ect_lab`: Conserva estrictamente los 8 grupos y 12 elementos acumulados. Lote 3 permanece sin ejecutar a la espera de autorización.
+  - `cms_ect`: Centinela intacto con 3.403 registros y hash MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+- **Métricas de Calidad:**
+  - PHPUnit: **532 tests (533 total), 1.830 assertions, 0 errors, 0 failures, 1 skipped** (100% PASS).
+  - PHPCS / WPCS: **168/168 archivos analizados, 0 errors, 0 warnings** (100% PASS).
+  - Verificación Integral Fase 3.15 (`scratch/verify_fase_3_15.php`): **216/216 controles PASS (100%)**.
+  - `composer validate --strict`: PASS.
+
 
 
 

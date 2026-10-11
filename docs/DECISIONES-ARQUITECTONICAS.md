@@ -815,6 +815,36 @@
 - **JUSTIFICACIÓN:** Certificar la reproducibilidad de la Fase 3.13, avanzar con la migración controlada del Lote 2 demostrando rollback e idempotencia, y validar por primera vez el comportamiento integral del plugin sirviendo contenido real vía HTTP en WordPress.
 - **CONSECUENCIAS:** El laboratorio cuenta ahora con 8 grupos y 12 elementos migrados, la capacidad de reversibilidad granular por lote queda empíricamente comprobada, y la respuesta HTTP de WordPress con TF Multilingual queda formalmente certificada sin errores 500 ni bucles.
 
+### ADR-041: Saneamiento Integral del Catálogo Incremental, Partición Disjunta de TRIDs, Conciliación Anatómica de WooCommerce y Auditoría de Rutas Frontend (Fase 3.15)
+- **FECHA:** 2026-10-11
+- **DECISIÓN:**
+  1. **Saneamiento y Reconstrucción Integral del Catálogo Incremental:**
+     - Se auditó el plan matriz completo (249 grupos totales, 120 clasificados como `IMPORTABLE`, fingerprint `08a93f721373c7fdb5395544faff69684ab1affd9ba7aa1ed1e67fd4a17bb949`).
+     - Se verificó la partición matemática disjunta de los 9 lotes incrementales (lotes 02 al 10) que comprenden exactamente 115 grupos y 124 elementos.
+     - Sumados a los 5 grupos del lote piloto inicial (`pilot-batch-1`), se cubre el 100% de los 120 grupos importables del universo WPML sin una sola omisión ni duplicado (Cero colisiones).
+     - Se certificó que el 100% de los 124 elementos editoriales existen físicamente en las tablas nativas de WordPress Core (`etk_t_posts`, `etk_t_terms`, `etk_t_term_taxonomy`).
+     - Se generó el catálogo enriquecido `scratch/incremental_batches_catalog.json` y el desglose relacional exhaustivo `scratch/incremental_batches_catalog_detailed.json`.
+  2. **Conciliación Anatómica Certificada del Lote 3 (`batch-03-taxonomy-woocommerce`):**
+     - Se subsanó la discrepancia textual originada por la errata de recomendación previa (`product_tag`, `pa_attribute`), y se aclaró la confusión sobre los TRIDs 9342..9357 (correspondientes a adjuntos de medios `post_attachment`).
+     - Se certificó la lista formal e inmutable de 16 TRIDs: `[4578, 4579, 4580, 4581, 4607, 4614, 4615, 4616, 4617, 4618, 4619, 4620, 4621, 4622, 4638, 9544]`.
+     - Desglose verificado por subtipos en base de datos:
+       - 5 grupos de `product_type` (TRIDs 4578 al 4581, 4607).
+       - 9 grupos de `product_visibility` (TRIDs 4614 al 4622).
+       - 2 grupos de `product_cat` (TRIDs 4638, 9544).
+     - Huella criptográfica inmutable ratificada: `5910dcf46cd4e9915b787cf6c06e59c87b1b0e7875d488ea0d68325cc3291945`.
+  3. **Auditoría de Gobernanza de Rutas Frontend y Frontera de Responsabilidad:**
+     - **Ruta `/en/` (404 Not Found):** Se determinó que la página frontal configurada (`page_on_front = 197`, "Inicio") posee traducción al inglés (Post 8356, "Home"), pero pertenece al TRID 197 bloqueado por francés (`BLOCKED_BY_LANGUAGE`). Al no estar migrado a TFML y al operar WordPress en Core limpio sin reglas de inicio traducidas, WordPress Core responde limpiamente `404 Not Found`.
+     - **Ruta `/fr/` (404 Not Found):** Confirmación de que el `200 OK` del informe anterior fue una errata clerical de transcripción. La ruta respondió `404 Not Found` en la ejecución real. Al no generarse reglas de reescritura para idiomas inactivos, WordPress Core rechaza la URL sin degradación a default.
+     - **Renderizado de HTML (Clasificado estrictamente como BLOCKED):** Se identificó que el directorio del tema `ecoCMS` no fue desplegado en el laboratorio aislado. Por ende, la renderización visual de etiquetas `<html lang="...">`, canónicas y hreflang en frontend queda catalogada honestamente como `BLOCKED` por ausencia de plantilla de presentación, sin falsear certificaciones inexistentes.
+  4. **Preservación Inmutable de Estado y Restricción Estricta:**
+     - El laboratorio `cms_ect_lab` retiene exactamente **8 grupos** y **12 elementos** acumulados.
+     - El Lote 3 **no fue ejecutado** (permanece en estado `STATUS_READY`, a la espera de autorización formal).
+     - Centinela en origen `cms_ect`: 3.403 filas y checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (**Delta = 0**).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.15 / Directiva DT-TFML-045 — Saneamiento integral del catálogo y preparación del lote 3.
+- **JUSTIFICACIÓN:** Sanear y validar formalmente la partición matemática completa de los lotes de migración, eliminar cualquier riesgo de desalineación de TRIDs antes de importaciones masivas, y delimitar con precisión técnica el estado del frontend de WordPress en el laboratorio.
+- **CONSECUENCIAS:** El catálogo incremental queda 100% blindado y certificado contra la base de datos real, el Lote 3 queda plenamente conciliado y listo para ejecución segura, y se documenta formalmente la frontera entre la lógica de dominio multilingüe y las dependencias de tema del frontend.
+
 
 
 

@@ -78,7 +78,7 @@ El desarrollo de TF Multilingual estÃ¡ estructurado en microfases controladas 
 - Columnas personalizadas en listados de posts y tÃ©rminos.
 - Endpoints REST de soporte editorial bajo `/wp-json/tf-multilingual/v1/`.
 
-### Fase 13.0: Motor de Migración Desacoplado (Fases 3.1 a 3.14 Certificadas)
+### Fase 13.0: Motor de Migración Desacoplado (Fases 3.1 a 3.15 Certificadas)
 - Implementación del motor transaccional reanudable, con control de concurrencia e idempotencia (`MigrationManager`, `WpmlMigrationPlanner`, `WpmlMigrationExecutor`, `WpmlMigrationRollbackService`).
 - Adaptador de migración de solo lectura para WPML validado contra el laboratorio real `cms_ect_lab` (22 tablas WPML, 3.403 registros, 4.021 posts, 82 terms).
 - Preflight dinámico, aislamiento físico, respaldo seguro fuera de DocumentRoot, certificación de restauración verificable y plan piloto determinista dry-run completados al 100% (Fase 3.10).
@@ -86,6 +86,7 @@ El desarrollo de TF Multilingual estÃ¡ estructurado en microfases controladas 
 - Ejecución piloto transaccional autorizada en `cms_ect_lab` (`pilot-batch-1`: 5 grupos, 9 elementos), certificación de idempotencia en base de datos real, reversibilidad total no destructiva (rollback completo) y capacidad de recuperación demostrada (Fase 3.12).
 - Planificación incremental exhaustiva en 9 lotes semánticos (115 grupos restantes), catálogo formal de lotes versionado, 9 escenarios de estrés sintético y recuperación transaccional, y verificación de resolución en capas de dominio (Fase 3.13).
 - Ejecución transaccional del segundo lote piloto (`batch-02-taxonomy-categories`: 3 grupos, 3 elementos), consolidación del estado acumulado en laboratorio (8 grupos, 12 elementos), verificación de idempotencia sin duplicación, reversibilidad aislada comprobada (`rollback_groups`) con preservación intacta del lote inicial, y certificación HTTP real en servidor web (`http://lab.ecoterra.test`) con 0 errores 500, resolución canónica 301 a 200 OK y cabeceras `X-Robots-Tag: noindex` (Fase 3.14).
+- Saneamiento integral del catálogo de migración incremental en 9 lotes disjuntos (115 grupos / 124 elementos con cobertura del 100% del universo importable), conciliación anatómica certificada del Lote 3 WooCommerce (`product_type`, `product_visibility`, `product_cat`), verificación de existencia física de entidades en WordPress Core, y auditoría funcional de enrutamiento frontend `/en/` y `/fr/` (Fase 3.15).
 - Adaptador de migración para Polylang (inventario analizado).
 
 ### Fase 14.0: Hardening, AuditorÃ­a y Cierre MVP

@@ -1,0 +1,2187 @@
+{
+    "batch-02-taxonomy-categories": {
+        "id": "batch-02-taxonomy-categories",
+        "label": "Taxonomías: Categorías (tours_cat, category)",
+        "groups": 3,
+        "elements": 3,
+        "complexity": "Baja",
+        "fingerprint": "9b76d7e38d779a08448474a9c22ef24b88dd3e65da292dbd64e338371a0e1d78",
+        "trids": [
+            9237,
+            9367,
+            9532
+        ],
+        "subtypes": {
+            "tours_cat": 2,
+            "category": 1
+        },
+        "details": {
+            "9237": {
+                "trid": 9237,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 614,
+                        "element_id": 49,
+                        "type": "term",
+                        "subtype": "tours_cat",
+                        "language_code": "en",
+                        "source_lang": null,
+                        "title_or_name": "Jungle Tours",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9367": {
+                "trid": 9367,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 871,
+                        "element_id": 50,
+                        "type": "term",
+                        "subtype": "category",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Blog",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9532": {
+                "trid": 9532,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 1147,
+                        "element_id": 96,
+                        "type": "term",
+                        "subtype": "tours_cat",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Paquetes",
+                        "exists_in_core": true
+                    }
+                ]
+            }
+        }
+    },
+    "batch-03-taxonomy-woocommerce": {
+        "id": "batch-03-taxonomy-woocommerce",
+        "label": "Taxonomías: WooCommerce (product_cat, type, visibility)",
+        "groups": 16,
+        "elements": 16,
+        "complexity": "Baja",
+        "fingerprint": "5910dcf46cd4e9915b787cf6c06e59c87b1b0e7875d488ea0d68325cc3291945",
+        "trids": [
+            4578,
+            4579,
+            4580,
+            4581,
+            4607,
+            4614,
+            4615,
+            4616,
+            4617,
+            4618,
+            4619,
+            4620,
+            4621,
+            4622,
+            4638,
+            9544
+        ],
+        "subtypes": {
+            "product_type": 5,
+            "product_visibility": 9,
+            "product_cat": 2
+        },
+        "details": {
+            "4578": {
+                "trid": 4578,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 142,
+                        "element_id": 2,
+                        "type": "term",
+                        "subtype": "product_type",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "simple",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "4579": {
+                "trid": 4579,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 143,
+                        "element_id": 3,
+                        "type": "term",
+                        "subtype": "product_type",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "grouped",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "4580": {
+                "trid": 4580,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 144,
+                        "element_id": 4,
+                        "type": "term",
+                        "subtype": "product_type",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "variable",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "4581": {
+                "trid": 4581,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 145,
+                        "element_id": 5,
+                        "type": "term",
+                        "subtype": "product_type",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "external",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "4607": {
+                "trid": 4607,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 146,
+                        "element_id": 31,
+                        "type": "term",
+                        "subtype": "product_type",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "ovabrw_car_rental",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "4614": {
+                "trid": 4614,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 147,
+                        "element_id": 6,
+                        "type": "term",
+                        "subtype": "product_visibility",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "exclude-from-search",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "4615": {
+                "trid": 4615,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 148,
+                        "element_id": 7,
+                        "type": "term",
+                        "subtype": "product_visibility",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "exclude-from-catalog",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "4616": {
+                "trid": 4616,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 149,
+                        "element_id": 8,
+                        "type": "term",
+                        "subtype": "product_visibility",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "featured",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "4617": {
+                "trid": 4617,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 150,
+                        "element_id": 9,
+                        "type": "term",
+                        "subtype": "product_visibility",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "outofstock",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "4618": {
+                "trid": 4618,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 151,
+                        "element_id": 10,
+                        "type": "term",
+                        "subtype": "product_visibility",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "rated-1",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "4619": {
+                "trid": 4619,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 152,
+                        "element_id": 11,
+                        "type": "term",
+                        "subtype": "product_visibility",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "rated-2",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "4620": {
+                "trid": 4620,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 153,
+                        "element_id": 12,
+                        "type": "term",
+                        "subtype": "product_visibility",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "rated-3",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "4621": {
+                "trid": 4621,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 154,
+                        "element_id": 13,
+                        "type": "term",
+                        "subtype": "product_visibility",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "rated-4",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "4622": {
+                "trid": 4622,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 155,
+                        "element_id": 14,
+                        "type": "term",
+                        "subtype": "product_visibility",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "rated-5",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "4638": {
+                "trid": 4638,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 156,
+                        "element_id": 15,
+                        "type": "term",
+                        "subtype": "product_cat",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Lodge",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9544": {
+                "trid": 9544,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 1163,
+                        "element_id": 97,
+                        "type": "term",
+                        "subtype": "product_cat",
+                        "language_code": "en",
+                        "source_lang": null,
+                        "title_or_name": "Sin categorizar",
+                        "exists_in_core": true
+                    }
+                ]
+            }
+        }
+    },
+    "batch-04-taxonomy-tags-1": {
+        "id": "batch-04-taxonomy-tags-1",
+        "label": "Taxonomías: Etiquetas (post_tag) - Parte 1",
+        "groups": 23,
+        "elements": 23,
+        "complexity": "Baja",
+        "fingerprint": "b039d492f187b1fbe59b9089686c148110aa4d8ea0296f3208ea2809b3ed65f7",
+        "trids": [
+            9368,
+            9369,
+            9370,
+            9371,
+            9372,
+            9373,
+            9374,
+            9375,
+            9376,
+            9377,
+            9378,
+            9379,
+            9380,
+            9381,
+            9382,
+            9383,
+            9384,
+            9385,
+            9386,
+            9387,
+            9388,
+            9389,
+            9390
+        ],
+        "subtypes": {
+            "post_tag": 23
+        },
+        "details": {
+            "9368": {
+                "trid": 9368,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 872,
+                        "element_id": 51,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Cusco",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9369": {
+                "trid": 9369,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 873,
+                        "element_id": 52,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Machu Picchu",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9370": {
+                "trid": 9370,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 874,
+                        "element_id": 53,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Eco Lodges",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9371": {
+                "trid": 9371,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 875,
+                        "element_id": 54,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Choquequirao",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9372": {
+                "trid": 9372,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 876,
+                        "element_id": 55,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Salkantay",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9373": {
+                "trid": 9373,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 877,
+                        "element_id": 56,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Pumasillu",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9374": {
+                "trid": 9374,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 878,
+                        "element_id": 57,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Pongo de Mainique",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9375": {
+                "trid": 9375,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 879,
+                        "element_id": 58,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Tours en Peru",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9376": {
+                "trid": 9376,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 880,
+                        "element_id": 59,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Tours en Cusco",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9377": {
+                "trid": 9377,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 881,
+                        "element_id": 60,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Avistamiento de Aves",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9378": {
+                "trid": 9378,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 882,
+                        "element_id": 61,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Birdwatching",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9379": {
+                "trid": 9379,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 883,
+                        "element_id": 62,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Rock Climbing Cusco",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9380": {
+                "trid": 9380,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 884,
+                        "element_id": 63,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Gallito de las Rocas",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9381": {
+                "trid": 9381,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 885,
+                        "element_id": 64,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Cafe Especial",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9382": {
+                "trid": 9382,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 886,
+                        "element_id": 65,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Quillabamba",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9383": {
+                "trid": 9383,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 887,
+                        "element_id": 66,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Vilcabamba",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9384": {
+                "trid": 9384,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 888,
+                        "element_id": 67,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Espiritu Pampa",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9385": {
+                "trid": 9385,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 889,
+                        "element_id": 68,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Lodging en Quillabamba",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9386": {
+                "trid": 9386,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 890,
+                        "element_id": 69,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Mountain Bike Quillabamba",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9387": {
+                "trid": 9387,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 891,
+                        "element_id": 70,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Mountain Bike Cusco",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9388": {
+                "trid": 9388,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 892,
+                        "element_id": 71,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Mountain Bike",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9389": {
+                "trid": 9389,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 893,
+                        "element_id": 72,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Coffee Experience",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9390": {
+                "trid": 9390,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 894,
+                        "element_id": 73,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Curso de Cafeologia",
+                        "exists_in_core": true
+                    }
+                ]
+            }
+        }
+    },
+    "batch-05-taxonomy-tags-2": {
+        "id": "batch-05-taxonomy-tags-2",
+        "label": "Taxonomías: Etiquetas (post_tag) - Parte 2",
+        "groups": 22,
+        "elements": 22,
+        "complexity": "Baja",
+        "fingerprint": "cd1c0018d1014c36c5430d1ae9aaf0272e32748b094379025fc01c99f3816e1c",
+        "trids": [
+            9392,
+            9393,
+            9394,
+            9395,
+            9396,
+            9397,
+            9398,
+            9400,
+            9401,
+            9402,
+            9403,
+            9404,
+            9407,
+            9408,
+            9409,
+            9410,
+            9412,
+            9413,
+            9414,
+            9415,
+            9416,
+            9417
+        ],
+        "subtypes": {
+            "post_tag": 22
+        },
+        "details": {
+            "9392": {
+                "trid": 9392,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 896,
+                        "element_id": 74,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Wayna Picchu",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9393": {
+                "trid": 9393,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 897,
+                        "element_id": 75,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Aguas Calientes",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9394": {
+                "trid": 9394,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 898,
+                        "element_id": 76,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Mandor",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9395": {
+                "trid": 9395,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 899,
+                        "element_id": 77,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Collpani",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9396": {
+                "trid": 9396,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 900,
+                        "element_id": 78,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "hidroelectrica",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9397": {
+                "trid": 9397,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 901,
+                        "element_id": 79,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "cocalmayo Hot Sspring",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9398": {
+                "trid": 9398,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 902,
+                        "element_id": 80,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Cocalmayo Hot Spring",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9400": {
+                "trid": 9400,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 905,
+                        "element_id": 81,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Cusco Amazonico",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9401": {
+                "trid": 9401,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 906,
+                        "element_id": 82,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Santuario Nacional Megantoni",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9402": {
+                "trid": 9402,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 907,
+                        "element_id": 83,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Saniriato",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9403": {
+                "trid": 9403,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 908,
+                        "element_id": 84,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Bajo Urubamba",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9404": {
+                "trid": 9404,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 909,
+                        "element_id": 85,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Tours hacia la Selva Cusqueña",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9407": {
+                "trid": 9407,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 913,
+                        "element_id": 86,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Rio Yoyato",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9408": {
+                "trid": 9408,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 914,
+                        "element_id": 87,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Saringaveni",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9409": {
+                "trid": 9409,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 915,
+                        "element_id": 88,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Camino Lamabarri",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9410": {
+                "trid": 9410,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 916,
+                        "element_id": 89,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Malanquiato",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9412": {
+                "trid": 9412,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 918,
+                        "element_id": 90,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Yanama",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9413": {
+                "trid": 9413,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 919,
+                        "element_id": 91,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Pumasillo",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9414": {
+                "trid": 9414,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 920,
+                        "element_id": 94,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Mollepata",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9415": {
+                "trid": 9415,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 921,
+                        "element_id": 93,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Cocalmayo",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9416": {
+                "trid": 9416,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 922,
+                        "element_id": 92,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Laguna de Humantay",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9417": {
+                "trid": 9417,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 923,
+                        "element_id": 95,
+                        "type": "term",
+                        "subtype": "post_tag",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Santa Teresa",
+                        "exists_in_core": true
+                    }
+                ]
+            }
+        }
+    },
+    "batch-06-elementor-templates": {
+        "id": "batch-06-elementor-templates",
+        "label": "Plantillas y Tipos Elementor (library, library_type)",
+        "groups": 10,
+        "elements": 11,
+        "complexity": "Media",
+        "fingerprint": "ee32aff6cc43ea1f334b758bda34d9a9cc271de3a3c76217abd56e6264924a24",
+        "trids": [
+            6,
+            1300,
+            1713,
+            1723,
+            2365,
+            3423,
+            4130,
+            4532,
+            4533,
+            9208
+        ],
+        "subtypes": {
+            "elementor_library": 9,
+            "elementor_library_type": 2
+        },
+        "details": {
+            "6": {
+                "trid": 6,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 7,
+                        "element_id": 6,
+                        "type": "post",
+                        "subtype": "elementor_library",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Kit por defecto",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "1300": {
+                "trid": 1300,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 2,
+                        "element_id": 1300,
+                        "type": "post",
+                        "subtype": "elementor_library",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Contact Tab 1",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "1713": {
+                "trid": 1713,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 3,
+                        "element_id": 1713,
+                        "type": "post",
+                        "subtype": "elementor_library",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Latest News",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "1723": {
+                "trid": 1723,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 4,
+                        "element_id": 1723,
+                        "type": "post",
+                        "subtype": "elementor_library",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Gallery Sidebar",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "2365": {
+                "trid": 2365,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 5,
+                        "element_id": 2365,
+                        "type": "post",
+                        "subtype": "elementor_library",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Room Details",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "3423": {
+                "trid": 3423,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 6,
+                        "element_id": 3423,
+                        "type": "post",
+                        "subtype": "elementor_library",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Contact Tab 2",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "4130": {
+                "trid": 4130,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 1,
+                        "element_id": 4130,
+                        "type": "post",
+                        "subtype": "elementor_library",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Default Kit",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "4532": {
+                "trid": 4532,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 139,
+                        "element_id": 32,
+                        "type": "term",
+                        "subtype": "elementor_library_type",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "page",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "4533": {
+                "trid": 4533,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 140,
+                        "element_id": 33,
+                        "type": "term",
+                        "subtype": "elementor_library_type",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "section",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9208": {
+                "trid": 9208,
+                "elements_count": 2,
+                "elements": [
+                    {
+                        "translation_id": 560,
+                        "element_id": 5048,
+                        "type": "post",
+                        "subtype": "elementor_library",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Testimonios",
+                        "exists_in_core": true
+                    },
+                    {
+                        "translation_id": 562,
+                        "element_id": 5055,
+                        "type": "post",
+                        "subtype": "elementor_library",
+                        "language_code": "en",
+                        "source_lang": "es",
+                        "title_or_name": "Testimonial",
+                        "exists_in_core": true
+                    }
+                ]
+            }
+        }
+    },
+    "batch-07-cpt-tours": {
+        "id": "batch-07-cpt-tours",
+        "label": "CPT Tours: Publicaciones restantes",
+        "groups": 12,
+        "elements": 20,
+        "complexity": "Media-Alta",
+        "fingerprint": "d24b52d1224564bd745b4bc8032a9607adef5dc00379b2634a50eed08e77888b",
+        "trids": [
+            9256,
+            9285,
+            9287,
+            9293,
+            9303,
+            9313,
+            9318,
+            9428,
+            9533,
+            9534,
+            9535,
+            9536
+        ],
+        "subtypes": {
+            "tours": 20
+        },
+        "details": {
+            "9256": {
+                "trid": 9256,
+                "elements_count": 2,
+                "elements": [
+                    {
+                        "translation_id": 649,
+                        "element_id": 5321,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Rock Climbing & Canyoning",
+                        "exists_in_core": true
+                    },
+                    {
+                        "translation_id": 650,
+                        "element_id": 5322,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "en",
+                        "source_lang": "es",
+                        "title_or_name": "Tour Demo",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9285": {
+                "trid": 9285,
+                "elements_count": 2,
+                "elements": [
+                    {
+                        "translation_id": 708,
+                        "element_id": 5380,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Mountain Bike",
+                        "exists_in_core": true
+                    },
+                    {
+                        "translation_id": 709,
+                        "element_id": 5381,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "en",
+                        "source_lang": "es",
+                        "title_or_name": "Tour Demo",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9287": {
+                "trid": 9287,
+                "elements_count": 2,
+                "elements": [
+                    {
+                        "translation_id": 712,
+                        "element_id": 5384,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Vivencial – Escuela de Café",
+                        "exists_in_core": true
+                    },
+                    {
+                        "translation_id": 713,
+                        "element_id": 5385,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "en",
+                        "source_lang": "es",
+                        "title_or_name": "Tour Demo",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9293": {
+                "trid": 9293,
+                "elements_count": 2,
+                "elements": [
+                    {
+                        "translation_id": 724,
+                        "element_id": 5396,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Machupicchu 2 Dias",
+                        "exists_in_core": true
+                    },
+                    {
+                        "translation_id": 725,
+                        "element_id": 5397,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "en",
+                        "source_lang": "es",
+                        "title_or_name": "Tour Demo",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9303": {
+                "trid": 9303,
+                "elements_count": 2,
+                "elements": [
+                    {
+                        "translation_id": 744,
+                        "element_id": 5416,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Choquequirao Trek 2 Dias",
+                        "exists_in_core": true
+                    },
+                    {
+                        "translation_id": 745,
+                        "element_id": 5417,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "en",
+                        "source_lang": "es",
+                        "title_or_name": "Tour Demo",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9313": {
+                "trid": 9313,
+                "elements_count": 2,
+                "elements": [
+                    {
+                        "translation_id": 764,
+                        "element_id": 5436,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Vilcabamba - Ñustahispana y Rosaspata \/ 1 Día",
+                        "exists_in_core": true
+                    },
+                    {
+                        "translation_id": 765,
+                        "element_id": 5437,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "en",
+                        "source_lang": "es",
+                        "title_or_name": "Tour Demo",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9318": {
+                "trid": 9318,
+                "elements_count": 2,
+                "elements": [
+                    {
+                        "translation_id": 774,
+                        "element_id": 5446,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Pongo De Mainique 2 Dias",
+                        "exists_in_core": true
+                    },
+                    {
+                        "translation_id": 775,
+                        "element_id": 5447,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "en",
+                        "source_lang": "es",
+                        "title_or_name": "Tour Demo",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9428": {
+                "trid": 9428,
+                "elements_count": 2,
+                "elements": [
+                    {
+                        "translation_id": 944,
+                        "element_id": 5772,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "The Best Of Peru 7D\/6N",
+                        "exists_in_core": true
+                    },
+                    {
+                        "translation_id": 945,
+                        "element_id": 5773,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "en",
+                        "source_lang": "es",
+                        "title_or_name": "Tour Demo",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9533": {
+                "trid": 9533,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 1148,
+                        "element_id": 6198,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Around Ecoterra Lodge 3D\/2N",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9534": {
+                "trid": 9534,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 1149,
+                        "element_id": 6204,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Cofee Adventure 3D\/2N",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9535": {
+                "trid": 9535,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 1150,
+                        "element_id": 6210,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Cofee School 3D\/2N",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9536": {
+                "trid": 9536,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 1151,
+                        "element_id": 6212,
+                        "type": "post",
+                        "subtype": "tours",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Bird Watching 2D\/1N",
+                        "exists_in_core": true
+                    }
+                ]
+            }
+        }
+    },
+    "batch-08-cpt-products": {
+        "id": "batch-08-cpt-products",
+        "label": "CPT WooCommerce: Productos",
+        "groups": 7,
+        "elements": 7,
+        "complexity": "Media",
+        "fingerprint": "3df3ce6f1a6dac619d203adaf5a31d8eb3fc332493330a5e8b755d4ff1d9136d",
+        "trids": [
+            9224,
+            9225,
+            9231,
+            9431,
+            9499,
+            9526,
+            9540
+        ],
+        "subtypes": {
+            "product": 7
+        },
+        "details": {
+            "9224": {
+                "trid": 9224,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 587,
+                        "element_id": 5250,
+                        "type": "post",
+                        "subtype": "product",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Habitación Matrimonial",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9225": {
+                "trid": 9225,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 588,
+                        "element_id": 5264,
+                        "type": "post",
+                        "subtype": "product",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Suite Matrimonial",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9231": {
+                "trid": 9231,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 599,
+                        "element_id": 5275,
+                        "type": "post",
+                        "subtype": "product",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Habitacion Amigos",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9431": {
+                "trid": 9431,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 950,
+                        "element_id": 5787,
+                        "type": "post",
+                        "subtype": "product",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Habitacion Familia",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9499": {
+                "trid": 9499,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 1083,
+                        "element_id": 6123,
+                        "type": "post",
+                        "subtype": "product",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Habitación Triple",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9526": {
+                "trid": 9526,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 1136,
+                        "element_id": 6178,
+                        "type": "post",
+                        "subtype": "product",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Habitación Doble",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9540": {
+                "trid": 9540,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 1155,
+                        "element_id": 6224,
+                        "type": "post",
+                        "subtype": "product",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Habitación Cabaña Familiar",
+                        "exists_in_core": true
+                    }
+                ]
+            }
+        }
+    },
+    "batch-09-core-posts-forms": {
+        "id": "batch-09-core-posts-forms",
+        "label": "Core Posts y Formularios (post, wpcf7_contact_form)",
+        "groups": 4,
+        "elements": 4,
+        "complexity": "Baja-Media",
+        "fingerprint": "6d188e1cbff392deaa030e917d5d43aaed482f915c218a73c87f415d39f53720",
+        "trids": [
+            4340,
+            9391,
+            9406,
+            9411
+        ],
+        "subtypes": {
+            "wpcf7_contact_form": 1,
+            "post": 3
+        },
+        "details": {
+            "4340": {
+                "trid": 4340,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 120,
+                        "element_id": 4340,
+                        "type": "post",
+                        "subtype": "wpcf7_contact_form",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Contactos - ES",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9391": {
+                "trid": 9391,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 895,
+                        "element_id": 5687,
+                        "type": "post",
+                        "subtype": "post",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Recomendaciones para visitar Machu Picchu",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9406": {
+                "trid": 9406,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 912,
+                        "element_id": 5718,
+                        "type": "post",
+                        "subtype": "post",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Santuario Amazonico del Pongo de Mainique",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "9411": {
+                "trid": 9411,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 917,
+                        "element_id": 5734,
+                        "type": "post",
+                        "subtype": "post",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Choquequirao, el otro Machu Picchu",
+                        "exists_in_core": true
+                    }
+                ]
+            }
+        }
+    },
+    "batch-10-nav-menu-items": {
+        "id": "batch-10-nav-menu-items",
+        "label": "Estructura de Menú (nav_menu_item)",
+        "groups": 18,
+        "elements": 18,
+        "complexity": "Alta (dependencias jerárquicas)",
+        "fingerprint": "19b7f15c730a7f0059b7d6873a37b07ed2bcd63f499c5a30fc921ae5d4957acc",
+        "trids": [
+            9210,
+            34659,
+            34701,
+            34789,
+            34792,
+            34824,
+            34826,
+            34828,
+            34829,
+            34832,
+            34833,
+            34834,
+            34835,
+            34836,
+            34837,
+            34838,
+            34839,
+            34840
+        ],
+        "subtypes": {
+            "nav_menu_item": 18
+        },
+        "details": {
+            "9210": {
+                "trid": 9210,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 1763,
+                        "element_id": 8363,
+                        "type": "post",
+                        "subtype": "nav_menu_item",
+                        "language_code": "en",
+                        "source_lang": "es",
+                        "title_or_name": "",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "34659": {
+                "trid": 34659,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 2154,
+                        "element_id": 9243,
+                        "type": "post",
+                        "subtype": "nav_menu_item",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "34701": {
+                "trid": 34701,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 2278,
+                        "element_id": 9376,
+                        "type": "post",
+                        "subtype": "nav_menu_item",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "34789": {
+                "trid": 34789,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 2541,
+                        "element_id": 9657,
+                        "type": "post",
+                        "subtype": "nav_menu_item",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "34792": {
+                "trid": 34792,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 2549,
+                        "element_id": 9671,
+                        "type": "post",
+                        "subtype": "nav_menu_item",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "34824": {
+                "trid": 34824,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 2643,
+                        "element_id": 9902,
+                        "type": "post",
+                        "subtype": "nav_menu_item",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "Terminos y Condiciones",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "34826": {
+                "trid": 34826,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 2647,
+                        "element_id": 10076,
+                        "type": "post",
+                        "subtype": "nav_menu_item",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "34828": {
+                "trid": 34828,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 2649,
+                        "element_id": 10080,
+                        "type": "post",
+                        "subtype": "nav_menu_item",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "34829": {
+                "trid": 34829,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 2650,
+                        "element_id": 10081,
+                        "type": "post",
+                        "subtype": "nav_menu_item",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "34832": {
+                "trid": 34832,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 2657,
+                        "element_id": 10151,
+                        "type": "post",
+                        "subtype": "nav_menu_item",
+                        "language_code": "es",
+                        "source_lang": null,
+                        "title_or_name": "",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "34833": {
+                "trid": 34833,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 2658,
+                        "element_id": 10152,
+                        "type": "post",
+                        "subtype": "nav_menu_item",
+                        "language_code": "en",
+                        "source_lang": null,
+                        "title_or_name": "",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "34834": {
+                "trid": 34834,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 2659,
+                        "element_id": 10153,
+                        "type": "post",
+                        "subtype": "nav_menu_item",
+                        "language_code": "en",
+                        "source_lang": null,
+                        "title_or_name": "",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "34835": {
+                "trid": 34835,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 2660,
+                        "element_id": 10154,
+                        "type": "post",
+                        "subtype": "nav_menu_item",
+                        "language_code": "en",
+                        "source_lang": null,
+                        "title_or_name": "",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "34836": {
+                "trid": 34836,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 2661,
+                        "element_id": 10155,
+                        "type": "post",
+                        "subtype": "nav_menu_item",
+                        "language_code": "en",
+                        "source_lang": null,
+                        "title_or_name": "",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "34837": {
+                "trid": 34837,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 2662,
+                        "element_id": 10156,
+                        "type": "post",
+                        "subtype": "nav_menu_item",
+                        "language_code": "en",
+                        "source_lang": null,
+                        "title_or_name": "",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "34838": {
+                "trid": 34838,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 2663,
+                        "element_id": 10157,
+                        "type": "post",
+                        "subtype": "nav_menu_item",
+                        "language_code": "en",
+                        "source_lang": null,
+                        "title_or_name": "",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "34839": {
+                "trid": 34839,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 2664,
+                        "element_id": 10158,
+                        "type": "post",
+                        "subtype": "nav_menu_item",
+                        "language_code": "en",
+                        "source_lang": null,
+                        "title_or_name": "",
+                        "exists_in_core": true
+                    }
+                ]
+            },
+            "34840": {
+                "trid": 34840,
+                "elements_count": 1,
+                "elements": [
+                    {
+                        "translation_id": 2665,
+                        "element_id": 10159,
+                        "type": "post",
+                        "subtype": "nav_menu_item",
+                        "language_code": "en",
+                        "source_lang": null,
+                        "title_or_name": "",
+                        "exists_in_core": true
+                    }
+                ]
+            }
+        }
+    }
+}
