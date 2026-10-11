@@ -1073,8 +1073,36 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Verificación Integral Fase 3.15 (`scratch/verify_fase_3_15.php`): **216/216 controles PASS (100%)**.
   - `composer validate --strict`: PASS.
 
+---
 
+## [Fase 3.16] - 2026-10-11
 
-
-
-
+### Migración Transaccional del Tercer Lote WooCommerce (DT-TFML-046)
+- **Ejecución Transaccional del Lote 3 (`batch-03-taxonomy-woocommerce`):**
+  - Migración exitosa de 16 grupos y 16 elementos correspondientes a taxonomías de WooCommerce en `cms_ect_lab` (TRIDs `[4578, 4579, 4580, 4581, 4607, 4614, 4615, 4616, 4617, 4618, 4619, 4620, 4621, 4622, 4638, 9544]`).
+  - Desglose verificado por subtipos taxonómicos: 5 grupos `product_type`, 9 grupos `product_visibility` y 2 grupos `product_cat`.
+  - Huella criptográfica inmutable ratificada: `5910dcf46cd4e9915b787cf6c06e59c87b1b0e7875d488ea0d68325cc3291945`.
+  - Nuevo estado acumulado en la base de datos: exactamente **24 grupos** en `etk_t_tfml_groups` (8 previos + 16 de lote 3, asignados con IDs 41 al 56) y **28 elementos** en `etk_t_tfml_group_elements` (12 previos + 16 de lote 3).
+  - Manifiesto de ejecución persistido y checkpoint actualizado a `completed` con 16 ítems procesados. Lock liberado.
+- **Idempotencia y Reversibilidad Aislada del Lote 3:**
+  - Re-ejecución inmediata del Lote 3 sobre el laboratorio evalúa los 16 grupos sin generar duplicados: los 16 TRIDs reportan formalmente `idempotent_skipped` y los conteos de base de datos se mantienen inmutables en 24 grupos y 28 elementos.
+  - Rollback selectivo mediante `rollback_groups` sobre los IDs del Lote 3 revierte exclusivamente este lote, retornando la base de datos a 8 grupos y 12 elementos.
+  - Los 8 grupos iniciales correspondientes a los lotes 1 y 2 (`[6, 7, 8, 9, 10, 38, 39, 40]`) y sus 12 elementos permanecen 100% blindados e intactos.
+  - Re-ejecución posterior restaura el estado final de 24 grupos y 28 elementos, con certificación profunda de reconciliación (`reconcile()`) al 100% (`integrity_verified = true`, 0 discrepancias).
+- **Validación de API de Dominio y Comprobación HTTP:**
+  - Validación funcional de `ContentTranslationResolver` sobre términos migrados (e.g. término 2 y 97, con resolución simétrica cruzada ES <-> EN).
+  - Comprobaciones HTTP reales contra `http://lab.ecoterra.test`:
+    - Ruta raíz (`/`) responde HTTP 200 OK en idioma predeterminado.
+    - Prefijos `/en/` y `/fr/` responden limpiamente 404 (sin página traducida en EN, e idioma inactivo en FR) sin errores 500 ni degradación espuria.
+    - Entidades migradas de lotes 1 y 2 responden HTTP 301 redirigiendo canónicamente a 200 OK.
+    - Ausencia absoluta de bucles de redirección (`CURLE_TOO_MANY_REDIRECTS = false`).
+    - Cabecera de aislamiento `X-Robots-Tag: noindex, nofollow, noarchive` activa en todas las respuestas.
+  - Frontera de frontend: se mantiene la designación formal de `BLOCKED` para el renderizado HTML de etiquetas (`<html lang>`, canonical y hreflang en el cuerpo HTML) debido a la ausencia física del tema `ecoCMS` en el laboratorio.
+- **Preservación Inmutable de Centinelas:**
+  - `cms_ect_lab`: Conserva exactamente 24 grupos acumulados y 28 elementos, lock liberado.
+  - `cms_ect`: Centinela intacto con 3.403 registros y hash MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0 verificado en pre y post-flight).
+- **Métricas de Calidad:**
+  - PHPUnit: **532 tests (533 total), 1.830 assertions, 0 errors, 0 failures, 1 skipped** (100% PASS).
+  - PHPCS / WPCS: **168/168 archivos analizados, 0 errors, 0 warnings** (100% PASS).
+  - Verificación Integral Fase 3.16 (`scratch/verify_fase_3_16.php`): **151/151 controles PASS (100%)**.
+  - `composer validate --strict`: PASS.

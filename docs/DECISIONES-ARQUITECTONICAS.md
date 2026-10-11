@@ -845,9 +845,33 @@
 - **JUSTIFICACIÓN:** Sanear y validar formalmente la partición matemática completa de los lotes de migración, eliminar cualquier riesgo de desalineación de TRIDs antes de importaciones masivas, y delimitar con precisión técnica el estado del frontend de WordPress en el laboratorio.
 - **CONSECUENCIAS:** El catálogo incremental queda 100% blindado y certificado contra la base de datos real, el Lote 3 queda plenamente conciliado y listo para ejecución segura, y se documenta formalmente la frontera entre la lógica de dominio multilingüe y las dependencias de tema del frontend.
 
-
-
-
-
-
-
+### ADR-042: Migración Transaccional del Tercer Lote Piloto (batch-03-taxonomy-woocommerce), Idempotencia, Reversibilidad Aislada y Validación de API de Dominio (Fase 3.16)
+- **FECHA:** 2026-10-11
+- **DECISIÓN:**
+  1. **Ejecución Transaccional del Lote 3 (`batch-03-taxonomy-woocommerce`):**
+     - Se ejecutó la migración transaccional de los 16 TRIDs autorizados en el laboratorio aislado `cms_ect_lab`: `[4578, 4579, 4580, 4581, 4607, 4614, 4615, 4616, 4617, 4618, 4619, 4620, 4621, 4622, 4638, 9544]`.
+     - Subtipos taxonómicos involucrados: 5 grupos de `product_type`, 9 grupos de `product_visibility` y 2 grupos de `product_cat` (16 grupos / 16 elementos).
+     - Huella criptográfica inmutable ratificada: `5910dcf46cd4e9915b787cf6c06e59c87b1b0e7875d488ea0d68325cc3291945`.
+     - Nuevo estado acumulado en base de datos del laboratorio: exactamente **24 grupos** en `etk_t_tfml_groups` (8 previos + 16 nuevos) y **28 elementos** en `etk_t_tfml_group_elements` (12 previos + 16 nuevos).
+     - Asignación correlativa de IDs de grupo en `etk_t_tfml_groups`: IDs 41 al 56.
+     - Registro de manifiesto transaccional y checkpoint actualizado a `completed` con 16 ítems procesados. Lock liberado.
+  2. **Idempotencia Estricta en Base de Datos Real:**
+     - Segunda ejecución consecutiva sobre el Lote 3 evalúa los 16 grupos sin realizar escrituras redundantes ni generar duplicados.
+     - Los 16 grupos devuelven formalmente el estado `idempotent_skipped` (0 duplicados).
+     - Los conteos de la base de datos se mantienen inmutables en exactamente 24 grupos y 28 elementos.
+  3. **Reversibilidad Aislada y Re-ejecución Post-Rollback:**
+     - Ejecución de `rollback_groups` sobre los IDs del Lote 3 (`[41, 42, ..., 56]`) revierte exclusivamente el tercer lote.
+     - La base de datos regresa de manera exacta al estado de 8 grupos y 12 elementos.
+     - Los 8 grupos iniciales correspondientes a los lotes 1 y 2 (`[6, 7, 8, 9, 10, 38, 39, 40]`) y sus 12 elementos permanecen 100% blindados e intactos.
+     - Re-ejecución posterior restaura el estado acumulado final de 24 grupos y 28 elementos.
+     - Verificación profunda mediante `reconcile()` certifica integridad estructural plena (`integrity_verified = true`, 0 discrepancias).
+  4. **Validación de API de Dominio y Comprobación HTTP:**
+     - Se verificó la resolución cruzada mediante `ContentTranslationResolver` sobre términos migrados (términos 2 y 97, resolución cruzada ES <-> EN).
+     - Comprobación HTTP sobre `http://lab.ecoterra.test`: ruta raíz responde HTTP 200 OK; `/en/` responde 404 (sin home traducida migrada); `/fr/` responde 404 (idioma inactivo sin aliasing ni degradación a default); páginas y categorías migradas responden 301 canónico a 200 OK; ausencia de bucles.
+     - Frontera de frontend: se mantiene la designación formal de `BLOCKED` para el renderizado HTML de etiquetas (`<html lang>`, canonical y hreflang en el cuerpo HTML) debido a la ausencia física del directorio del tema `ecoCMS` en el laboratorio.
+  5. **Invarianza Absoluta del Centinela en Origen (`cms_ect`):**
+     - Verificación pre y post-flight en `cms_ect`: 3.403 filas exactas y checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (**Delta = 0**).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.16 / Directiva DT-TFML-046 — Migración transaccional del tercer lote piloto WooCommerce.
+- **JUSTIFICACIÓN:** Ejecutar el tercer lote de migración incremental WPML -> TFML sobre taxonomías WooCommerce en laboratorio aislado, certificar idempotencia y rollback selectivo en entorno de persistencia real sin afectar lotes previos, y consolidar el estado de 24 grupos y 28 elementos.
+- **CONSECUENCIAS:** El laboratorio avanza al estado acumulado de 24 grupos y 28 elementos, el motor demuestra una vez más su solidez transaccional y reversibilidad granular, y los 7 lotes restantes (99 grupos) permanecen intactos en estado `STATUS_READY`.
