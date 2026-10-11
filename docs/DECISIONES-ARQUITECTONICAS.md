@@ -549,3 +549,33 @@
 - **CONTEXTO:** Fase 3.8 — Preparación y certificación del laboratorio aislado.
 - **JUSTIFICACIÓN:** Validar migraciones con datos reales exige un entorno estéril, contenido y protegido contra filtraciones (correos a clientes reales, webhooks o indexación), junto con un motor de reversión blindado contra la eliminación accidental de datos de otras operaciones.
 - **CONSECUENCIAS:** Entorno seguro y reproducible listo para recibir datos reales una vez autorizados, con garantías matemáticas de que el rollback no destruirá grupos preexistentes ni sobrepasará los límites de su propia ejecución.
+
+---
+
+### ADR-035: Preflight Dinámico, Aislamiento Físico de Código, Respaldo Verificable y Clonación Anonimizada en Laboratorio
+- **DECISIÓN:**
+  1. **Aislamiento Físico del Repositorio de Código (Retiro de Reparse Point / Junction NTFS):**
+     - Retiro seguro del enlace NTFS junction (`cmd /c rmdir`) en `d:\laragon\www\lab.ecoterra\wp-content\plugins\tf-multilingual` para prevenir cualquier afectación cruzada accidental al árbol de trabajo de desarrollo.
+     - Despliegue de un árbol físico de código completamente independiente mediante clon y checkout fijado estrictamente en el baseline certificado `af46d65a226568e6653549ed4f1eea0956189a44`.
+     - Autonomía de dependencias mediante autoloader local de Composer en el laboratorio aislado.
+  2. **Descubrimiento Dinámico de Prefijo y Estructuras:**
+     - Prohibición estricta de asumir prefijos estándar `wp_`.
+     - Descubrimiento programático del prefijo real del sitio origen (`etk_t_`) desde `wp-config.php` y comprobación de las 72 tablas del esquema.
+     - Configuración consistente de `$table_prefix = 'etk_t_';` en el `wp-config.php` del laboratorio `lab.ecoterra`.
+  3. **Respaldo Streaming de Solo Lectura Fuera del Repositorio:**
+     - Extracción streaming de bajo consumo de memoria (MYSQLI_USE_RESULT) de las 22 tablas relacionales de WPML (`etk_t_icl_*`), 5 tablas de contenido de WordPress Core (`etk_t_posts`, `etk_t_postmeta`, `etk_t_terms`, `etk_t_term_taxonomy`, `etk_t_term_relationships`) y la tabla de configuración (`etk_t_options`).
+     - Almacenamiento del respaldo SQL en directorio protegido `d:\laragon\www\lab.ecoterra\backups\preflight_backup_cms_ect_snapshot.sql`, estrictamente fuera del repositorio Git del plugin y con `.gitignore` propio.
+  4. **Anonimización Estricta y Sanitización de Datos en `cms_ect_lab`:**
+     - Purgado total de usuarios productivos (`etk_t_users` y `etk_t_usermeta`). Generación de un único usuario administrador sintético de pruebas: `admin_lab` (`admin@lab.ecoterra.test`).
+     - Reescritura segura de correos electrónicos en `etk_t_postmeta` hacia `@lab.ecoterra.test`, preservando la consistencia de cadenas serializadas en PHP (`s:XX:...`).
+     - Eliminación de pasarelas de pago y credenciales de terceros en `etk_t_options` (`stripe_%`, `paypal_%`, `woocommerce_%_settings` con tokens/secretos).
+     - Validación matemática de invariancia de WPML en `cms_ect_lab`: exactamente 3.403 filas en `etk_t_icl_translations` con MD5 `4241ca7e7ec6399a594537cb04790c10`.
+  5. **Frontera Estricta de Fase (Migración WPML → TFML No Ejecutada):**
+     - Creación e inicialización del esquema TFML (`etk_t_tfml_*`) en `cms_ect_lab` con conteo verificado de 0 filas.
+     - Prohibición categórica de ejecutar la migración transaccional en la Fase 3.9; la ejecución con datos reales queda reservada exclusivamente para la Fase 3.10.
+     - Cero escrituras en la base de datos de producción `cms_ect` (Delta = 0 verificado por centinela pre y post-flight).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.9 — Preflight, aislamiento físico, respaldo y clonación controlada.
+- **JUSTIFICACIÓN:** El paso a pruebas con datos relacionales reales requiere aislamiento absoluto de código (para que pruebas en lab no alteren Git de desarrollo), respaldo verificable antes de cualquier operación, y anonimización para respetar la privacidad sin degradar la topología relacional de WPML.
+- **CONSECUENCIAS:** El laboratorio `lab.ecoterra` cuenta con una réplica exacta, anonimizada y fiel de los 3.403 registros de WPML sobre base de datos `cms_ect_lab`, código físico independiente y respaldo completo, sin que se haya alterado un solo byte en la producción `cms_ect`.
+

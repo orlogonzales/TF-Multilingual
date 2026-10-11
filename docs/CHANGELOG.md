@@ -786,3 +786,36 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Regresiones Core, constructores y migración: Fases 3.7 (49/49), 3.6 (34/34), 3.5 (31/31), 3.4 (31/31), 3.3 (38/38), 3.2 (35/35), 3.1 (27/27), 2.8 (53/53) **100% PASS** (265/265 regresiones).
   - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
   - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
+
+---
+
+## [Fase 3.9] - 2026-10-11
+
+### Preflight, Aislamiento Físico, Respaldo Verificable y Clonación Controlada
+- **Aislamiento Físico del Código (Retiro de Enlace NTFS Junction):**
+  - Retiro seguro y verificado del enlace NTFS Junction (`d:\laragon\www\lab.ecoterra\wp-content\plugins\tf-multilingual`) sin afectar el repositorio de desarrollo (`cms.ecoterra`).
+  - Despliegue de un árbol de código físico independiente en el laboratorio, con checkout Git anclado estrictamente en el baseline certificado `af46d65a226568e6653549ed4f1eea0956189a44` y vendor propio con dependencias optimizadas.
+- **Descubrimiento Dinámico de Prefijo y Estructuras:**
+  - Descubrimiento programático del prefijo real de tablas (`etk_t_`) en el sitio origen `cms.ecoterra` (`cms_ect`), prohibiendo asunciones sobre el prefijo `wp_`.
+  - Configuración consistente de `$table_prefix = 'etk_t_';` en `d:\laragon\www\lab.ecoterra\wp-config.php`.
+- **Respaldo Streaming de Solo Lectura y Protección Fuera del Repositorio:**
+  - Extracción consistente en streaming (17.19 MB) de 28 tablas seleccionadas de `cms_ect`: 22 tablas relacionales de WPML (`etk_t_icl_*`), 5 tablas Core (`etk_t_posts`, `etk_t_postmeta`, `etk_t_terms`, `etk_t_term_taxonomy`, `etk_t_term_relationships`) y configuración (`etk_t_options`).
+  - Almacenamiento seguro en `d:\laragon\www\lab.ecoterra\backups\preflight_backup_cms_ect_snapshot.sql` con `.gitignore` propio, protegido fuera del repositorio del plugin.
+- **Restauración y Anonimización Estricta en `cms_ect_lab`:**
+  - Restauración íntegra de las 22 tablas de WPML y 5 tablas Core en la base de datos exclusiva `cms_ect_lab`.
+  - Purgado total de usuarios productivos en `etk_t_users` y generación de único administrador sintético `admin_lab` (`admin@lab.ecoterra.test`).
+  - Anonimización de correos electrónicos en `etk_t_postmeta` reescribiendo hacia `@lab.ecoterra.test` con recálculo exacto de longitudes serializadas PHP.
+  - Purgado de claves API y secretos de pasarelas de pago en `etk_t_options` (`stripe_%`, `paypal_%`, etc.).
+  - Preservación matemática de los datos WPML: exactamente 3.403 registros en `etk_t_icl_translations` con checksum MD5 `4241ca7e7ec6399a594537cb04790c10`.
+  - Paridad de contenido Core: 4.021 posts y 82 términos restaurados exactamente.
+- **Frontera Estricta de Fase y Bloqueo de Migración:**
+  - Esquema maestro TFML (`etk_t_tfml_*`) inicializado en `cms_ect_lab` con exactamente 0 filas en todas las tablas (`groups`, `elements`, `media`, `strings`).
+  - Bloqueo categórico de ejecución de migración: la importación con datos reales queda reservada exclusivamente para la Fase 3.10.
+  - Cero alteraciones en el origen de producción `cms_ect`: Delta = 0 absoluto en centinela pre y post-flight.
+- **Verificación Integral y Calidad:**
+  - Suite de pruebas unitarias: **519 tests, 1.777 assertions, 0 errors, 0 failures, 0 warnings, 0 deprecations**.
+  - Estándares WPCS / PHPCS: **167/167 archivos analizados, 0 errors, 0 warnings**.
+  - Verificación en laboratorio real WordPress (`scratch/verify_fase_3_9.php`): **60/60 assertions passed (100%)**.
+  - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+  - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
+
