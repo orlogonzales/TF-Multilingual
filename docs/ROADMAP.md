@@ -1,4 +1,4 @@
-﻿# ROADMAP TÃ‰CNICO OFICIAL â€” TF MULTILINGUAL
+# ROADMAP TÃ‰CNICO OFICIAL â€” TF MULTILINGUAL
 **Documento:** ROADMAP.md
 **Proyecto:** TF Multilingual (`tf-multilingual`)
 **VersiÃ³n:** 1.0.0
@@ -78,10 +78,11 @@ El desarrollo de TF Multilingual estÃ¡ estructurado en microfases controladas 
 - Columnas personalizadas en listados de posts y tÃ©rminos.
 - Endpoints REST de soporte editorial bajo `/wp-json/tf-multilingual/v1/`.
 
-### Fase 13.0: Motor de MigraciÃ³n Desacoplado
-- ImplementaciÃ³n del motor batch reanudable e independiente del transporte (`MigrationBatchRunner`).
-- Adaptador de migraciÃ³n de solo lectura para WPML (validado contra el laboratorio `cms.ecoterra`).
-- Adaptador de migraciÃ³n para Polylang.
+### Fase 13.0: Motor de Migración Desacoplado (Fases 3.1 a 3.10 Certificadas)
+- Implementación del motor transaccional reanudable, con control de concurrencia e idempotencia (`MigrationManager`, `WpmlMigrationPlanner`, `WpmlMigrationExecutor`, `WpmlMigrationRollbackService`).
+- Adaptador de migración de solo lectura para WPML validado contra el laboratorio real `cms_ect_lab` (22 tablas WPML, 3.403 registros, 4.021 posts, 82 terms).
+- Preflight dinámico, aislamiento físico, respaldo seguro fuera de DocumentRoot, certificación de restauración verificable y plan piloto determinista dry-run completados al 100% (Fase 3.10).
+- Adaptador de migración para Polylang (inventario analizado).
 
 ### Fase 14.0: Hardening, AuditorÃ­a y Cierre MVP
 - Pruebas de integraciÃ³n, concurrencia y lÃ­mites de memoria.

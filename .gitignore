@@ -23,6 +23,9 @@ Thumbs.db
 # Logs and scratch
 *.log
 /scratch/*
+!/scratch/verify_fase_3_10.php
+!/scratch/test_restore_verify.php
+!/scratch/execute_lab_planner_inventory.php
 !/scratch/verify_fase_3_9.php
 !/scratch/clonar_a_lab_aislado.php
 !/scratch/preflight_discovery.php

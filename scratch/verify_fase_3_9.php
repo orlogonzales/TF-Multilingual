@@ -112,8 +112,10 @@ assert_true( 40 === strlen( $host_git_head ) && ctype_xdigit( $host_git_head ), 
 // -------------------------------------------------------------------------
 echo "\n--- Control 2: Verificación de Respaldo y Salvaguardas Estructurales ---\n";
 
-$backup_file = $lab_dir . '/backups/preflight_backup_cms_ect_snapshot.sql';
-assert_true( file_exists( $backup_file ), 'Archivo de respaldo SQL existe en d:/laragon/www/lab.ecoterra/backups/' );
+$backup_file = file_exists( 'd:/laragon/backup/tfml_staging/preflight_backup_cms_ect_snapshot.sql' )
+	? 'd:/laragon/backup/tfml_staging/preflight_backup_cms_ect_snapshot.sql'
+	: $lab_dir . '/backups/preflight_backup_cms_ect_snapshot.sql';
+assert_true( file_exists( $backup_file ), 'Archivo de respaldo SQL existe en ruta segura' );
 
 $backup_size = (int) filesize( $backup_file );
 assert_true( $backup_size > 15000000, "Tamaño del respaldo es consistente ({$backup_size} bytes, > 15 MB)" );
@@ -129,17 +131,17 @@ assert_true( strpos( $header_sample, 'TF Multilingual' ) !== false, 'Encabezado 
 assert_true( strpos( $header_sample, 'cms_ect' ) !== false, 'Origen del respaldo documentado formalmente como cms_ect' );
 
 // Verify HTTP access protection for backups directory.
-$backup_dir = dirname( $backup_file );
-assert_true( file_exists( $backup_dir . '/.htaccess' ), 'Archivo .htaccess de bloqueo HTTP existe en backups/' );
-$htaccess_content = (string) file_get_contents( $backup_dir . '/.htaccess' );
+$backup_protect_dir = $lab_dir . '/backups';
+assert_true( file_exists( $backup_protect_dir . '/.htaccess' ), 'Archivo .htaccess de bloqueo HTTP existe en backups/' );
+$htaccess_content = (string) file_get_contents( $backup_protect_dir . '/.htaccess' );
 assert_true( strpos( $htaccess_content, 'Require all denied' ) !== false || strpos( $htaccess_content, 'Deny from all' ) !== false, 'Reglas de denegación de acceso web configuradas en .htaccess' );
 
-assert_true( file_exists( $backup_dir . '/index.php' ), 'Archivo index.php de protección 403 existe en backups/' );
-$index_php_content = (string) file_get_contents( $backup_dir . '/index.php' );
+assert_true( file_exists( $backup_protect_dir . '/index.php' ), 'Archivo index.php de protección 403 existe en backups/' );
+$index_php_content = (string) file_get_contents( $backup_protect_dir . '/index.php' );
 assert_true( strpos( $index_php_content, '403' ) !== false, 'index.php de backups/ configurado para responder HTTP 403 Forbidden' );
 
-assert_true( file_exists( $backup_dir . '/web.config' ), 'Archivo web.config para IIS existe en backups/' );
-$web_config_content = (string) file_get_contents( $backup_dir . '/web.config' );
+assert_true( file_exists( $backup_protect_dir . '/web.config' ), 'Archivo web.config para IIS existe en backups/' );
+$web_config_content = (string) file_get_contents( $backup_protect_dir . '/web.config' );
 assert_true( strpos( $web_config_content, '<deny users="*"' ) !== false, 'web.config de backups/ deniega acceso a todos los usuarios' );
 
 // -------------------------------------------------------------------------

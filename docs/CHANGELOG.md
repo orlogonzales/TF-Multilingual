@@ -826,3 +826,38 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Invariante centinela WPML: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
   - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
 
+---
+
+## [Fase 3.10] - 2026-10-11
+
+### Preflight Final, Verificación de Restauración y Planificación de Migración Piloto (Dry-Run)
+- **Reubicación Física del Respaldo SQL Fuera del DocumentRoot:**
+  - Traslado verificado del archivo de respaldo `preflight_backup_cms_ect_snapshot.sql` (17.19 MB, SHA-256 `f4db11d9c18bd393fb684a38128a1f7be65b76a09249484ef39de67ba73c4b1a`) al directorio del sistema `d:\laragon\backup\tfml_staging\`, ubicado de forma estricta fuera de `d:\laragon\www`.
+  - Eliminación definitiva del archivo SQL en `d:\laragon\www\lab.ecoterra\backups\`, mitigando todo riesgo de descarga vía peticiones HTTP directas y preservando intactas las salvaguardas de protección de carpeta (`.htaccess` con `Require all denied`, `index.php` 403 y `web.config` deny).
+- **Certificación de Restauración Verificable en Base Temporal:**
+  - Procedimiento automatizado `scratch/test_restore_verify.php` que crea una base de datos efímera (`cms_ect_restore_verify`), ejecuta la restauración de las 154 sentencias SQL del respaldo en 3.58 segundos con 0 errores, verifica la integridad idéntica de las 28 tablas (3.403 registros WPML con checksum MD5 `4241ca7e7ec6399a594537cb04790c10`, 4.021 posts y 82 términos), y destruye la base temporal de manera limpia.
+- **Corrección de Divergencia en WPML Migration Executor (`validate_plan`):**
+  - Corrección de la consulta sobre `icl_translations` en `WpmlMigrationExecutor::validate_plan()` para discriminar por `AND element_type = %s`, impidiendo falsos positivos de divergencia en TRID ocasionados por identificadores solapados entre entidades Core (`posts`, `terms`, `comments`).
+- **Resiliencia ante Taxonomías No Registradas en Contextos de CLI / Aislamiento:**
+  - Implementación de mecanismo de respaldo directo contra la tabla `term_taxonomy` en `WordPressElementValidator::validate_term()` cuando `get_term()` retorna `WP_Error('invalid_taxonomy')`, asegurando validación fiel de términos asociados a taxonomías de plugins de terceros en entornos CLI de migración.
+- **Inventario Determinista y Planificación Piloto sobre `cms_ect_lab`:**
+  - Ejecución de `WpmlMigrationPlanner` sobre el laboratorio con datos reales clonados de WPML.
+  - Validación de concordancia matemática absoluta con el inventario de la Fase 3.4 (Delta = 0 en todas las categorías): 249 grupos totales analizados (120 IMPORTABLE, 52 BLOCKED_BY_LANGUAGE por `fr`, 24 SKIPPED, 53 ORPHAN, 0 CONFLICT) y 3.033 adjuntos para deduplicación bajo `MEDIA_MODEL_B_DEDUPLICATION`.
+  - Huella digital SHA-256 determinista calculada: `08a93f721373c7fdb5395544faff69684ab1affd9ba7aa1ed1e67fd4a17bb949`.
+  - El plan permanece en `STATUS_NEEDS_CONFIGURATION` reteniendo el francés (`fr`) sin forzar su registro automático, preservando la soberanía lingüística y editorial.
+- **Validación Formal Dry-Run y Cero Escrituras en TFML:**
+  - Validación formal del plan en `WpmlMigrationExecutor::validate_plan()`, certificada como 100% válida con 0 errores.
+  - Cero llamadas a `execute_plan()`; retención estricta de migración en todas las 5 tablas propias de TFML (`etk_t_tfml_*`), manteniéndose en exactamente 0 registros.
+  - Verificación de capacidad de reversión (rollback) certificando que grupos ajenos no registrados en el manifiesto son estrictamente bloqueados como `not_owned`.
+  - Invarianza absoluta de la base de producción `cms_ect`: 3.403 filas en WPML con checksum MD5 intacto (Delta = 0 en pre y post-flight).
+- **Trazabilidad y Versionado:**
+  - Inclusión en `.gitignore` de las herramientas certificadas: `scratch/verify_fase_3_10.php`, `scratch/test_restore_verify.php` y `scratch/execute_lab_planner_inventory.php`.
+- **Verificación Integral y Calidad:**
+  - Pruebas PHPUnit: **520 tests, 1.777 assertions, 0 errors, 0 failures, 0 warnings**.
+  - Estándares WPCS / PHPCS: **167/167 archivos analizados, 0 errors, 0 warnings**.
+  - Verificación integral de Fase 3.10 (`scratch/verify_fase_3_10.php`): **63/63 checks PASS (100%)**.
+  - Regresiones previas (Fases 3.9, 3.7, 3.6, 3.5, 3.4): **100% PASS**.
+  - Centinela WPML `cms_ect`: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+  - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
+
+

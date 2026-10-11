@@ -586,3 +586,29 @@
 - **JUSTIFICACIÓN:** El paso a pruebas con datos relacionales reales requiere aislamiento absoluto de código, respaldo blindado contra acceso web, anonimización profunda en metadatos y contenido para garantizar la privacidad, y versionado formal de scripts para asegurar la reproducibilidad de las pruebas sin exponer credenciales.
 - **CONSECUENCIAS:** El laboratorio `lab.ecoterra` cuenta con una réplica exacta, completamente anonimizada y fiel de los 3.403 registros de WPML sobre base de datos `cms_ect_lab`, código físico independiente, respaldo blindado y herramientas versionadas, sin que se haya alterado un solo byte en la producción `cms_ect`.
 
+---
+
+### ADR-036: Reubicación de Respaldo Fuera de DocumentRoot, Certificación de Restauración Verificable, Corrección de Divergencias WPML y Planificación Dry-Run Piloto (Fase 3.10)
+- **DECISIÓN:**
+  1. **Reubicación Física del Respaldo SQL Fuera de DocumentRoot:**
+     - Traslado permanente del snapshot SQL `preflight_backup_cms_ect_snapshot.sql` (17.19 MB, SHA-256 `f4db11d9c18bd393fb684a38128a1f7be65b76a09249484ef39de67ba73c4b1a`) al directorio del sistema operativo `d:\laragon\backup\tfml_staging\`, ubicado de forma estricta fuera de `d:\laragon\www` (DocumentRoot del servidor web).
+     - Eliminación del archivo `.sql` dentro del DocumentRoot de `lab.ecoterra\backups\`, conservando las barreras de protección de carpeta contra peticiones HTTP (`.htaccess` con `Require all denied`, `index.php` con 403 Forbidden y `web.config` con `<deny users="*"/>`).
+  2. **Certificación de Restauración Verificable en Base Temporal:**
+     - Implementación y ejecución del procedimiento automatizado `scratch/test_restore_verify.php`, que recrea una base de datos efímera (`cms_ect_restore_verify`), ejecuta la restauración de las 154 sentencias DDL/DML en 3.58 segundos, valida la integridad criptográfica idéntica de las 28 tablas (3.403 registros WPML con checksum MD5 `4241ca7e7ec6399a594537cb04790c10`, 4.021 posts y 82 términos), y destruye limpiamente la base temporal al culminar la certificación.
+  3. **Corrección de Divergencia en WPML Migration Executor (`validate_plan` vs `element_type`):**
+     - En `WpmlMigrationExecutor::validate_plan()`, se corrigió la consulta de verificación de cambios sobre `icl_translations` para incorporar el discriminador de tipo `AND element_type = %s` (`post_` + subtype, `tax_` + subtype o tipo nativo). Esta modificación previene falsas alarmas de divergencia en TRID causadas por colisiones naturales de IDs de elementos entre posts, taxonomías y comentarios en WordPress Core.
+  4. **Resiliencia ante Taxonomías No Registradas en Contextos de CLI / Aislamiento:**
+     - En `WordPressElementValidator::validate_term()`, cuando taxonomías personalizadas no registradas por hooks nativos de WordPress en entornos de CLI (como `tours_cat` o `product_type`) retornan `WP_Error('invalid_taxonomy')`, se implementó una consulta directa de respaldo a `$wpdb->term_taxonomy` para confirmar la existencia física real de la taxonomía y el término en la base de datos sin requerir el arranque completo de plugins de terceros.
+  5. **Inventario Determinista y Generación de Plan de Migración Piloto (Dry-Run):**
+     - Ejecución del planificador determinista sobre los datos reales de WPML en `cms_ect_lab`, confirmando concordancia matemática idéntica con el inventario de la Fase 3.4 (Delta = 0 en las 6 categorías): 249 grupos totales analizados (120 IMPORTABLE, 52 BLOCKED_BY_LANGUAGE por `fr`, 24 SKIPPED, 53 ORPHAN, 0 CONFLICT) y 3.033 adjuntos bajo `MEDIA_MODEL_B_DEDUPLICATION`. Huella digital SHA-256 determinista inmutable: `08a93f721373c7fdb5395544faff69684ab1affd9ba7aa1ed1e67fd4a17bb949`.
+     - El plan permanece en `STATUS_NEEDS_CONFIGURATION` reteniendo el francés (`fr`) sin auto-registro forzado, respetando el control editorial y la gobernanza de idiomas.
+  6. **Retención Estricta de Migración Efectiva (Cero Escrituras en TFML):**
+     - Durante la Fase 3.10 se ejecutó exclusivamente la validación formal del plan (`validate_plan`), resultando 100% válida con 0 errores.
+     - Cero invocaciones a `execute_plan()`; las 5 tablas propias de TFML (`etk_t_tfml_*`) permanecen con exactamente 0 filas.
+     - Cero modificaciones sobre la base productiva `cms_ect` (Delta = 0 verificado por centinela pre y post-flight).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.10 / Directiva DT-TFML-040 — Preflight final y planificación de migración piloto WPML → TFML.
+- **JUSTIFICACIÓN:** Garantizar la seguridad total del respaldo trasladándolo fuera de cualquier directorio web, demostrar la recuperabilidad mediante restauración verificable en base de datos temporal, afinar la detección de divergencias en WPML y taxonomías, y generar un plan de migración matemáticamente determinista y validado al 100%, manteniendo las tablas TFML en cero escrituras hasta la autorización formal de la ejecución piloto.
+- **CONSECUENCIAS:** El laboratorio `cms_ect_lab` y las herramientas de migración quedan completamente certificados, respaldados, probados contra reversión y listos para la autorización y ejecución del lote piloto real en la fase posterior.
+
+

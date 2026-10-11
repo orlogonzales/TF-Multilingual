@@ -280,10 +280,12 @@ class WpmlMigrationExecutor {
 
 				// 3. WPML source divergence check (if icl_translations exists).
 				if ( $has_icl ) {
-					$row = $this->db->get_row(
+					$wpml_element_type = ( 'post' === $element_type ) ? 'post_' . $subtype : ( 'term' === $element_type ? 'tax_' . $subtype : $subtype );
+					$row               = $this->db->get_row(
 						$this->db->prepare(
-							"SELECT trid, language_code FROM {$icl_table} WHERE element_id = %d LIMIT 1",
-							$element_id
+							"SELECT trid, language_code FROM {$icl_table} WHERE element_id = %d AND element_type = %s LIMIT 1",
+							$element_id,
+							$wpml_element_type
 						)
 					);
 

@@ -105,6 +105,23 @@ class WordPressElementValidator {
 
 		$term = get_term( $term_id, $expected_taxonomy );
 		if ( function_exists( 'is_wp_error' ) && is_wp_error( $term ) ) {
+			// Fallback: If custom taxonomy is not registered in current request/CLI context,
+			// verify directly against wpdb term_taxonomy table if available.
+			if ( 'invalid_taxonomy' === $term->get_error_code() ) {
+				global $wpdb;
+				if ( null !== $wpdb && isset( $wpdb->term_taxonomy ) ) {
+					$db_tax = $wpdb->get_var(
+						$wpdb->prepare(
+							"SELECT taxonomy FROM {$wpdb->term_taxonomy} WHERE term_id = %d AND taxonomy = %s LIMIT 1",
+							$term_id,
+							$expected_taxonomy
+						)
+					);
+					if ( $db_tax === $expected_taxonomy ) {
+						return;
+					}
+				}
+			}
 			throw InvalidTranslationElementException::for_non_existent_entity( 'term', $term_id );
 		}
 
