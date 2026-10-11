@@ -872,4 +872,68 @@ class WpmlMigrationExecutorTest extends TestCase {
 		$this->assertSame( 10, $saved_cp->get_last_processed_trid() );
 		$this->assertSame( MigrationCheckpoint::STATUS_COMPLETED, $saved_cp->get_status() );
 	}
+
+	/**
+	 * Test: Execution rejects plan with STATUS_NEEDS_CONFIGURATION.
+	 */
+	public function test_execution_rejects_unready_plan_status(): void {
+		$db       = $this->create_mock_db();
+		$registry = $this->create_test_registry();
+		$executor = new WpmlMigrationExecutor( $db, null, $registry );
+		$executor->set_authorized( true );
+
+		$unready_plan = new MigrationPlan(
+			array(
+				'source'            => 'wpml',
+				'status'            => MigrationPlan::STATUS_NEEDS_CONFIGURATION,
+				'missing_languages' => array( 'fr' ),
+				'planned_groups'    => array(),
+			)
+		);
+
+		$this->expectException( MigrationPlanValidationException::class );
+		$this->expectExceptionMessage( 'NEEDS_CONFIGURATION' );
+
+		$executor->execute_batch( $unready_plan );
+	}
+
+	/**
+	 * Test: Derived partial plan with non-importable group fails validation.
+	 */
+	public function test_partial_plan_with_invalid_group_fails_validation(): void {
+		$db       = $this->create_mock_db();
+		$registry = $this->create_test_registry();
+		$schema   = $this->createMock( SchemaManager::class );
+		$schema->method( 'is_installed' )->willReturn( true );
+
+		$executor = new WpmlMigrationExecutor(
+			$db,
+			null,
+			$registry,
+			null,
+			null,
+			null,
+			$schema
+		);
+
+		$bad_partial = new MigrationPlan(
+			array(
+				'source'         => 'wpml',
+				'status'         => MigrationPlan::STATUS_READY,
+				'is_partial'     => true,
+				'planned_groups' => array(
+					array(
+						'trid'           => 99,
+						'element_type'   => 'post',
+						'subtype'        => 'post',
+						'classification' => MigrationPlan::CLASSIFICATION_BLOCKED_BY_LANGUAGE,
+					),
+				),
+			)
+		);
+
+		$res = $executor->validate_plan( $bad_partial );
+		$this->assertFalse( $res['valid'] );
+		$this->assertStringContainsString( 'no elegible', $res['errors'][0] );
+	}
 }

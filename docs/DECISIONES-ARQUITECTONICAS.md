@@ -611,4 +611,41 @@
 - **JUSTIFICACIÓN:** Garantizar la seguridad total del respaldo trasladándolo fuera de cualquier directorio web, demostrar la recuperabilidad mediante restauración verificable en base de datos temporal, afinar la detección de divergencias en WPML y taxonomías, y generar un plan de migración matemáticamente determinista y validado al 100%, manteniendo las tablas TFML en cero escrituras hasta la autorización formal de la ejecución piloto.
 - **CONSECUENCIAS:** El laboratorio `cms_ect_lab` y las herramientas de migración quedan completamente certificados, respaldados, probados contra reversión y listos para la autorización y ejecución del lote piloto real en la fase posterior.
 
+---
+
+### ADR-037: Gobernanza de Planes Incompletos, Derivación Criptográfica de Planes Piloto/Parciales y Preparación de Ejecución Piloto Transaccional (Fase 3.11)
+- **DECISIÓN:**
+  1. **Auditoría y Blindaje del Contrato de `STATUS_NEEDS_CONFIGURATION` en el Ejecutor:**
+     - Se establece la regla soberana de que un plan de migración con estado `NEEDS_CONFIGURATION` (o `BLOCKED`) **NUNCA** puede ser ejecutado directamente en su totalidad por `WpmlMigrationExecutor::execute_batch()` o `MigrationManager::execute_plan()`.
+     - La presencia de grupos importables en un plan no confiere autorización implícita para ignorar dependencias lingüísticas no configuradas (`fr`). Todo intento de ejecutar un plan incompleto es rechazado de inmediato arrojando `MigrationPlanValidationException`.
+  2. **Mecanismo Formal de Derivación de Planes Parciales / Piloto (`derive_partial_plan`):**
+     - Se implementa el método soberano `MigrationPlan::derive_partial_plan(array $selected_trids, string $label = 'pilot')`:
+       - Preserva intacto e inmutable el plan matriz original (sus 249 grupos, sus clasificaciones y su huella SHA-256 `08a93f721373c7fdb5395544faff69684ab1affd9ba7aa1ed1e67fd4a17bb949`).
+       - Valida que todos los TRIDs solicitados existan en el plan matriz y pertenezcan estrictamente a la clasificación `CLASSIFICATION_IMPORTABLE` (rechazando con `InvalidArgumentException` cualquier grupo bloqueado, huérfano o excluido).
+       - Otorga al plan derivado el estado `STATUS_READY`, con dependencias de idioma vacías (`missing_languages = []`) ya que sus elementos solo utilizan idiomas activos (`es` y `en`).
+       - Establece un linaje criptográfico verificable vinculando `parent_fingerprint` con la huella del plan matriz, y marcando `is_partial = true`.
+       - Genera su propia huella digital SHA-256 inmutable calculada deterministamente sobre sus grupos seleccionados ordenados por TRID ascendente.
+  3. **Selección del Lote Piloto Representativo (5 grupos / 9 elementos):**
+     - Se selecciona un lote piloto calibrado y verificable de 5 grupos editoriales reales:
+       1. `TRID 4575`: Término de taxonomía `tours_cat`, Canónico ID 41 (`es`), Traducción ID 47 (`en`).
+       2. `TRID 9238`: Término de taxonomía `tours_cat`, Canónico ID 46 (`es`), Traducción ID 48 (`en`).
+       3. `TRID 9239`: CPT `tours`, Canónico ID 5286 (`es`), Traducción ID 5287 (`en`).
+       4. `TRID 9247`: CPT `tours`, Canónico ID 5303 (`es`), Traducción ID 5304 (`en`).
+       5. `TRID 4338`: Post type `page`, Canónico ID 4338 (`es`).
+     - Huella digital SHA-256 del plan piloto: `30742abbc3af9267c826aef6c24875756e829971df65993553ec75d2aa55f711`.
+  4. **Comprobación Previa de Correspondencia Core y WPML:**
+     - Verificación exhaustiva de que los 5 TRIDs existen en `etk_t_icl_translations`, que los posts 5286, 5287, 5303, 5304, 4338 existen en `etk_t_posts` con estado activo (no papelera), y que los términos 41, 47, 46, 48 existen físicamente en `etk_t_terms` y `etk_t_term_taxonomy`.
+  5. **Validación Dry-Run del Lote Piloto y Retención de Escrituras:**
+     - Validación formal mediante `WpmlMigrationExecutor::validate_plan()` certificada al 100% (0 errores).
+     - Retención absoluta de llamadas a `execute_plan()`; las 5 tablas maestras `etk_t_tfml_*` en `cms_ect_lab` permanecen con exactamente 0 registros.
+     - Cero escrituras en `cms_ect` (Centinela WPML pre y post-flight verificado con Delta = 0 absoluto).
+  6. **Infraestructura de Checkpoints, Manifiestos y Protección de Rollback:**
+     - Checkpoint configurado y serializable para el lote piloto de 5 elementos.
+     - Protección de reversión validada: todo grupo no registrado en el manifiesto de la ejecución es estrictamente bloqueado como `not_owned`.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.11 / Directiva DT-TFML-041 — Preparación de ejecución piloto transaccional.
+- **JUSTIFICACIÓN:** Separar formalmente el inventario matriz incompleto del plan piloto ejecutable previene ejecuciones inadvertidas de datos con dependencias no resueltas, garantiza la trazabilidad criptográfica completa de cualquier subconjunto y deja preparado un lote piloto representativo, verificado y reversible.
+- **CONSECUENCIAS:** El sistema cuenta con capacidad formal para derivar planes parciales auditables y autorizados, manteniendo intacto el inventario general y garantizando que la ejecución piloto real solo procederá tras la autorización expresa del usuario.
+
+
 

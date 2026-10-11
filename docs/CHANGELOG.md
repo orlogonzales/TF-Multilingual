@@ -860,4 +860,45 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Centinela WPML `cms_ect`: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
   - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
 
+---
+
+## [Fase 3.11] - 2026-10-11
+
+### Gobernanza de Planes Incompletos, Derivación Criptográfica y Preparación de Ejecución Piloto
+- **Gobernanza de Planes y Bloqueo de Ejecución de Estados Incompletos:**
+  - Blindaje del contrato de ejecución en `WpmlMigrationExecutor::execute_batch()` y `MigrationManager::execute_plan()`: los planes en estado `STATUS_NEEDS_CONFIGURATION` o `STATUS_BLOCKED` son categóricamente rechazados arrojando `MigrationPlanValidationException`.
+  - La presencia de grupos importables en un plan matriz no permite ignorar dependencias no resueltas; la ejecución de subconjuntos exige formalmente un plan derivado.
+- **Mecanismo de Derivación de Planes Parciales / Piloto (`derive_partial_plan`):**
+  - Implementación del método soberano `MigrationPlan::derive_partial_plan(array $selected_trids, string $label = 'pilot')`.
+  - Invarianza del plan matriz: el inventario de 249 grupos, sus clasificaciones y su huella digital SHA-256 (`08a93f721373c7fdb5395544faff69684ab1affd9ba7aa1ed1e67fd4a17bb949`) permanecen estrictamente inmutables.
+  - Validación de elegibilidad: los TRIDs seleccionados deben existir y estar clasificados como `CLASSIFICATION_IMPORTABLE` (los grupos bloqueados, huérfanos o excluidos son rechazados con `InvalidArgumentException`).
+  - El plan derivado adquiere estado formal `STATUS_READY`, con dependencias de idioma vacías (`missing_languages = []`), linaje criptográfico `parent_fingerprint` y huella SHA-256 propia calculada deterministamente.
+- **Definición del Lote Piloto Representativo (5 grupos / 9 elementos):**
+  - Construcción del plan piloto calibrado (`pilot-batch-1`):
+    - `TRID 4575` (`term`, `tours_cat`): Canónico 41 (`es`), Traducción 47 (`en`).
+    - `TRID 9238` (`term`, `tours_cat`): Canónico 46 (`es`), Traducción 48 (`en`).
+    - `TRID 9239` (`post`, `tours`): Canónico 5286 (`es`), Traducción 5287 (`en`).
+    - `TRID 9247` (`post`, `tours`): Canónico 5303 (`es`), Traducción 5304 (`en`).
+    - `TRID 4338` (`post`, `page`): Canónico 4338 (`es`).
+  - Huella digital SHA-256 del plan piloto: `30742abbc3af9267c826aef6c24875756e829971df65993553ec75d2aa55f711`.
+- **Verificación Previa de Correspondencia Core y WPML:**
+  - Comprobación exhaustiva en `cms_ect_lab` de la existencia física y vigencia de los 5 TRIDs en `etk_t_icl_translations`, los posts 5286, 5287, 5303, 5304, 4338 en `etk_t_posts` (estado activo, no trash), y los términos 41, 47, 46, 48 en `etk_t_terms` y `etk_t_term_taxonomy`.
+- **Validación Dry-Run del Plan Piloto y Cero Escrituras:**
+  - Validación formal en `WpmlMigrationExecutor::validate_plan()` certificada al 100% con 0 errores.
+  - Retención absoluta de llamadas a `execute_plan()`; las 5 tablas de TFML en `cms_ect_lab` permanecen con exactamente 0 filas.
+  - Invarianza de `cms_ect`: 3.403 filas en WPML con checksum intacto (Delta = 0 en pre y post-flight).
+- **Checkpoints, Manifiestos y Protección de Rollback:**
+  - Checkpoint estructurado y serializable para el lote piloto de 5 elementos.
+  - Prueba de titularidad en `WpmlMigrationRollbackService`: los grupos ajenos no registrados en el manifiesto son incondicionalmente bloqueados como `not_owned` (la bandera `force = true` no puede vulnerar grupos ajenos).
+- **Trazabilidad y Versionado:**
+  - Registro de `scratch/verify_fase_3_11.php` en `.gitignore`.
+- **Verificación Integral y Calidad:**
+  - Pruebas PHPUnit: **526 tests, 1.798 assertions, 0 errors, 0 failures, 0 warnings**.
+  - Estándares WPCS / PHPCS: **167/167 archivos analizados, 0 errors, 0 warnings**.
+  - Verificación integral de Fase 3.11 (`scratch/verify_fase_3_11.php`): **60/60 checks PASS (100%)**.
+  - Regresiones previas (Fases 3.10, 3.9, 3.7, 3.6, 3.5, 3.4): **100% PASS**.
+  - Centinela WPML `cms_ect`: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+  - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
+
+
 

@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace TF\Multilingual\Migration;
 
+use InvalidArgumentException;
+
 /**
  * Class MigrationPlan
  *
@@ -124,17 +126,41 @@ class MigrationPlan {
 	private array $planned_groups;
 
 	/**
+	 * Cryptographic fingerprint of the parent plan if derived as a partial/pilot plan.
+	 *
+	 * @var string|null
+	 */
+	private ?string $parent_fingerprint;
+
+	/**
+	 * Whether this plan is an explicitly derived partial/pilot plan.
+	 *
+	 * @var bool
+	 */
+	private bool $is_partial;
+
+	/**
+	 * Optional label describing the partial/pilot plan.
+	 *
+	 * @var string
+	 */
+	private string $label;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param array<string, mixed> $data Initialization data.
 	 */
 	public function __construct( array $data ) {
-		$this->source            = (string) ( $data['source'] ?? 'wpml' );
-		$this->status            = (string) ( $data['status'] ?? self::STATUS_BLOCKED );
-		$this->missing_languages = (array) ( $data['missing_languages'] ?? array() );
-		$this->summary           = (array) ( $data['summary'] ?? array() );
-		$this->media_plan        = (array) ( $data['media_plan'] ?? array() );
-		$this->planned_groups    = (array) ( $data['planned_groups'] ?? array() );
+		$this->source             = (string) ( $data['source'] ?? 'wpml' );
+		$this->status             = (string) ( $data['status'] ?? self::STATUS_BLOCKED );
+		$this->missing_languages  = (array) ( $data['missing_languages'] ?? array() );
+		$this->summary            = (array) ( $data['summary'] ?? array() );
+		$this->media_plan         = (array) ( $data['media_plan'] ?? array() );
+		$this->planned_groups     = (array) ( $data['planned_groups'] ?? array() );
+		$this->parent_fingerprint = isset( $data['parent_fingerprint'] ) ? (string) $data['parent_fingerprint'] : null;
+		$this->is_partial         = ! empty( $data['is_partial'] );
+		$this->label              = (string) ( $data['label'] ?? '' );
 	}
 
 	/**
@@ -216,6 +242,119 @@ class MigrationPlan {
 	}
 
 	/**
+	 * Checks whether this plan is an explicitly derived partial/pilot plan.
+	 *
+	 * @return bool
+	 */
+	public function is_partial(): bool {
+		return $this->is_partial;
+	}
+
+	/**
+	 * Gets parent plan cryptographic fingerprint if partial.
+	 *
+	 * @return string|null
+	 */
+	public function get_parent_fingerprint(): ?string {
+		return $this->parent_fingerprint;
+	}
+
+	/**
+	 * Gets the label assigned to this plan.
+	 *
+	 * @return string
+	 */
+	public function get_label(): string {
+		return $this->label;
+	}
+
+	/**
+	 * Derives a valid, partial/pilot migration plan for an explicit subset of importable groups.
+	 *
+	 * Guarantees that:
+	 * 1. The original plan is untouched and preserved.
+	 * 2. All selected TRIDs must exist in the original plan.
+	 * 3. All selected TRIDs must be classified as CLASSIFICATION_IMPORTABLE (no blocked/orphan/skipped groups allowed).
+	 * 4. The derived plan receives STATUS_READY because all selected groups have active, verified language pairs.
+	 * 5. Lineage is cryptographically bound to the parent plan via parent_fingerprint.
+	 *
+	 * @param array<int, int> $selected_trids Array of TRIDs to include in the partial/pilot plan.
+	 * @param string          $label          Human-readable label for the pilot batch.
+	 * @return self New immutable partial migration plan.
+	 * @throws InvalidArgumentException If selected TRIDs are empty or contain invalid/unimportable groups.
+	 */
+	public function derive_partial_plan( array $selected_trids, string $label = 'pilot' ): self {
+		if ( empty( $selected_trids ) ) {
+			throw new InvalidArgumentException( 'No se puede derivar un plan parcial con una lista vacía de TRIDs.' );
+		}
+
+		$selected_trids_map = array_fill_keys( array_map( 'intval', $selected_trids ), true );
+		$indexed_groups     = array();
+		foreach ( $this->planned_groups as $group ) {
+			$indexed_groups[ (int) ( $group['trid'] ?? 0 ) ] = $group;
+		}
+
+		$filtered_groups = array();
+		$total_elements  = 0;
+
+		foreach ( array_keys( $selected_trids_map ) as $trid ) {
+			if ( ! isset( $indexed_groups[ $trid ] ) ) {
+				throw new InvalidArgumentException(
+					sprintf( 'El TRID %d no existe en el plan de migración original.', $trid )
+				);
+			}
+
+			$group = $indexed_groups[ $trid ];
+			if ( self::CLASSIFICATION_IMPORTABLE !== ( $group['classification'] ?? '' ) ) {
+				throw new InvalidArgumentException(
+					sprintf(
+						'El TRID %d no es elegible para el plan parcial: su clasificación es "%s" (se requiere "%s").',
+						$trid,
+						$group['classification'] ?? '',
+						self::CLASSIFICATION_IMPORTABLE
+					)
+				);
+			}
+
+			$filtered_groups[] = $group;
+			$total_elements   += count( (array) ( $group['translations'] ?? array() ) );
+		}
+
+		// Sort filtered groups deterministically by TRID ascending.
+		usort( $filtered_groups, fn( array $a, array $b ) => ( (int) $a['trid'] ) <=> ( (int) $b['trid'] ) );
+
+		$derived_summary = array(
+			'total_groups'            => count( $filtered_groups ),
+			'importable_groups'       => count( $filtered_groups ),
+			'blocked_language_groups' => 0,
+			'skipped_groups'          => 0,
+			'conflict_groups'         => 0,
+			'orphan_groups'           => 0,
+			'total_elements'          => $total_elements,
+			'importable_elements'     => $total_elements,
+			'pending_elements'        => 0,
+		);
+
+		return new self(
+			array(
+				'source'             => $this->source,
+				'status'             => self::STATUS_READY,
+				'missing_languages'  => array(),
+				'summary'            => $derived_summary,
+				'media_plan'         => array(
+					'total_attachment_rows' => 0,
+					'strategy'              => $this->media_plan['strategy'] ?? 'MEDIA_MODEL_B_DEDUPLICATION',
+					'description'           => 'Plan parcial derivado: gestión de adjuntos según plan matriz.',
+				),
+				'planned_groups'     => $filtered_groups,
+				'parent_fingerprint' => $this->get_fingerprint(),
+				'is_partial'         => true,
+				'label'              => $label,
+			)
+		);
+	}
+
+	/**
 	 * Computes a deterministic cryptographic fingerprint of the migration plan.
 	 *
 	 * Detects alterations in plan structure, source, language dependencies, or group definitions.
@@ -231,6 +370,12 @@ class MigrationPlan {
 			'media_plan'        => $this->media_plan,
 			'planned_groups'    => $this->planned_groups,
 		);
+
+		if ( $this->is_partial ) {
+			$payload['parent_fingerprint'] = $this->parent_fingerprint;
+			$payload['is_partial']         = true;
+			$payload['label']              = $this->label;
+		}
 
 		$encoded = function_exists( 'wp_json_encode' ) ? wp_json_encode( $payload ) : json_encode( $payload );
 
@@ -253,7 +398,7 @@ class MigrationPlan {
 	 * @return array<string, mixed>
 	 */
 	public function to_array(): array {
-		return array(
+		$data = array(
 			'source'            => $this->source,
 			'status'            => $this->status,
 			'missing_languages' => $this->missing_languages,
@@ -262,5 +407,13 @@ class MigrationPlan {
 			'planned_groups'    => $this->planned_groups,
 			'fingerprint'       => $this->get_fingerprint(),
 		);
+
+		if ( $this->is_partial ) {
+			$data['parent_fingerprint'] = $this->parent_fingerprint;
+			$data['is_partial']         = true;
+			$data['label']              = $this->label;
+		}
+
+		return $data;
 	}
 }

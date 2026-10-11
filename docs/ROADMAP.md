@@ -78,10 +78,11 @@ El desarrollo de TF Multilingual estÃ¡ estructurado en microfases controladas 
 - Columnas personalizadas en listados de posts y tÃ©rminos.
 - Endpoints REST de soporte editorial bajo `/wp-json/tf-multilingual/v1/`.
 
-### Fase 13.0: Motor de Migración Desacoplado (Fases 3.1 a 3.10 Certificadas)
+### Fase 13.0: Motor de Migración Desacoplado (Fases 3.1 a 3.11 Certificadas)
 - Implementación del motor transaccional reanudable, con control de concurrencia e idempotencia (`MigrationManager`, `WpmlMigrationPlanner`, `WpmlMigrationExecutor`, `WpmlMigrationRollbackService`).
 - Adaptador de migración de solo lectura para WPML validado contra el laboratorio real `cms_ect_lab` (22 tablas WPML, 3.403 registros, 4.021 posts, 82 terms).
 - Preflight dinámico, aislamiento físico, respaldo seguro fuera de DocumentRoot, certificación de restauración verificable y plan piloto determinista dry-run completados al 100% (Fase 3.10).
+- Gobernanza de estados incompletos (`NEEDS_CONFIGURATION`), mecanismo formal de derivación de planes parciales (`derive_partial_plan`), preparación y validación dry-run del lote piloto `pilot-batch-1` (Fase 3.11).
 - Adaptador de migración para Polylang (inventario analizado).
 
 ### Fase 14.0: Hardening, AuditorÃ­a y Cierre MVP

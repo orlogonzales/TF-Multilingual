@@ -228,6 +228,19 @@ class WpmlMigrationExecutor {
 			$errors[] = 'El plan de migración no contiene grupos planificados para procesar.';
 		}
 
+		// If plan is partial/derived, all planned groups must strictly be CLASSIFICATION_IMPORTABLE.
+		if ( $plan->is_partial() ) {
+			foreach ( $groups as $group ) {
+				if ( MigrationPlan::CLASSIFICATION_IMPORTABLE !== ( $group['classification'] ?? '' ) ) {
+					$errors[] = sprintf(
+						'El plan parcial derivado contiene el grupo TRID %d no elegible con clasificación "%s".',
+						(int) ( $group['trid'] ?? 0 ),
+						$group['classification'] ?? ''
+					);
+				}
+			}
+		}
+
 		$has_icl   = $this->has_icl_translations_table();
 		$icl_table = $this->db->prefix . 'icl_translations';
 
@@ -363,6 +376,20 @@ class WpmlMigrationExecutor {
 		?string $expected_fingerprint = null
 	): array {
 		$this->assert_authorized();
+
+		// Safety assertion: Only plans in STATUS_READY can be executed.
+		if ( MigrationPlan::STATUS_READY !== $plan->get_status() ) {
+			throw new MigrationPlanValidationException(
+				sprintf(
+					'Ejecución rechazada: El plan de migración tiene estado "%s". %s',
+					$plan->get_status(),
+					MigrationPlan::STATUS_NEEDS_CONFIGURATION === $plan->get_status()
+						? 'El plan general presenta dependencias lingüísticas no configuradas en el inventario. Para ejecutar un lote piloto o parcial seguro, derive un plan explícito mediante derive_partial_plan().'
+						: 'El plan presenta bloqueos críticos en la fuente.'
+				),
+				array( 'plan_status' => $plan->get_status() )
+			);
+		}
 
 		$token = null !== $execution_id ? $execution_id : ( function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : uniqid( 'exec_', true ) );
 
