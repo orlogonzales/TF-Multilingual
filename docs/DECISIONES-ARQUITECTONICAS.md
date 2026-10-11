@@ -647,5 +647,50 @@
 - **JUSTIFICACIÓN:** Separar formalmente el inventario matriz incompleto del plan piloto ejecutable previene ejecuciones inadvertidas de datos con dependencias no resueltas, garantiza la trazabilidad criptográfica completa de cualquier subconjunto y deja preparado un lote piloto representativo, verificado y reversible.
 - **CONSECUENCIAS:** El sistema cuenta con capacidad formal para derivar planes parciales auditables y autorizados, manteniendo intacto el inventario general y garantizando que la ejecución piloto real solo procederá tras la autorización expresa del usuario.
 
+---
+
+### ADR-038: Ejecución Piloto Transaccional WPML → TFML en Laboratorio Real Aislado, Idempotencia Criptográfica y Reversibilidad Completa (Fase 3.12)
+- **DECISIÓN:**
+  1. **Ejecución Piloto Autorizada en Laboratorio Aislado (`cms_ect_lab`, prefijo `etk_t_`):**
+     - Ejecución real transaccional acotada estrictamente al lote `pilot-batch-1` (5 grupos de traducción y 9 elementos editoriales reales):
+       1. `TRID 4575`: Taxonomía `tours_cat`, Canónico ID 41 (`es`), Traducción ID 47 (`en`).
+       2. `TRID 9238`: Taxonomía `tours_cat`, Canónico ID 46 (`es`), Traducción ID 48 (`en`).
+       3. `TRID 9239`: CPT `tours`, Canónico ID 5286 (`es`), Traducción ID 5287 (`en`).
+       4. `TRID 9247`: CPT `tours`, Canónico ID 5303 (`es`), Traducción ID 5304 (`en`).
+       5. `TRID 4338`: Post type `page`, Canónico ID 4338 (`es`).
+     - Huella SHA-256 certificada: `30742abbc3af9267c826aef6c24875756e829971df65993553ec75d2aa55f711`.
+     - Resultado en tablas TFML: exactamente 5 filas en `etk_t_tfml_groups` y 9 filas en `etk_t_tfml_group_elements`.
+  2. **Aislamiento Total de Almacenamiento y Opciones de WordPress:**
+     - Enrutamiento dinámico de `$GLOBALS['wpdb']` a la instancia de laboratorio (`$lab_wpdb`) durante las operaciones de migración para garantizar que las opciones de WordPress (`update_option`, `get_option`, `delete_option`) empleadas por checkpoints (`MigrationCheckpointRepository`), bloqueos (`MigrationExecutionLock`) y manifiestos (`WpmlMigrationRollbackService`) se almacenen estrictamente en `cms_ect_lab.etk_t_options`.
+     - Cero escrituras en la base de datos de origen `cms_ect` (Delta = 0 verificado por centinela pre y post-flight con 3.403 registros y MD5 `4241ca7e7ec6399a594537cb04790c10`).
+  3. **Adopción de Criterios Explícitos de Fallo y Pruebas Negativas (Adenda DT-TFML-042-A):**
+     - Incorporación formal de criterios explícitos de detención inmediata (STOP/FAIL) y matriz estándar de resultados (`PASS`, `FAIL_RECOVERED`, `FAIL_UNRECOVERED`, `BLOCKED`, `NOT_EXECUTED`) en `docs/GOBERNANZA.md`.
+     - Verificación automatizada de rechazos:
+       - N1: Ejecutor no autorizado bloqueado (`MigrationAuthorizationException`).
+       - N2: Plan con huella SHA-256 manipulada rechazado tajantemente (`MigrationPlanValidationException`).
+       - N3: Plan matriz en `STATUS_NEEDS_CONFIGURATION` bloqueado para ejecución directa.
+       - N4: Intento de derivar grupos bloqueados por idiomas faltantes (`fr`) rechazado.
+       - N5: Rollback sobre grupos no pertenecientes al manifiesto bloqueado como `not_owned`.
+  4. **Idempotencia Estricta Demostrada en Base de Datos Real:**
+     - Re-ejecución del mismo plan piloto sobre las tablas ya pobladas:
+       - Cero grupos nuevos y cero elementos duplicados creados.
+       - Los 5 grupos son reportados formalmente con estado `idempotent_skipped`.
+       - Conteo en base de datos inmutable (5 grupos y 9 elementos permanecen constantes).
+  5. **Reversibilidad Total Transaccional (Rollback Completo y Limpieza de Manifiesto):**
+     - Ejecución de `WpmlMigrationRollbackService::rollback_execution()` sobre el reporte piloto:
+       - Eliminación atómica y limpia de los 5 grupos y 9 elementos creados en TFML.
+       - Las 5 tablas TFML (`etk_t_tfml_*`) son restauradas exactamente a 0 registros.
+       - Tablas de WordPress Core (`etk_t_posts` con 4.021 filas y `etk_t_terms` con 82 filas) y de WPML (`etk_t_icl_translations` con 3.403 filas) permanecen 100% inalteradas.
+       - Eliminación automática del manifiesto de ejecución y checkpoint de la tabla de opciones.
+  6. **Capacidad de Recuperación y Re-ejecución Post-Rollback:**
+     - Tras el rollback, la re-ejecución del plan piloto reproduce fielmente los 5 grupos y 9 elementos con 100% de integridad y conciliación verificada, demostrando la capacidad de recuperación total del sistema.
+  7. **Renovación Automática de Checkpoint Completado en Ejecutor:**
+     - Actualización en `WpmlMigrationExecutor::execute_batch()` para reiniciar un checkpoint limpio si el almacenado en base de datos ya tiene estado `STATUS_COMPLETED`, permitiendo re-ejecuciones idempotentes y corridas de validación sin interferencias residuales.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.12 / Directiva DT-TFML-042 y Adenda DT-TFML-042-A — Ejecución piloto transaccional WPML → TFML.
+- **JUSTIFICACIÓN:** Certificar la primera migración real de contenidos con datos de WPML exige comprobar experimentalmente en un entorno aislado no solo que la importación produce los datos correctos, sino que la idempotencia previene duplicaciones, el rollback devuelve el estado a cero sin dañar el Core ni WPML, y el sistema puede recuperarse y re-ejecutarse deterministamente.
+- **CONSECUENCIAS:** La arquitectura transaccional de TF Multilingual queda formalmente validada y certificada con datos reales: el plugin es capaz de migrar posts y términos de WPML, garantizar idempotencia, deshacer la operación limpiamente sin tocar Core ni WPML, y recuperarse ante fallos.
+
+
 
 

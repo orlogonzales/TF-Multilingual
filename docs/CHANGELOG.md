@@ -900,5 +900,47 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Centinela WPML `cms_ect`: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
   - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
 
+---
+
+## [Fase 3.12] - 2026-10-11
+
+### Ejecución Piloto Transaccional WPML → TFML, Idempotencia y Reversibilidad Completa (DT-TFML-042 / ADENDA DT-TFML-042-A)
+- **Ejecución Piloto Autorizada en Laboratorio Aislado (`cms_ect_lab`, prefijo `etk_t_`):**
+  - Ejecución real transaccional acotada al lote `pilot-batch-1` (5 grupos de traducción y 9 elementos editoriales reales) mediante `WpmlMigrationExecutor::run()`:
+    - `TRID 4575` (`term`, `tours_cat`): Canónico 41 (`es`), Traducción 47 (`en`).
+    - `TRID 9238` (`term`, `tours_cat`): Canónico 46 (`es`), Traducción 48 (`en`).
+    - `TRID 9239` (`post`, `tours`): Canónico 5286 (`es`), Traducción 5287 (`en`).
+    - `TRID 9247` (`post`, `tours`): Canónico 5303 (`es`), Traducción 5304 (`en`).
+    - `TRID 4338` (`post`, `page`): Canónico 4338 (`es`).
+  - Huella SHA-256 autorizada: `30742abbc3af9267c826aef6c24875756e829971df65993553ec75d2aa55f711`.
+  - Resultado en base de datos: exactamente 5 registros en `etk_t_tfml_groups` y 9 registros en `etk_t_tfml_group_elements`.
+- **Aislamiento Total de Almacenamiento y Opciones de WordPress:**
+  - Redirección dinámica de `$GLOBALS['wpdb']` a la instancia de laboratorio para garantizar que checkpoints, locks y manifiestos de ejecución se almacenen exclusivamente en `cms_ect_lab.etk_t_options`. CERO escrituras en `cms_ect` (Delta = 0 verificado por centinela pre y post-flight).
+- **Pruebas Negativas y Criterios Explícitos de Fallo (Adenda DT-TFML-042-A):**
+  - Verificación y cumplimiento al 100% de la matriz de fallo:
+    - N1: Ejecutor no autorizado bloqueado (`MigrationAuthorizationException`).
+    - N2: Discrepancia de huella digital SHA-256 rechazada tajantemente (`MigrationPlanValidationException`).
+    - N3: Plan matriz en `STATUS_NEEDS_CONFIGURATION` bloqueado para ejecución directa.
+    - N4: Derivación de grupos bloqueados por dependencias de idiomas (`fr`) rechazada.
+    - N5: Rollback sobre grupos ajenos no registrados en el manifiesto bloqueado como `not_owned`.
+- **Idempotencia Estricta Demostrada en Base de Datos Real:**
+  - Re-ejecución del plan piloto produce exactamente 0 grupos nuevos y 0 elementos duplicados; todos los 5 grupos reportan `idempotent_skipped`. Conteo en base de datos inmutable (5 grupos y 9 elementos).
+- **Reversión Total Transaccional (Rollback Completo y Limpieza de Manifiesto):**
+  - `WpmlMigrationRollbackService::rollback_execution()` revierte exactamente los 5 grupos y 9 elementos; las 5 tablas TFML quedan restauradas a 0 filas; WordPress Core (`etk_t_posts` con 4.021 filas y `etk_t_terms` con 82 filas) y WPML (`etk_t_icl_translations` con 3.403 filas) intactos. Manifiesto y checkpoint eliminados limpiamente.
+- **Capacidad de Recuperación y Re-ejecución Post-Rollback:**
+  - Re-ejecución posterior al rollback regenera limpiamente los 5 grupos y 9 elementos con 100% de integridad y conciliación verificada.
+- **Renovación Automática de Checkpoint en Ejecutor:**
+  - En `WpmlMigrationExecutor::execute_batch()`, si el checkpoint almacenado en base de datos ya está completado (`is_completed()`), se reinicia limpiamente para permitir re-ejecuciones sin bloqueos.
+- **Trazabilidad y Versionado:**
+  - `scratch/verify_fase_3_12.php` registrado en `.gitignore`.
+- **Métricas de Calidad y Resultados:**
+  - Pruebas PHPUnit: **526 tests, 1.800 assertions, 0 errors, 0 failures, 1 skipped**.
+  - Estándares WPCS / PHPCS: **167/167 archivos analizados, 0 errors, 0 warnings**.
+  - Verificación Fase 3.12 (`scratch/verify_fase_3_12.php`): **110/110 checks PASS (100%)**.
+  - Matriz de Resultados (Adenda DT-TFML-042-A): **PASS**.
+  - Centinela WPML `cms_ect`: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+  - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
+
+
 
 

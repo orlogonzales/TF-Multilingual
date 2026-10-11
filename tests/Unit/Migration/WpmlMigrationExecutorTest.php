@@ -280,6 +280,11 @@ class WpmlMigrationExecutorTest extends TestCase {
 		$this->assertCount( 1, $res2['batch_results'] );
 		$this->assertSame( 'idempotent_skipped', $res2['batch_results'][0]['status'] );
 		$this->assertSame( 42, $res2['batch_results'][0]['group_id'] );
+
+		// Third run without explicit checkpoint: completed checkpoint in repo is automatically renewed.
+		$res3 = $executor->execute_batch( $plan, 50, 'token_idem' );
+		$this->assertCount( 1, $res3['batch_results'] );
+		$this->assertSame( 'idempotent_skipped', $res3['batch_results'][0]['status'] );
 	}
 
 

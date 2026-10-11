@@ -413,7 +413,7 @@ class WpmlMigrationExecutor {
 		$all_groups = $plan->get_planned_groups();
 		if ( null === $checkpoint ) {
 			$checkpoint = $this->checkpoint_repository->get( 'wpml' );
-			if ( null === $checkpoint ) {
+			if ( null === $checkpoint || $checkpoint->is_completed() ) {
 				$checkpoint = new MigrationCheckpoint(
 					array(
 						'source'      => 'wpml',
