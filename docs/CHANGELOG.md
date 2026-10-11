@@ -1280,4 +1280,38 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Verificación Integral Fase 3.21 (`scratch/verify_fase_3_21.php`): **299/299 controles PASS (100%)**.
   - `composer validate --strict`: PASS.
 
+---
+
+## [Fase 3.22] - 2026-10-11
+
+### Migración Controlada del Noveno Lote: Entradas y Formularios CF7 (DT-TFML-052)
+- **Ejecución Transaccional del Lote 9 (`batch-09-core-posts-forms`):**
+  - Migración exitosa de 4 grupos y 4 elementos en `cms_ect_lab` (TRIDs `[4340, 9391, 9406, 9411]`, Posts `[4340, 5687, 5718, 5734]`).
+  - Subtipos y tipos de post involucrados: 3 grupos `post:post` (entradas nativas de blog: Posts 5687, 5718, 5734) y 1 grupo `post:wpcf7_contact_form` (formulario de contacto Contact Form 7: Post 4340).
+  - Carácter lingüístico: 4 publicaciones monolingües en idioma español (`es`).
+  - Huella criptográfica inmutable ratificada: `6d188e1cbff392deaa030e917d5d43aaed482f915c218a73c87f415d39f53720`.
+  - Nuevo estado acumulado en la base de datos: exactamente **102 grupos** en `etk_t_tfml_groups` (98 previos + 4 de lote 9) y **115 elementos** en `etk_t_tfml_group_elements` (111 previos + 4 de lote 9), alcanzando el 85,0% de grupos y el 86,5% de elementos importables del universo WPML.
+  - Manifiesto de ejecución persistido y checkpoint actualizado a `completed` con 4 ítems procesados. Lock liberado.
+- **Invarianza Criptográfica de Entradas y Formularios Contact Form 7:**
+  - Captura y comparación de snapshots pre y post-migración sobre las 4 publicaciones: certificación de Delta Cero absoluto en `etk_t_posts`, `etk_t_postmeta` (metadatos de blog, configuración de CF7: `_form`, `_mail`, `_mail_2`, `_messages`, `_additional_settings`) y relaciones taxonómicas en `etk_t_term_relationships`. Cero envíos de formulario y cero despachos de correo durante la verificación.
+- **Idempotencia y Reversibilidad Aislada del Lote 9:**
+  - Re-ejecución inmediata del Lote 9 sobre el laboratorio evalúa los 4 grupos sin generar duplicados: los 4 TRIDs reportan formalmente `idempotent_skipped` y los conteos de base de datos se mantienen inmutables en 102 grupos y 115 elementos.
+  - Rollback selectivo mediante `rollback_groups` sobre los IDs del Lote 9 revierte exclusivamente este lote, retornando la base de datos a 98 grupos y 111 elementos.
+  - Los 98 grupos acumulados de los lotes 1 al 8 permanecen 100% blindados e intactos.
+  - Re-ejecución posterior restaura el estado final de 102 grupos y 115 elementos, con certificación profunda de reconciliación (`reconcile()`) al 100% (`integrity_verified = true`, 0 discrepancias).
+- **Validación de API de Dominio y Comprobación HTTP:**
+  - Validación funcional de `ContentTranslationResolver` sobre Entradas y Formulario CF7: reconocimiento de idioma `es` para cada publicación y resolución hacia `en` devolviendo estrictamente `null` (sin fallback indebido a default ni canonical).
+  - Preservación íntegra de la capacidad de resolución de lotes anteriores (productos WooCommerce de Lote 8, tours bilingües de Lote 7, plantillas Elementor de Lote 6, etiquetas, categorías, páginas).
+  - Comprobaciones HTTP reales contra `http://lab.ecoterra.test` sin errores 500 ni bucles.
+  - Frontera de frontend: se mantiene la designación formal de `BLOCKED` para el renderizado HTML de etiquetas (`<html lang>`, canonical y hreflang en el cuerpo HTML) debido a la ausencia física del tema `ecoCMS` en el laboratorio.
+- **Preservación Inmutable de Centinelas:**
+  - `cms_ect_lab`: Conserva exactamente 102 grupos acumulados y 115 elementos, lock liberado.
+  - `cms_ect`: Centinela intacto con 3.403 registros y hash MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0 verificado en pre y post-flight).
+- **Métricas de Calidad:**
+  - PHPUnit: **532 tests (533 total), 1.830 assertions, 0 errors, 0 failures, 1 skipped** (100% PASS).
+  - PHPCS / WPCS: **168/168 archivos analizados, 0 errors, 0 warnings** (100% PASS).
+  - Verificación Integral Fase 3.22 (`scratch/verify_fase_3_22.php`): **250/250 controles PASS (100%)**.
+  - `composer validate --strict`: PASS.
+
+
 
