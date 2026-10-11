@@ -1179,3 +1179,35 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - PHPCS / WPCS: **168/168 archivos analizados, 0 errors, 0 warnings** (100% PASS).
   - Verificación Integral Fase 3.18 (`scratch/verify_fase_3_18.php`): **281/281 controles PASS (100%)**.
   - `composer validate --strict`: PASS.
+
+---
+
+## [Fase 3.19] - 2026-10-11
+
+### Migración Controlada del Sexto Lote: Plantillas y Tipos Elementor (DT-TFML-049)
+- **Ejecución Transaccional del Lote 6 (`batch-06-elementor-templates`):**
+  - Migración exitosa de 10 grupos y 11 elementos correspondientes a plantillas y tipos de Elementor (`elementor_library` y `elementor_library_type`) en `cms_ect_lab` (TRIDs `[6, 1300, 1713, 1723, 2365, 3423, 4130, 4532, 4533, 9208]`).
+  - Incorporación del primer grupo bilingüe de plantillas: TRID 9208 con Post 5048 en español ("Testimonios") y Post 5055 en inglés ("Testimonial").
+  - Huella criptográfica inmutable ratificada: `ee32aff6cc43ea1f334b758bda34d9a9cc271de3a3c76217abd56e6264924a24`.
+  - Nuevo estado acumulado en la base de datos: exactamente **79 grupos** en `etk_t_tfml_groups` (69 previos + 10 de lote 6) y **84 elementos** en `etk_t_tfml_group_elements` (73 previos + 11 de lote 6), alcanzando el 65,8% de cobertura de grupos importables del universo WPML.
+  - Manifiesto de ejecución persistido y checkpoint actualizado a `completed` con 10 ítems procesados. Lock liberado.
+- **Invarianza Criptográfica de Metadatos y JSON Elementor:**
+  - Captura y comparación de snapshots pre y post-migración sobre los 9 posts de biblioteca y 2 términos de tipo: certificación de Delta Cero absoluto en `etk_t_posts`, `etk_t_postmeta` y estructuras JSON serializadas en `_elementor_data` (hashes MD5 idénticos al 100%).
+- **Idempotencia y Reversibilidad Aislada del Lote 6:**
+  - Re-ejecución inmediata del Lote 6 sobre el laboratorio evalúa los 10 grupos sin generar duplicados: los 10 TRIDs reportan formalmente `idempotent_skipped` y los conteos de base de datos se mantienen inmutables en 79 grupos y 84 elementos.
+  - Rollback selectivo mediante `rollback_groups` sobre los IDs del Lote 6 revierte exclusivamente este lote, retornando la base de datos a 69 grupos y 73 elementos.
+  - Los 69 grupos acumulados de los lotes 1 al 5 permanecen 100% blindados e intactos.
+  - Re-ejecución posterior restaura el estado final de 79 grupos y 84 elementos, con certificación profunda de reconciliación (`reconcile()`) al 100% (`integrity_verified = true`, 0 discrepancias).
+- **Validación de API de Dominio y Comprobación HTTP:**
+  - Validación funcional de `ContentTranslationResolver` sobre plantillas Elementor: resolución simétrica cruzada ES <-> EN en TRID 9208 (Post 5048 hacia EN resuelve exactamente a Post 5055, y Post 5055 hacia ES resuelve a Post 5048).
+  - Ausencia estricta de fallback hacia idiomas sin traducción (devuelve `null`).
+  - Comprobaciones HTTP reales contra `http://lab.ecoterra.test` sin errores 500 ni bucles.
+  - Frontera de frontend: se mantiene la designación formal de `BLOCKED` para el renderizado HTML de etiquetas (`<html lang>`, canonical y hreflang en el cuerpo HTML) debido a la ausencia física del tema `ecoCMS` en el laboratorio.
+- **Preservación Inmutable de Centinelas:**
+  - `cms_ect_lab`: Conserva exactamente 79 grupos acumulados y 84 elementos, lock liberado.
+  - `cms_ect`: Centinela intacto con 3.403 registros y hash MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0 verificado en pre y post-flight).
+- **Métricas de Calidad:**
+  - PHPUnit: **532 tests (533 total), 1.830 assertions, 0 errors, 0 failures, 1 skipped** (100% PASS).
+  - PHPCS / WPCS: **168/168 archivos analizados, 0 errors, 0 warnings** (100% PASS).
+  - Verificación Integral Fase 3.19 (`scratch/verify_fase_3_19.php`): **250/250 controles PASS (100%)**.
+  - `composer validate --strict`: PASS.

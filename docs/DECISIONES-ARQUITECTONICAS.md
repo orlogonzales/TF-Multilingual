@@ -943,3 +943,34 @@
 - **CONTEXTO:** Fase 3.18 / Directivas DT-TFML-048 y DT-TFML-048-R1 — Migración controlada del lote 5 (Etiquetas WordPress, segunda parte).
 - **JUSTIFICACIÓN:** Ejecutar el quinto lote de migración incremental WPML -> TFML sobre taxonomías de etiquetas estándar en laboratorio aislado, certificar el valor preventivo del mecanismo de STOP ante divergencias textuales, formalizar la regla de autoridad soberana del catálogo, y avanzar el acumulado a 69 grupos y 73 elementos.
 - **CONSECUENCIAS:** El laboratorio avanza al estado acumulado de 69 grupos y 73 elementos (57,5% de los grupos importables del universo WPML), la gobernanza de catálogo queda formalmente blindada contra inferencias, y los 5 lotes restantes (54 grupos) permanecen intactos en estado `STATUS_READY`.
+
+### ADR-045: Migración Controlada del Sexto Lote (batch-06-elementor-templates), Preservación Criptográfica de Metadatos y JSON Elementor, Resolución Bilingüe y Reversibilidad Aislada (Fase 3.19)
+- **FECHA:** 2026-10-11
+- **DECISIÓN:**
+  1. **Ejecución Transaccional del Lote 6 (`batch-06-elementor-templates`):**
+     - Se ejecutó la migración de los 10 TRIDs autorizados obtenidos exclusivamente del catálogo oficial de Fase 3.15: `[6, 1300, 1713, 1723, 2365, 3423, 4130, 4532, 4533, 9208]`.
+     - Subtipos taxonómicos y tipos de post involucrados: 8 grupos de `elementor_library` (posts) y 2 grupos de `elementor_library_type` (terms).
+     - Cardinalidad verificada: 10 grupos y 11 elementos (incluye el primer grupo bilingüe de plantillas: TRID 9208 con Post 5048 en español y Post 5055 en inglés).
+     - Huella criptográfica inmutable ratificada: `ee32aff6cc43ea1f334b758bda34d9a9cc271de3a3c76217abd56e6264924a24`.
+     - Nuevo estado acumulado en la base de datos del laboratorio: exactamente **79 grupos** en `etk_t_tfml_groups` (69 previos + 10 nuevos) y **84 elementos** en `etk_t_tfml_group_elements` (73 previos + 11 nuevos).
+     - Manifiesto oficial persistido y checkpoint completado con 10 ítems procesados. Lock liberado.
+  2. **Preservación Criptográfica de Integridad Elementor (Delta Cero Absoluto):**
+     - Se capturó un snapshot exhaustivo de solo lectura pre y post-migración sobre los 9 posts `elementor_library` y los 2 términos `elementor_library_type`.
+     - Se certificó que las tablas nativas de WordPress (`etk_t_posts`, `etk_t_postmeta`, `etk_t_terms`, `etk_t_term_taxonomy`, `etk_t_term_relationships`) permanecen 100% idénticas (Delta = 0).
+     - Se comprobó que el contenido JSON serializado en `_elementor_data` conserva exactamente sus hashes MD5 y bytes originales, sin reescrituras de configuración, metadatos ni atributos internos de Elementor.
+  3. **Idempotencia y Reversibilidad Aislada en Base de Datos Real:**
+     - Segunda ejecución consecutiva sobre el Lote 6 reportó 10 resultados `idempotent_skipped` (0 duplicados).
+     - Rollback selectivo mediante `rollback_groups` sobre los IDs del manifiesto del Lote 6 revirtió exclusivamente los 10 grupos del Lote 6, retornando la base de datos a 69 grupos y 73 elementos, con los 69 grupos previos 100% blindados e inalterados.
+     - Re-ejecución posterior restauró el estado final de 79 grupos y 84 elementos con 100% de reconciliación profunda (`integrity_verified = true`, 0 discrepancias).
+  4. **Validación de API de Dominio y Resolución Bilingüe Cruzada:**
+     - `ContentTranslationResolver`: validación de asignación lingüística sobre plantillas (Post 6, Post 1300, Term 32 en idioma `es`).
+     - Resolución simétrica cruzada ES <-> EN comprobada en TRID 9208: Post 5048 ('Testimonios', `es`) hacia `en` resuelve exactamente a Post 5055 ('Testimonial', `en`), y Post 5055 hacia `es` resuelve exactamente a Post 5048.
+     - Resolución monolingüe hacia idiomas sin traducción devuelve `null` sin degradación espuria.
+     - Comprobaciones HTTP reales sobre `http://lab.ecoterra.test` sin errores 500 ni bucles.
+     - Frontera de frontend: se mantiene la designación formal de `BLOCKED` para el renderizado HTML de etiquetas (`<html lang>`, canonical y hreflang en el cuerpo HTML) debido a la ausencia física del tema `ecoCMS` en el laboratorio.
+  5. **Invarianza Absoluta del Centinela en Origen (`cms_ect`):**
+     - Verificación pre y post-flight en `cms_ect`: 3.403 filas exactas y checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (**Delta = 0**).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.19 / Directiva DT-TFML-049 — Migración controlada del lote 6 (Plantillas Elementor).
+- **JUSTIFICACIÓN:** Ejecutar el sexto lote incremental WPML -> TFML sobre plantillas y tipos de Elementor en laboratorio aislado, certificar la inviolabilidad de metadatos y estructuras JSON de Elementor, validar la resolución bilingüe simétrica cruzada de plantillas en la API de dominio, y consolidar el acumulado en 79 grupos y 84 elementos (65,8% de grupos importables).
+- **CONSECUENCIAS:** El laboratorio avanza al estado acumulado de 79 grupos y 84 elementos, se certifica que la migración no contamina las configuraciones visuales ni estructuras JSON de Elementor, y los 4 lotes restantes (41 grupos) permanecen intactos en estado `STATUS_READY`.
