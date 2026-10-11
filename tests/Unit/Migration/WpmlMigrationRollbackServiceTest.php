@@ -277,4 +277,35 @@ class WpmlMigrationRollbackServiceTest extends TestCase {
 		// Clean up.
 		$service->delete_execution_manifest( $execution_id );
 	}
+
+	/**
+	 * Test 7: Rollback rejects deletion if manifest was tampered with or corrupted.
+	 */
+	public function test_rollback_rejects_tampered_or_corrupted_manifest(): void {
+		$db         = $this->create_mock_db();
+		$group_repo = $this->createMock( TranslationGroupRepository::class );
+
+		$group_repo->expects( $this->never() )->method( 'delete' );
+
+		$service      = new WpmlMigrationRollbackService( $db, $group_repo );
+		$execution_id = 'exec_tampered_manifest';
+
+		// Corrupted or tampered manifest where imported_group_ids is empty or stripped.
+		$service->save_execution_manifest(
+			$execution_id,
+			array(
+				'execution_id'       => $execution_id,
+				'imported_group_ids' => array(), // Tampered!
+			)
+		);
+
+		$res = $service->rollback_groups( array( 100 ), $execution_id, true );
+
+		$this->assertFalse( $res['success'] );
+		$this->assertSame( 1, $res['blocked_groups_count'] );
+		$this->assertSame( 'not_owned', $res['blocked_groups'][0]['code'] );
+
+		// Clean up.
+		$service->delete_execution_manifest( $execution_id );
+	}
 }

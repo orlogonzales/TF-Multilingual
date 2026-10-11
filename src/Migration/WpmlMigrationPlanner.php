@@ -72,11 +72,12 @@ class WpmlMigrationPlanner {
 	/**
 	 * Generates a complete deterministic migration plan from WPML data.
 	 *
-	 * @param int $limit  Maximum number of TRIDs to process (0 = all).
-	 * @param int $offset Starting offset of TRIDs.
+	 * @param int  $limit                 Maximum number of TRIDs to process (0 = all).
+	 * @param int  $offset                Starting offset of TRIDs.
+	 * @param bool $detect_tfml_conflicts Whether to query existing TFML elements to classify collisions (default: true).
 	 * @return MigrationPlan
 	 */
-	public function generate_plan( int $limit = 0, int $offset = 0 ): MigrationPlan {
+	public function generate_plan( int $limit = 0, int $offset = 0, bool $detect_tfml_conflicts = true ): MigrationPlan {
 		$table = $this->db->prefix . 'icl_translations';
 
 		// Verify table existence safely.
@@ -181,7 +182,7 @@ class WpmlMigrationPlanner {
 			$this->db->prepare( 'SHOW TABLES LIKE %s', $tfml_table )
 		) === $tfml_table;
 
-		if ( $has_tfml_table ) {
+		if ( $detect_tfml_conflicts && $has_tfml_table ) {
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$tfml_rows = $this->db->get_col( "SELECT element_id FROM `{$tfml_table}`" );
 			foreach ( $tfml_rows as $id ) {

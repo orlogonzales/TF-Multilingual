@@ -691,6 +691,53 @@
 - **JUSTIFICACIÓN:** Certificar la primera migración real de contenidos con datos de WPML exige comprobar experimentalmente en un entorno aislado no solo que la importación produce los datos correctos, sino que la idempotencia previene duplicaciones, el rollback devuelve el estado a cero sin dañar el Core ni WPML, y el sistema puede recuperarse y re-ejecutarse deterministamente.
 - **CONSECUENCIAS:** La arquitectura transaccional de TF Multilingual queda formalmente validada y certificada con datos reales: el plugin es capaz de migrar posts y términos de WPML, garantizar idempotencia, deshacer la operación limpiamente sin tocar Core ni WPML, y recuperarse ante fallos.
 
+---
+
+### ADENDA ADR-038-A: Cierre Correctivo de Fase 3.12, Auditoría Estricta de Esquema y Matriz Integral de Pruebas Negativas (DT-TFML-042B)
+- **DECISIÓN:**
+  1. **Auditoría de Esquema y Justificación de `SchemaManager::install()` en el Laboratorio:**
+     - **Causa Raíz:** En la definición canónica DDL de `SchemaManager::get_schema_ddl()`, la tabla `tfml_group_elements` incorporó formalmente la columna `updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`. En el laboratorio `cms_ect_lab`, instanciado en fases previas (3.8/3.9), dicha columna no se había sincronizado en base de datos.
+     - **Intervención y Consecuencias:** La ejecución de `SchemaManager::install()` invocó `dbDelta()`, aplicando de forma nativa e inocua la adición de la columna `updated_at` a `etk_t_tfml_group_elements` y actualizando la opción `tfml_schema_version` a `1.0.0`.
+     - **Comparativa de Esquema (5 tablas TFML):**
+       - `etk_t_tfml_groups`: Sin cambios estructurales (6 columnas).
+       - `etk_t_tfml_group_elements`: Actualizada con columna `updated_at` (+1 columna, total 6 columnas), alineándose al 100% con el estándar canónico del plugin.
+       - `etk_t_tfml_media_translations`, `etk_t_tfml_strings`, `etk_t_tfml_string_translations`: Estructura idéntica y canónica.
+     - **Inviolabilidad de Tablas Ajenas:** CERO alteraciones sobre tablas de WordPress Core (`etk_t_posts`, `etk_t_terms`, `etk_t_postmeta`, `etk_t_term_taxonomy`, `etk_t_term_relationships`) y de WPML (`etk_t_icl_*`).
+     - **Eliminación Definitiva de TRUNCATE:** Se documenta que los comandos `TRUNCATE` ejecutados durante la etapa exploratoria previa formaron parte del desarrollo inicial de fixtures. En el protocolo de cierre DT-TFML-042B se erradica cualquier vaciado o reset de laboratorio: los 5 grupos y 9 elementos permanecen preservados físicamente.
+  2. **Matriz Completa de Pruebas Negativas y Criterios de Fallo (NEG-01 a NEG-13):**
+     - Se certifica la totalidad de los 13 escenarios negativos previstos en la Adenda DT-TFML-042-A mediante pruebas automatizadas y aisladas:
+       | ID | Criterio de Seguridad / Fallo | Método / Script | Resultado | Evidencia Verificable |
+       |---|---|---|---|---|
+       | **NEG-01** | Desviación de conexión hacia base no autorizada | `scratch/verify_fase_3_12.php` | **PASS** | Bloqueo preventivo en preflight ante `$wpdb->dbname !== 'cms_ect_lab'` |
+       | **NEG-02** | Ejecución por worker o ejecutor no autorizado | `WpmlMigrationExecutor::execute_batch()` | **PASS** | Arroja `MigrationAuthorizationException` antes de validar o adquirir locks |
+       | **NEG-03** | Plan con huella SHA-256 adulterada o manipulada | `WpmlMigrationExecutor::validate_plan()` | **PASS** | Arroja `MigrationPlanValidationException` con detalle del error de huella |
+       | **NEG-04** | Ejecución directa de plan matriz incompleto (`STATUS_NEEDS_CONFIGURATION`) | `WpmlMigrationExecutor::execute_batch()` | **PASS** | Bloqueado incondicionalmente por estado lingüístico incompleto (`fr`) |
+       | **NEG-05** | Intento de derivar grupos con idiomas bloqueados/faltantes (`fr`) | `WpmlMigrationPlanner::derive_partial_plan()` | **PASS** | Arroja `InvalidArgumentException` protegiendo la gobernanza lingüística |
+       | **NEG-06** | Inclusión de TRID ajeno al lote piloto autorizado o inexistente | Filtro de gobernanza / `derive_partial_plan()` | **PASS** | Rechazo tajante de TRID 4576 no listado en el lote autorizado |
+       | **NEG-07** | Intento de ejecución concurrente bajo lock activo de otro worker | `MigrationExecutionLock::acquire()` | **PASS** | Retorna `false` atómicamente; rechaza concurrencia con `MigrationConcurrencyException` |
+       | **NEG-08** | Recuperación ante bloqueo con TTL vencido y control de fencing token | `MigrationExecutionLock::renew()` / `verify_ownership()` | **PASS** | Sobrescribe lock expirado; rechaza tokens espurios sobre lock vigente |
+       | **NEG-09** | Rollback ante manifiesto adulterado o grupo ajeno a la ejecución | `WpmlMigrationRollbackService::rollback_groups()` | **PASS** | Bloquea la reversión reportando formalmente código `not_owned` |
+       | **NEG-10** | Inyección de fallo a mitad de lote (Rollback transaccional) | `WpmlMigrationExecutor::execute_batch()` (mock fallo) | **PASS** | Arroja `MigrationExecutionException`, ejecuta `rollback_transaction()` y fija checkpoint en `failed` |
+       | **NEG-11** | Capacidad de recuperación y trazabilidad tras fallo previo | `MigrationCheckpoint::get_errors()` | **PASS** | Historial de errores preservado con `item_id`, timestamp y mensaje para auditoría |
+       | **NEG-12** | Idempotencia ante checkpoint completado previamente | `WpmlMigrationExecutor::execute_batch()` | **PASS** | Detección de `is_completed()` y renovación limpia a `pending` para re-evaluación |
+       | **NEG-13** | Blindaje de registros preexistentes frente a rollback con `force = true` | `WpmlMigrationRollbackService::rollback_groups()` | **PASS** | Grupo preexistente 555 protegido incondicionalmente (`not_owned`), bandera `force` anulada |
+  3. **Certificación del Estado Físico Preservado del Laboratorio (`cms_ect_lab`):**
+     - **ID de Ejecución Oficial:** `pilot_final_qJ1bqJV9`.
+     - **Manifiesto:** `tfml_migration_manifest_pilot_final_qJ1bqJV9` almacenado en `etk_t_options`, listando exactamente los grupos `[6, 7, 8, 9, 10]`.
+     - **Checkpoint:** `tfml_migration_checkpoint_wpml` con estado `completed`, 5 ítems procesados, `last_processed_trid` = 9247 y 0 errores.
+     - **Bloqueo (Lock):** Totalmente liberado (`is_locked = false`).
+     - **Datos Persistidos en Base de Datos Real:**
+       - `etk_t_tfml_groups`: exactamente 5 filas (IDs 6, 7, 8, 9, 10).
+       - `etk_t_tfml_group_elements`: exactamente 9 filas (elementos 41 [es], 47 [en], 46 [es], 48 [en], 5286 [es], 5287 [en], 5303 [es], 5304 [en], 4338 [es]).
+       - Tablas TFML restantes (`media_translations`, `strings`, `string_translations`): 0 filas.
+     - **Integridad de Contenido Core y WPML en Laboratorio:** 4.021 posts, 82 terms y 3.403 registros WPML intactos con checksum MD5 `4241ca7e7ec6399a594537cb04790c10`.
+     - **Centinela en Producción (`cms_ect`):** 3.403 registros y checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0 verificado en pre y post-flight).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.12 / Directiva DT-TFML-042B — Cierre correctivo y certificación final de Fase 3.12.
+- **JUSTIFICACIÓN:** Cumplir rigurosamente con los estándares de gobernanza y auditoría formal del proyecto, asegurando que ninguna discrepancia quede sin explicar, que cada criterio negativo cuente con evidencia empírica verificable y que el estado del laboratorio refleje con fidelidad matemática el éxito del lote piloto.
+- **CONSECUENCIAS:** La Fase 3.12 queda cerrada y certificada de forma definitiva con calificación unánime de PASS en todos los controles técnicos, de seguridad y de gobernanza.
+
+
 
 
 

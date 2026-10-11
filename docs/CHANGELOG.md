@@ -916,29 +916,48 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Resultado en base de datos: exactamente 5 registros en `etk_t_tfml_groups` y 9 registros en `etk_t_tfml_group_elements`.
 - **Aislamiento Total de Almacenamiento y Opciones de WordPress:**
   - Redirección dinámica de `$GLOBALS['wpdb']` a la instancia de laboratorio para garantizar que checkpoints, locks y manifiestos de ejecución se almacenen exclusivamente en `cms_ect_lab.etk_t_options`. CERO escrituras en `cms_ect` (Delta = 0 verificado por centinela pre y post-flight).
-- **Pruebas Negativas y Criterios Explícitos de Fallo (Adenda DT-TFML-042-A):**
-  - Verificación y cumplimiento al 100% de la matriz de fallo:
-    - N1: Ejecutor no autorizado bloqueado (`MigrationAuthorizationException`).
-    - N2: Discrepancia de huella digital SHA-256 rechazada tajantemente (`MigrationPlanValidationException`).
-    - N3: Plan matriz en `STATUS_NEEDS_CONFIGURATION` bloqueado para ejecución directa.
-    - N4: Derivación de grupos bloqueados por dependencias de idiomas (`fr`) rechazada.
-    - N5: Rollback sobre grupos ajenos no registrados en el manifiesto bloqueado como `not_owned`.
+- **Auditoría de Esquema y Sincronización en Laboratorio (DT-TFML-042B):**
+  - Justificación de `SchemaManager::install()`: adición inocua vía `dbDelta()` de la columna canónica `updated_at` a la tabla `etk_t_tfml_group_elements`, alineándola al 100% con la definición canónica del plugin.
+  - Cero modificaciones estructurales ni relacionales en tablas de WordPress Core (`etk_t_posts`, `etk_t_terms`) ni de WPML (`etk_t_icl_*`).
+  - Erradicación definitiva de operaciones `TRUNCATE` en el protocolo de certificación final; preservación física inmutable de los datos del lote piloto en el laboratorio.
+- **Cobertura Exhaustiva de Pruebas Negativas (NEG-01 a NEG-13 / ADENDA DT-TFML-042-A):**
+  - Certificación automatizada del 100% de los criterios explícitos de fallo:
+    - **NEG-01:** Rechazo preventivo si la conexión apunta a base no autorizada (`$wpdb->dbname !== 'cms_ect_lab'`).
+    - **NEG-02:** Bloqueo inmediato ante ejecutor no autorizado (`MigrationAuthorizationException`).
+    - **NEG-03:** Rechazo tajante de planes con huella SHA-256 manipulada o adulterada (`MigrationPlanValidationException`).
+    - **NEG-04:** Bloqueo incondicional de ejecución directa de plan matriz en `STATUS_NEEDS_CONFIGURATION`.
+    - **NEG-05:** Rechazo al intentar derivar grupos bloqueados por dependencias lingüísticas (`fr`).
+    - **NEG-06:** Rechazo de TRIDs ajenos al lote autorizado o inexistentes en el inventario.
+    - **NEG-07:** Rechazo atómico de ejecución concurrente ante bloqueo activo de otro worker (`MigrationConcurrencyException`).
+    - **NEG-08:** Recuperación de bloqueo con TTL vencido y verificación estricta de fencing token.
+    - **NEG-09:** Rechazo de rollback ante manifiesto adulterado o grupo ajeno (bloqueo `not_owned`).
+    - **NEG-10:** Inyección de fallo a mitad de transacción con rollback transaccional automático e InnoDB savepoint/rollback.
+    - **NEG-11:** Capacidad de recuperación tras fallo previo y preservación del historial de error en el checkpoint para auditoría.
+    - **NEG-12:** Renovación automática de checkpoint completado para permitir re-evaluación idempotente limpia.
+    - **NEG-13:** Blindaje de registros preexistentes: rollback con `force = true` bloqueado incondicionalmente ante grupos ajenos (`not_owned`).
+- **Certificación del Estado Físico Preservado del Laboratorio (`cms_ect_lab`):**
+  - Conservación exacta y permanente de los 5 grupos y 9 elementos migrados en el laboratorio:
+    - `etk_t_tfml_groups`: exactamente 5 filas (IDs 6, 7, 8, 9, 10).
+    - `etk_t_tfml_group_elements`: exactamente 9 filas (elementos 41, 47, 46, 48, 5286, 5287, 5303, 5304, 4338).
+    - Tablas TFML restantes: 0 filas.
+  - Registro de ejecución oficial: `pilot_final_qJ1bqJV9`.
+  - Manifiesto: `tfml_migration_manifest_pilot_final_qJ1bqJV9` con grupos `[6, 7, 8, 9, 10]`.
+  - Checkpoint: `tfml_migration_checkpoint_wpml` con estado `completed`, 5 ítems procesados y 0 errores.
+  - Bloqueo: completamente liberado (`is_locked = false`).
 - **Idempotencia Estricta Demostrada en Base de Datos Real:**
   - Re-ejecución del plan piloto produce exactamente 0 grupos nuevos y 0 elementos duplicados; todos los 5 grupos reportan `idempotent_skipped`. Conteo en base de datos inmutable (5 grupos y 9 elementos).
 - **Reversión Total Transaccional (Rollback Completo y Limpieza de Manifiesto):**
   - `WpmlMigrationRollbackService::rollback_execution()` revierte exactamente los 5 grupos y 9 elementos; las 5 tablas TFML quedan restauradas a 0 filas; WordPress Core (`etk_t_posts` con 4.021 filas y `etk_t_terms` con 82 filas) y WPML (`etk_t_icl_translations` con 3.403 filas) intactos. Manifiesto y checkpoint eliminados limpiamente.
 - **Capacidad de Recuperación y Re-ejecución Post-Rollback:**
   - Re-ejecución posterior al rollback regenera limpiamente los 5 grupos y 9 elementos con 100% de integridad y conciliación verificada.
-- **Renovación Automática de Checkpoint en Ejecutor:**
-  - En `WpmlMigrationExecutor::execute_batch()`, si el checkpoint almacenado en base de datos ya está completado (`is_completed()`), se reinicia limpiamente para permitir re-ejecuciones sin bloqueos.
 - **Trazabilidad y Versionado:**
   - `scratch/verify_fase_3_12.php` registrado en `.gitignore`.
-- **Métricas de Calidad y Resultados:**
-  - Pruebas PHPUnit: **526 tests, 1.800 assertions, 0 errors, 0 failures, 1 skipped**.
+- **Métricas de Calidad y Resultados Finales:**
+  - Pruebas PHPUnit: **527 tests, 1.804 assertions, 0 errors, 0 failures, 1 skipped**.
   - Estándares WPCS / PHPCS: **167/167 archivos analizados, 0 errors, 0 warnings**.
-  - Verificación Fase 3.12 (`scratch/verify_fase_3_12.php`): **110/110 checks PASS (100%)**.
-  - Matriz de Resultados (Adenda DT-TFML-042-A): **PASS**.
-  - Centinela WPML `cms_ect`: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+  - Verificación Integral Fase 3.12 (`scratch/verify_fase_3_12.php`): **103/103 checks PASS (100%)**.
+  - Matriz de Pruebas Negativas (NEG-01 a NEG-13): **100% PASS**.
+  - Centinela WPML `cms_ect`: 3,403 filas exactas, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0 absoluto).
   - Composer: `composer validate --strict` exitoso y `composer dump-autoload -o` optimizado.
 
 
