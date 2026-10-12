@@ -1426,6 +1426,44 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Verificación Integral Fase 3.25 (`scratch/verify_fase_3_25.php`): **60/60 controles PASS (100%)**.
   - `composer validate --strict`: PASS.
 
+---
+
+## [Fase 3.26] - 2026-10-11
+
+### Diagnóstico y Diseño Seguro de la Portada Bilingüe y Compatibilidad del Tema (DT-TFML-056)
+- **Diagnóstico Causa-Raíz del Atributo `<html lang="en-US">` en Páginas en Español:**
+  - Identificación del flujo en WordPress Core: `ecoCMS/header.php` invoca `language_attributes()` -> `get_bloginfo('language')` -> `get_locale()`.
+  - Constatación de causa raíz: la opción de base de datos `WPLANG` se encuentra vacía (`""`) en `cms_ect_lab`, provocando que WordPress Core recurra por defecto a `'en_US'`.
+  - Ausencia de interceptor en TF Multilingual sobre el hook nativo `locale` o `determine_locale` en frontend.
+  - Diseño de solución limpia y desacoplada (sin expresiones regulares ni manipulación de búferes): registro de un filtro sobre el hook `locale` en `Plugin::init()` / `RewriteManager` que entrega a WordPress Core el locale oficial (`es_ES` o `en_US`) según `CurrentLanguageResolver::get_current_language()` y `LanguageRegistry`.
+- **Diagnóstico de Enrutamiento y Resolución de Portada Bilingüe (`/` vs `/en/`):**
+  - Verificación de configuración WordPress Core: `show_on_front = 'page'`, `page_on_front = 197`.
+  - Anatomía del TRID 197 en WPML: Post 197 (`es` - Inicio, canónica), Post 8356 (`en` - Home, traducción inglesa) y Post 8839 (`fr` - Accueil, traducción francesa).
+  - Causa raíz del 404 en `/en/`: TRID 197 fue clasificado como `BLOCKED_BY_LANGUAGE` al contener el miembro en francés (`fr`), no importándose en los 10 lotes iniciales.
+  - Demostración de doble requisito técnico para resolver `/en/` con HTTP 200 OK:
+    1. Registro del par activo `es` <-> `en` (Posts 197 y 8356) en `tfml_groups` / `tfml_group_elements`.
+    2. Intercepción de la consulta de portada de WordPress (`option_page_on_front` o `pre_get_posts`) para sustituir `page_id = 197` por el ID traducido `8356` cuando el idioma activo sea `'en'`.
+- **Evaluación Comparativa de Alternativas para el TRID 197:**
+  - Alternativa A (Mantener bloqueado): descarta la resolución de `/en/` mientras `fr` no se active.
+  - Alternativa B (Importación parcial explícita del par activo — SELECCIONADA Y RECOMENDADA): evoluciona formalmente el contrato de `MigrationPlan` para importar `es` <-> `en` y retener `fr` en `pending_translations`. 100% auditable, reversible (rollback a 120/133) y sin mutaciones al origen.
+  - Alternativa C (Asociación editorial manual): descartada por desalineación con el inventario unificado del migrador.
+- **Auditoría Exhaustiva de Compatibilidad Temática de `ecoCMS`:**
+  - Cuantificación exacta sobre los 175 archivos PHP del tema: 105 llamadas directas y 4 guardas `function_exists` (109 referencias a símbolos WPML en total).
+  - Desglose verificado: 5 ocurrencias de la constante `ICL_LANGUAGE_CODE`, 96 llamadas a `traducir()`, 2 llamadas a `icl_object_id()` y 2 llamadas a `icl_get_languages()`.
+  - Constatación de dependencia en `ecoCMS/inc/ecoterra.php`: la función `traducir()` recurre a `defined( 'ICL_LANGUAGE_CODE' ) ? ICL_LANGUAGE_CODE : 'es'`.
+  - Diseño del adaptador de compatibilidad de solo lectura (`ThemeCompatibilityBridge`) en TFML para definir `ICL_LANGUAGE_CODE` y stubs para `icl_object_id` e `icl_get_languages` sin alterar los archivos de `ecoCMS`.
+- **Diagnóstico de Arquitectura de Cabecera y Dependencia de Elementor:**
+  - Constatación de que la cabecera original se diseñó con Elementor Pro en el CPT `ova_framework_hf_el` (6 publicaciones en `etk_t_posts`).
+  - Constatación de que `ecoCMS/inc/class-hook.php` recurre ordenadamente al fallback `template-parts/header-default.php` en ausencia del constructor.
+- **Preservación Inmutable de Centinelas:**
+  - `cms_ect_lab`: Conserva exactamente 120 grupos acumulados y 133 elementos, lock liberado (Delta = 0).
+  - `cms_ect`: Centinela intacto con 3.403 registros y hash MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0 verificado en pre y post-flight).
+- **Métricas de Calidad:**
+  - PHPUnit: **532 tests (533 total), 1.830 assertions, 0 errors, 0 failures, 1 skipped** (100% PASS).
+  - PHPCS / WPCS: **168/168 archivos analizados, 0 errors, 0 warnings** (100% PASS).
+  - Verificación Integral Fase 3.26 (`scratch/verify_fase_3_26.php`): **56/56 controles PASS (100%)**.
+  - `composer validate --strict`: PASS.
+
 
 
 

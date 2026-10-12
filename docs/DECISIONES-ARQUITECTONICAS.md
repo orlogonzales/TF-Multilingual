@@ -1168,6 +1168,45 @@
 - **JUSTIFICACIÓN:** Cumplir el mandato de incorporar una copia física aislada del tema `ecoCMS` y la dependencia `ova-framework`, habilitar el renderizado real del frontend, ejecutar la matriz de 11 rutas HTTP/HTML obligatorias y diagnosticar la interacción entre el tema y TF Multilingual manteniendo blindados los datos y el aislamiento.
 - **CONSECUENCIAS:** Queda superado el bloqueo de renderizado HTML (0 bytes -> 52KB). Se documentan las dependencias restantes (Elementor para cabecera compleja y TRID 197 para `/en/`), habilitando el paso hacia la derivación quirúrgica del TRID 197 en la Fase 3.26.
 
+### ADR-052: Diagnóstico Integral del TRID 197, Enrutamiento de Portada Bilingüe, Causa Raíz del Atributo <html lang> y Compatibilidad Lingüística de ecoCMS (Fase 3.26)
+- **FECHA:** 2026-10-11
+- **DECISIÓN:**
+  1. **Diagnóstico Causa-Raíz de `<html lang="en-US">` en Páginas en Español:**
+     - En `ecoCMS/header.php`, el tema invoca la función canónica de WordPress `language_attributes()`, la cual consulta internamente `get_bloginfo('language')` -> `get_locale()`.
+     - En la base de datos de laboratorio `cms_ect_lab` (heredado de `cms_ect`), la opción de WordPress `WPLANG` se encuentra vacía (`""`). Ante esto, WordPress Core recurre por defecto al locale `'en_US'`.
+     - TF Multilingual no registraba ningún interceptor en el filtro de WordPress Core `locale` o `determine_locale` en frontend.
+     - **Solución Limpia Certificada (Sin Expresiones Regulares ni Buffering):** Enganchar en el ciclo de inicio de TF Multilingual un filtro nativo sobre el hook `locale`. Cuando `!is_admin()`, el filtro consulta `CurrentLanguageResolver::get_current_language()`, resuelve su código regional formal (`es` -> `es_ES`, `en` -> `en_US`) desde `LanguageRegistry`, y lo entrega a WordPress Core. WordPress Core convierte automáticamente `es_ES` en `lang="es-ES"` en `language_attributes()`, preservando la pureza arquitectónica y eliminando cualquier manipulación frágil sobre el HTML.
+  2. **Diagnóstico Anatómico del TRID 197 y Resolución de Portada Bilingüe (`/` vs `/en/`):**
+     - Configuración Core en `etk_t_options`: `show_on_front = 'page'`, `page_on_front = 197`.
+     - En WPML (`etk_t_icl_translations`), el TRID 197 agrupa tres miembros: Post ID 197 (`es` - Inicio, canónica original), Post ID 8356 (`en` - Home, traducción inglesa) y Post ID 8839 (`fr` - Accueil, traducción francesa).
+     - Causa del HTTP 404 actual en `/en/`: El clasificador del migrador catalogó el TRID 197 como `BLOCKED_BY_LANGUAGE` al detectar la presencia de `'fr'` (idioma no activo en `LanguageRegistry`), impidiendo su importación en los 10 lotes iniciales.
+     - **Doble Condición Técnica para Resolver `/en/` con HTTP 200 OK:**
+       a) Migrar el par activo `es` <-> `en` (Posts 197 y 8356) a las tablas de traducción de TF Multilingual.
+       b) Interceptar la consulta de la portada de WordPress (en `option_page_on_front` o `pre_get_posts` en la consulta principal): cuando el idioma activo resuelto sea `'en'`, sustituir `page_id = 197` por el ID traducido `8356` (obtenido a través de `ContentTranslationResolver::resolve_element_id('post', 197, 'en')`). Sin esta intercepción, WordPress Core consulta `page_id = 197`, y `QueryLanguageFilter` descarta el resultado por discrepancia lingüística (`es` != `en`), produciendo 404 Not Found.
+  3. **Evaluación Comparativa de Alternativas para la Migración del TRID 197:**
+     - *Alternativa A (Mantener bloqueado hasta activar francés):* Preserva la regla estricta de migración pero bloquea indefinidamente la portada en inglés (`/en/`), haciendo inviable certificar el sitio bilingüe.
+     - *Alternativa B (Derivación e importación parcial explícita del par activo — SELECCIONADA Y RECOMENDADA):* Evolucionar formalmente el contrato de `MigrationPlan` para soportar la importación selectiva de un par de idiomas activos (`es` <-> `en`) mientras se preserva el miembro francés (Post 8839) en `pending_translations` dentro del manifiesto de migración. Permite crear 1 grupo y 2 elementos en tablas TFML (elevando el total a 121 grupos y 135 elementos), preservando la trazabilidad completa, garantizando reversibilidad absoluta (rollback selectivo a 120/133) y permitiendo incorporar el francés sin colisiones en fases futuras.
+     - *Alternativa C (Crear grupo manual fuera del migrador vía TranslationEditorialService):* Desvincula la creación del registro histórico de WPML, rompe la consistencia de los checkpoints de migración y genera bit drift. Descartada.
+  4. **Auditoría Exhaustiva de Compatibilidad Temática de ecoCMS:**
+     - Se realizó un inventario estático riguroso sobre los 175 archivos PHP del tema `ecoCMS`, cuantificando con exactitud 105 llamadas directas y 4 guardas estructurales (109 referencias a símbolos WPML en total):
+       - `ICL_LANGUAGE_CODE`: 5 ocurrencias del identificador en 3 archivos (`inc/ecoterra.php`, `inc/short-codes.php`, `template-parts/tour.php`).
+       - `traducir()`: 96 llamadas a la función helper a lo largo de 94 líneas del tema (vistas de tours, encabezados, botones, taxonomías).
+       - `icl_object_id()`: 2 llamadas directas y 2 guardas `function_exists('icl_object_id')` en `inc/class-hook.php`.
+       - `icl_get_languages()`: 2 llamadas directas y 2 guardas `function_exists('icl_get_languages')` en `inc/short-codes.php`.
+     - Se verificó que `traducir()` en `ecoCMS/inc/ecoterra.php` implementa: `$idioma_actual = defined( 'ICL_LANGUAGE_CODE' ) ? ICL_LANGUAGE_CODE : 'es';`. Sin la constante definida, retorna invariablemente el texto en español.
+     - **Estrategia Seleccionada:** Proveer en TF Multilingual un puente de compatibilidad temático de solo lectura (`ThemeCompatibilityBridge`): definir la constante `ICL_LANGUAGE_CODE` con base en `CurrentLanguageResolver` y registrar funciones stub para `icl_object_id` e `icl_get_languages` delegando en `ContentTranslationResolver`. Esta estrategia garantiza el funcionamiento del 100% de las 109 referencias del tema sin modificar una sola línea de código de `ecoCMS`.
+  5. **Diagnóstico de Arquitectura de Cabecera y Dependencia de Elementor:**
+     - En `ecoCMS`, la cabecera original de producción fue maquetada con el constructor visual Elementor Pro utilizando el Custom Post Type `ova_framework_hf_el` (identificadas 6 publicaciones en `etk_t_posts`).
+     - Al no encontrarse activo Elementor en el laboratorio, `ecoCMS/inc/class-hook.php` activa su mecanismo de contingencia ejecutando `get_template_part('template-parts/header', 'default')`.
+     - En `header-default.php`, la navegación clásica requiere la asignación explícita de ubicación (`theme_location => 'primary'`) o la incorporación controlada de los complementos `elementor` y `elementor-pro` para renderizar el encabezado y mega-menú original de producción.
+  6. **Invarianza Absoluta de Centinelas:**
+     - Base de datos de origen `cms_ect`: 3.403 filas en `etk_t_icl_translations`, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (**Delta = 0**).
+     - Base de datos de laboratorio `cms_ect_lab`: 120 grupos, 133 elementos congelados intactos (**Delta = 0**).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.26 / Directiva DT-TFML-056 — Diagnóstico y diseño seguro de la portada bilingüe y compatibilidad del tema.
+- **JUSTIFICACIÓN:** Resolver técnicamente los diagnósticos requeridos por Dirección Técnica sobre la discrepancia de atributo `<html lang>`, la ausencia de respuesta en `/en/`, las alternativas de importación del TRID 197, la cuantificación de compatibilidad de `ecoCMS` y la dependencia de Elementor, manteniendo estrictamente el modo no destructivo de solo lectura.
+- **CONSECUENCIAS:** Se sientan las bases arquitectónicas y de diseño técnico para que la Dirección Técnica autorice las siguientes microfases operativas: registro del filtro `locale` en TFML, puente de compatibilidad temática `ICL_LANGUAGE_CODE`/stubs, e importación controlada del par activo del TRID 197.
+
 
 
 
