@@ -1491,6 +1491,37 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Verificación Integral Fase 3.27 (`scratch/verify_fase_3_27.php`): **45/45 controles PASS (100%)**.
   - `composer validate --strict`: PASS.
 
+---
+
+## [Fase 3.28] - 2026-10-11
+
+### Contratos y Adaptadores Limitados de Compatibilidad con WPML (DT-TFML-058)
+- **Separación Arquitectónica en Tres Superficies Soberanas:**
+  - **Superficie A (API Pública Nativa):** Implementación de `TF\Multilingual\API\ServicioTraduccionPublico` para proveer acceso independiente y desacoplado a las funciones de traducción y consulta de idiomas del sistema.
+  - **Superficie B (Adaptador de Compatibilidad WPML):** Implementación de `TF\Multilingual\Compatibilidad\AdaptadorCompatibilidadWpml` y stubs globales en `src/Compatibilidad/funciones_wpml.php` para traducir llamadas a `icl_object_id()` e `icl_get_languages()`. **Desactivado por omisión** mediante filtro extensible `tfml_enable_wpml_compatibility_adapter`.
+  - **Superficie C (Código Específico del Tema ecoCMS):** La función `traducir()` en `ecoCMS/inc/ecoterra.php` y sus 94 llamadas temáticas se mantienen 100% intactas, preservando su comportamiento y fallback nativo a español.
+- **Restricción Categórica de Constante Global:**
+  - **`ICL_LANGUAGE_CODE` permanece estrictamente NO definida**, protegiendo la soberanía del Core y evitando efectos colaterales de suplantación de WPML.
+- **Auditoría e Inventario de Contratos en ecoCMS:**
+  - Inventario formal automatizado (`scratch/audit_theme_contracts.php` y `scratch/theme_contracts_inventory.json`):
+    - `traducir()`: 94 llamadas en 4 archivos temáticos (`footer.php`, `inc/ecoterra.php`, `inc/short-codes.php`, `template-parts/tour.php`).
+    - `icl_object_id()`: 4 llamadas en `inc/class-hook.php` (para CPT `ova_framework_hf_el` con `return_original = false`).
+    - `icl_get_languages()`: 4 llamadas en `inc/short-codes.php` (usando argumento `'skip_missing=0&orderby=custom'`).
+    - `ICL_LANGUAGE_CODE`: 3 ocurrencias en código temático.
+- **Implementación de Contratos Funcionales:**
+  - Soporte completo para `icl_object_id($id, $type, $return_original_if_missing, $lang)` con resolución bidireccional sobre los 120 grupos de traducción y preservación de fallbacks.
+  - Soporte completo para `icl_get_languages($args)` con entrega de esquemas de datos esperados por el tema y exclusión estricta de idiomas inactivos (`fr`).
+  - Funciones globales `icl_object_id` e `icl_get_languages` protegidas con `!function_exists()`, con degradación limpia cuando el adaptador no está habilitado.
+- **Preservación Inmutable de Centinelas y Datos:**
+  - Base de datos `cms_ect`: 3.403 filas en `etk_t_icl_translations`, hash MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+  - Base de datos `cms_ect_lab`: 120 grupos y 133 elementos congelados intactos (Delta = 0).
+  - TRID 197 no importado en esta fase; Elementor no instalado.
+- **Métricas de Calidad y Verificación:**
+  - PHPUnit: **554 tests, 1.919 assertions, 0 errors, 0 failures** (100% PASS).
+  - PHPCS / WPCS: **174/174 archivos analizados, 0 errors, 0 warnings** (100% PASS).
+  - Verificación Integral Fase 3.28 (`scratch/verify_fase_3_28.php`): **68/68 controles PASS (100%)**.
+  - `composer validate --strict`: PASS.
+
 
 
 

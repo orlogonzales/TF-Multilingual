@@ -1247,6 +1247,36 @@
 - **JUSTIFICACIÓN:** Resolver de raíz la emisión errónea de `lang="en-US"` en las páginas públicas en español de Ecoterra Lodge, garantizando accesibilidad web, SEO multilingüe canónico y compatibilidad nativa con WordPress Core sin manipulación frágil del DOM ni mutaciones persistentes de la base de datos.
 - **CONSECUENCIAS:** Las páginas públicas emiten el atributo de idioma formal correspondiente al idioma resuelto por la URL. La administración de WordPress y los procesos internos no son alterados. Se prepara el camino para la integración de compatibilidad temática de menús y el TRID 197 en fases posteriores.
 
+---
+
+### ADR-054: Separación en Tres Superficies Arquitectónicas y Adaptador Heredado Limitado de Compatibilidad WPML sin ICL_LANGUAGE_CODE (Fase 3.28)
+- **FECHA:** 2026-10-11
+- **DECISIÓN:**
+  1. **Separación Arquitectónica en Tres Superficies Soberanas:**
+     - **Superficie A (API Pública Nativa de TF Multilingual):** Implementada en `TF\Multilingual\API\ServicioTraduccionPublico`. Provee una interfaz limpia, orientada a objetos e independiente de cualquier plugin heredado (`obtener_idioma_actual()`, `obtener_idioma_por_defecto()`, `obtener_idiomas_activos()`, `es_idioma_activo()`, `resolver_traduccion_elemento()`, `obtener_idioma_de_elemento()`, `obtener_informacion_idiomas()`).
+     - **Superficie B (Adaptador Heredado Opcional WPML):** Implementado en `TF\Multilingual\Compatibilidad\AdaptadorCompatibilidadWpml` y `src/Compatibilidad/funciones_wpml.php`. Traduce firmas y contratos históricos (`icl_object_id()`, `icl_get_languages()`) hacia la Superficie A. **Permanece desactivado por defecto** (`apply_filters('tfml_enable_wpml_compatibility_adapter', false)`) y no se activa a menos que exista configuración explícita o necesidad temática demostrada.
+     - **Superficie C (Lógica Específica del Tema ecoCMS):** La función `traducir()` en `inc/ecoterra.php` y sus 94 llamadas temáticas se mantienen 100% intactas dentro del tema WordPress, respetando su mecanismo nativo de fallback a español (`defined('ICL_LANGUAGE_CODE') ? ICL_LANGUAGE_CODE : 'es'`).
+  2. **Restricción Categórica de Constante Global:**
+     - **NO se define bajo ninguna circunstancia la constante global `ICL_LANGUAGE_CODE`**.
+     - Justificación: Definir dicha constante de forma prematura desactiva silenciosamente los fallbacks del tema, falsea el estado del runtime simulando que WPML Core está en ejecución, y vulnera la arquitectura desacoplada de TF Multilingual.
+  3. **Implementación de Contratos Auditados:**
+     - **`icl_object_id($id, $type, $return_original_if_missing, $lang)`:** Normaliza subtipos ('tours', 'ova_framework_hf_el', 'page', 'category', etc.) mediante `normalizar_tipo_elemento()`, resuelve en grupos de traducción existentes en `etk_t_tfml_groups` / `etk_t_tfml_group_elements`, y respeta rigurosamente el parámetro de retorno original ante ausencias o idiomas inactivos (p. ej. 'fr').
+     - **`icl_get_languages($args)`:** Analiza query strings o arrays (`skip_missing`, `orderby`), alimenta la estructura requerida por selectores de idiomas (`active`, `url`, `country_flag_url`, `native_name`, `language_code`, `default_locale`), y excluye estrictamente idiomas inactivos/bloqueados (`fr`).
+     - **Funciones Globales Envolventes:** Enclavadas con salvaguardas `if (!function_exists())` en `funciones_wpml.php`, delegando de forma segura en `AdaptadorCompatibilidadWpml::obtener_instancia_activa()`. Si el adaptador no está habilitado, retornan `null` o array vacío de forma segura sin producir errores fatales.
+  4. **Invarianza Estricta de Centinelas y Datos:**
+     - Cero escrituras o mutaciones sobre tablas WPML (`etk_t_icl_translations`, etc.).
+     - Base de producción `cms_ect`: 3.403 filas intactas, MD5 `4241ca7e7ec6399a594537cb04790c10` (**Delta = 0**).
+     - Base de laboratorio `cms_ect_lab`: 120 grupos y 133 elementos intactos (**Delta = 0**). TRID 197 no importado en esta fase.
+  5. **Verificación Formal y Calidad:**
+     - 11 pruebas unitarias añadidas en `AdaptadorCompatibilidadWpmlTest.php`. Total suite: 554 tests, 1919 aserciones PASS.
+     - 68/68 controles superados con éxito en `scratch/verify_fase_3_28.php`.
+     - 174/174 archivos conformes con WordPress Coding Standards (WPCS) mediante PHPCS (0 errores, 0 advertencias).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.28 / Directiva DT-TFML-058 — Contratos y adaptadores limitados de compatibilidad con WPML.
+- **JUSTIFICACIÓN:** Permitir que temas y complementos diseñados para el ecosistema histórico de WPML (`ecoCMS`, `ova-framework`) puedan operar armónicamente sobre TF Multilingual sin acoplamiento espurio, garantizando que el Core del plugin permanezca 100% nativo, modular e independiente.
+- **CONSECUENCIAS:** Se establece una frontera nítida de compatibilidad heredada que minimiza deuda técnica, evita colisiones de constantes globales y habilita la futura activación modular de funcionalidades visuales avanzadas de forma segura y controlada.
+
+
 
 
 

@@ -1,0 +1,669 @@
+{
+    "traducir": {
+        "count": 94,
+        "files": {
+            "footer.php": 4,
+            "inc/ecoterra.php": 1,
+            "inc/short-codes.php": 39,
+            "template-parts/tour.php": 50
+        },
+        "items": [
+            {
+                "symbol": "traducir",
+                "file": "footer.php",
+                "line": 48,
+                "code": "<h4><?= traducir('\u00bfComo ponerse en contaco?', 'How to get in touch?', 'Comment nous contacter?') ?></h4>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "footer.php",
+                "line": 51,
+                "code": "<li><strong><?= traducir('Tel\u00e9fono Contacto', 'Contact Phone', 'T\u00e9l\u00e9phone de contact') ?>:</strong> <?= esc_html($info_company_phones) ?></li>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "footer.php",
+                "line": 52,
+                "code": "<li><strong><?= traducir('Email', 'Email', 'Email') ?>:</strong> <?= esc_html($company_email) ?></li>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "footer.php",
+                "line": 53,
+                "code": "<li><?= traducir('Quillabamba, Cusco - Per\u00fa', 'Quillabamba, Cusco - Peru', 'Quillabamba, Cusco - Per\u00fa') ?></li>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/ecoterra.php",
+                "line": 122,
+                "code": "function traducir( $texto_es = '', $texto_en = '', $texto_fr = '' ) {"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 25,
+                "code": "'montana'  => traducir( 'Monta\u00f1a', 'Mountains', 'Montagne' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 26,
+                "code": "'piscina'  => traducir( 'Piscina', 'Pool', 'Piscine' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 27,
+                "code": "'bosque'   => traducir( 'Bosque', 'Forest', 'For\u00eat' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 28,
+                "code": "'interior' => traducir( 'Interior', 'Inside', 'Int\u00e9rieur' )"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 34,
+                "code": "'matrimonial'            => traducir( '1 x CAMA MATRIMONIAL', '1 x DOUBLE BED', '1 x CHAMBRE DOUBLE' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 35,
+                "code": "'matrimonial-litera'     => traducir( '1 x CAMA MATRIMONIAL | 1 x LITERA', '1 x DOUBLE BED | 1 x LITERA', '1 x CHAMBRE DOUBLE | 1 x LITERA' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 36,
+                "code": "'matrimonial-sofa'       => traducir( '1 x CAMA MATRIMONIAL | 1 x SOF\u00c1 CAMA', '1 x DOUBLE BED | 1 x SOFA BED', '1 x CHAMBRE DOUBLE | 1 x CANAP\u00c9 CHAMBRE' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 37,
+                "code": "'doble-simple'           => traducir( '1 x CAMA DOBLE | 1 x DOBLE CAMA', '1 x DOUBLE BED | 1 x DOUBLE BED', '1 x CHAMBRE DOUBLE | 1 x CHAMBRE DOUBLE' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 38,
+                "code": "'doble-doble'            => traducir( '1 x CAMA DOBLE | 2 x DOBLE CAMA', '1 x DOUBLE BED | 2 x DOUBLE BED', '1 x CHAMBRE DOUBLE | 1 x CHAMBRE DOUBLE' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 39,
+                "code": "'3-individual'           => traducir( '3 x CAMA INDIVIUAL', '3 x SINGLE BED', '3 x CHAMBRE SINGLE' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 40,
+                "code": "'matrimonial-individual' => traducir( '1 x CAMA MATRIMONIAL | 1 x CAMA INDIVIDUAL', '1 x DOUBLE BED | 1 x SINGLE BED', '1 x CHAMBRE DOUBLE | 1 x CHAMBRE SINGLE' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 41,
+                "code": "'suite-familiar-1'       => traducir( '1 x CAMA MATRIMONIAL | 3 x CAMA INDIVIDUAL | 1 x LITERA | 1 x SOF\u00c1 CAMA', '1 x DOUBLE BED | 3 x SINGLE BED | 1 x LITERA | 1 x SOFA BED', '1 x CHAMBRE DOUBLE | 3 x CHAMBRE SINGLE | 1 x LITERA | 1 x CHAMBRE SOFA' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 42,
+                "code": "'suite-familiar-2'       => traducir( '7 x CAMA INDIVIDUAL | 1 x CAMA INDIVIDUAL | 1 x SOF\u00c1 CAMA', '7 x SINGLE BED | 1 x SINGLE BED | 1 x SOFA BED', '7 x CHAMBRE SINGLE | 1 x CHAMBRE SINGLE | 1 x CHAMBRE SOFA' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 43,
+                "code": "'suite-familiar-3'       => traducir( '1 x CAMA MATRIMONIAL | 1 x CAMA INDIVIDUAL | 1 x LITERA', '1 x DOUBLE BED | 1 x SINGLE BED | 1 x LITERA', '1 x CHAMBRE DOUBLE | 1 x CHAMBRE SINGLE | 1 x LITERA' )"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 56,
+                "code": "<?php if ( ! empty( $capacidad ) ) : ?><div class=\"caracteristica-item\"><div class=\"caracteristica-icon mb-2\"><?php echo $icono_capacidad; ?></div><div class=\"caracteristica-titulo\"><?php echo traducir( 'CAPACIDAD', 'CAPACITY', 'CAPACITE' ) ?></div><div class=\"caracteristica-valor\"><?php echo esc_html( $capacidad ); ?> <?php echo traducir( 'PERSONAS', 'PEOPLE', 'PERSONNES' ) ?></div></div><?php endif; ?>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 57,
+                "code": "<?php if ( ! empty( $area ) ) : ?><div class=\"caracteristica-item\"><div class=\"caracteristica-icon mb-2\"><?php echo $icono_area; ?></div><div class=\"caracteristica-titulo\"><?php echo traducir( 'AREA', 'AREA', 'AREA' ) ?></div><div class=\"caracteristica-valor\"><?php echo esc_html( $area ); ?> M2</div></div><?php endif; ?>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 58,
+                "code": "<?php if ( ! empty( $vista_texto ) ) : ?><div class=\"caracteristica-item\"><div class=\"caracteristica-icon mb-2\"><?php echo $icono_vista; ?></div><div class=\"caracteristica-titulo\"><?php echo traducir( 'VISTA', 'VIEW', 'VUE' ) ?></div><div class=\"caracteristica-valor\"><?php echo esc_html( $vista_texto ); ?></div></div><?php endif; ?>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 59,
+                "code": "<?php if ( ! empty( $camas_texto ) ) : ?><div class=\"caracteristica-item\"><div class=\"caracteristica-icon mb-2\"><?php echo $icono_camas; ?></div><div class=\"caracteristica-titulo\"><?php echo traducir( 'CAMAS', 'BEDS', 'CHAMBRES' ) ?></div><div class=\"caracteristica-valor\"><?php echo esc_html( $camas_texto ); ?></div></div><?php endif; ?>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 84,
+                "code": "'ropero'                  => traducir( 'Ropero', 'Wardrobe', 'Coffre' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 85,
+                "code": "'salon'                   => traducir( 'Sal\u00f3n', 'Salon', 'Salle' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 86,
+                "code": "'adaptador'               => traducir( 'Adaptador', 'Adaptator', 'Adaptateur' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 87,
+                "code": "'comedor'                 => traducir( 'Comedor', 'Dining room', 'Cuisine' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 88,
+                "code": "'escritorio'              => traducir( 'Escritorio', 'Desktop', 'Bureau' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 89,
+                "code": "'caja-fuerte'             => traducir( 'Caja fuerte', 'Safe', 'Coffre-fort' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 90,
+                "code": "'mini-bar'                => traducir( 'Mini bar', 'Mini bar', 'Bar petit' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 91,
+                "code": "'wifi'                    => traducir( 'Wifi', 'Wifi', 'Wifi' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 92,
+                "code": "'ducha-con-agua-caliente' => traducir( 'Ducha con agua caliente', 'Shower with hot water', 'Douche avec eau chaude' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 93,
+                "code": "'balcon'                  => traducir( 'Balc\u00f3n', 'Balcony', 'Balcon' )"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 164,
+                "code": "<?php echo traducir( 'DESDE S/ ', 'FROM S/ ', 'DE S/ ' ); ?><?php echo number_format( floatval( $precio ) ); ?>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 178,
+                "code": "<?php echo esc_html( $capacidad ); ?> <?php echo traducir( 'Personas', 'Guests', 'Personnes' ); ?> | <?php echo esc_html( $area ); ?> m\u00b2"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 189,
+                "code": "<?php echo traducir( 'Detalles', 'Details', 'D\u00e9tails' ); ?>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 195,
+                "code": "<i class=\"fa-solid fa-cart-shopping\"></i> <?php echo traducir( 'Reservar', 'Book', 'R\u00e9server' ); ?>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 300,
+                "code": "<?php echo esc_html( $capacidad ); ?> <?php echo traducir( 'Personas', 'Guests', 'Personnes' ); ?> | <?php echo esc_html( $area ); ?> m\u00b2"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 306,
+                "code": "<?php echo traducir( 'DESDE S/ ', 'FROM S/ ', 'DE S/ ' ); ?><?php echo number_format( floatval( $precio ) ); ?>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 337,
+                "code": "'texto' => traducir( 'Reservar Ahora', 'Book Now', 'R\u00e9server Maintenant' ),"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 497,
+                "code": "<div class=\"label\">' . traducir( 'Ubicaci\u00f3n de Lodge', 'Lodge Location', 'Emplacement du Lodge' ) . '</div>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 512,
+                "code": "<div class=\"label\">' . traducir( 'Escribenos', 'Write Us', '\u00c9crivez-nous' ) . '</div>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 529,
+                "code": "<div class=\"label\">' . traducir( 'Llamenos', 'Call Us', 'Appelez-nous' ) . '</div>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "inc/short-codes.php",
+                "line": 544,
+                "code": "<div class=\"label\">' . traducir( 'WhatsApp', 'WhatsApp', 'WhatsApp' ) . '</div>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 19,
+                "code": "<h3><?= traducir('Galer\u00eda de fotos','Photo Gallery') ?></h3>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 40,
+                "code": "<h3><?= traducir('Reservar Este Tour','Book This Tour') ?></h3>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 45,
+                "code": "<div id=\"alerta_mensaje_enviado\" style=\"display: none;\"><div class=\"alert alert-success text-center\" role=\"alert\"><?= traducir('Gracias, s\u00fa reserva fue enviada, tan pronto podamos le enviaremos la confirmaci\u00f3n de reserva.', 'Thank you, your reservation was sent, as soon as we can we will send you the reservation confirmation.') ?></div></div>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 46,
+                "code": "<div id=\"alerta_mensaje_no_enviado\" style=\"display: none;\"><div class=\"alert alert-danger text-center\" role=\"alert\"><?= traducir('UPS!, lo sentimos su mensaje no pudo ser enviado, por favor int\u00e9ntelo nuevamente, gracias.', 'UPS !, sorry your message could not be sent, please try again, thank you.') ?></div></div>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 50,
+                "code": "<label class=\"etiqueta\"><?= traducir('NOMBRE','NAME'); ?></label>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 51,
+                "code": "<input type=\"text\" name=\"nombre\" id=\"nombre\" class=\"form-control text-uppercase\" placeholder=\"<?= traducir('Nombre completo','Full Name'); ?>\" onblur=\"mayusculas(event, this)\" autocomplete=\"off\">"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 57,
+                "code": "<label class=\"etiqueta\"><?= traducir('EMAIL','EMAIL'); ?></label>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 58,
+                "code": "<input type=\"email\" name=\"email\" id=\"email\" class=\"form-control text-lowercase\" placeholder=\"<?= traducir('Email','Email'); ?>\" class=\"text-lowercase\" onblur=\"minusculas(event, this);\" autocomplete=\"off\">"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 64,
+                "code": "<label class=\"etiqueta\"><?= traducir('FECHA DE VIAJE','TRAVEL DATE'); ?></label>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 65,
+                "code": "<input type=\"text\" name=\"fecha_salida\" id=\"fecha_salida\" class=\"form-control\" placeholder=\"<?= traducir('Fecha de viaje','Travel Date'); ?>\" autocomplete=\"off\">"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 74,
+                "code": "<label class=\"etiqueta\"><?= traducir('PASAJEROS ADULTOS','ADULT PASSENGERS'); ?> <small><?= $rango_edades_adultos ?></small></label>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 76,
+                "code": "<option value=\"\" selected=\"\"><?= traducir('SELECCIONE','SELECT') ?></option>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 77,
+                "code": "<option value=\"0\">- <?= traducir('NINGUNO','NONE') ?> -</option>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 81,
+                "code": "echo '<option value=\"'.$i.'\">'.$i.' '.traducir('PASAJEROS','PASSENGERS').'</option>';"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 83,
+                "code": "echo '<option value=\"'.$i.'\">'.$i.' '.traducir('PASAJERO','PASSENGER').'</option>';"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 93,
+                "code": "<label class=\"etiqueta\"><?= traducir('PASAJEROS ESTUDIANTES','STUDENTS PASSENGERS'); ?> <small><?= $rango_edades_jovenes ?></small></label>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 95,
+                "code": "<option value=\"\"><?= traducir('SELECCIONE','SELECT') ?></option>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 96,
+                "code": "<option value=\"0\" selected=\"\">- <?= traducir('NINGUNO','NONE') ?> -</option>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 100,
+                "code": "echo '<option value=\"'.$i.'\">'.$i.' '.traducir('PASAJEROS','PASSENGERS').'</option>';"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 102,
+                "code": "echo '<option value=\"'.$i.'\">'.$i.' '.traducir('PASAJERO','PASSENGER').'</option>';"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 112,
+                "code": "<label class=\"etiqueta\"><?= traducir('PASAJEROS MENORES','PASSENGERS MINIORS'); ?> <small><?= $rango_edades_menores ?></small></label>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 114,
+                "code": "<option value=\"\"><?= traducir('SELECCIONE','SELECT') ?></option>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 115,
+                "code": "<option value=\"0\" selected=\"\">- <?= traducir('NINGUNO','NONE') ?> -</option>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 119,
+                "code": "echo '<option value=\"'.$i.'\">'.$i.' '.traducir('PASAJEROS','PASSENGERS').'</option>';"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 121,
+                "code": "echo '<option value=\"'.$i.'\">'.$i.' '.traducir('PASAJERO','PASSENGER').'</option>';"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 131,
+                "code": "<label class=\"etiqueta\"><?= traducir('PASAJEROS INFANTES','INFANT PASSENGERS'); ?> <small><?= $rango_edades_infantes ?></small></label>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 133,
+                "code": "<option value=\"\"><?= traducir('SELECCIONE','SELECT') ?></option>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 134,
+                "code": "<option value=\"0\" selected=\"\">- <?= traducir('NINGUNO','NONE') ?> -</option>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 138,
+                "code": "echo '<option value=\"'.$i.'\">'.$i.' '.traducir('PASAJEROS','PASSENGERS').'</option>';"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 140,
+                "code": "echo '<option value=\"'.$i.'\">'.$i.' '.traducir('PASAJERO','PASSENGER').'</option>';"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 152,
+                "code": "<label class=\"etiqueta\"><?= traducir('PAIS','COUNTRY','PA\u00cdS'); ?></label>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 154,
+                "code": "<option value=\"\" selected=\"\"><?= traducir('SELECCIONE','SELECT') ?></option>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 168,
+                "code": "<label class=\"etiqueta\"><?= traducir('FORMA DE CONTACTO', 'CONTACT METHOD') ?></label>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 170,
+                "code": "<option value=\"\" selected=\"\"><?= traducir('SELECCIONE','CHOOSE') ?></option>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 171,
+                "code": "<option value=\"email\"><?= traducir('ESCRIBEME AL EMAIL','WRITE TO ME AT EMAIL') ?></option>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 172,
+                "code": "<option value=\"telefono\"><?= traducir('LLAMAME AL TELEFONO','CALL ME ON THE PHONE') ?></option>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 173,
+                "code": "<option value=\"whatsapp\"><?= traducir('ESCRIBEME AL WHATSAPP','WRITE TO ME AT WHATSAPP') ?></option>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 179,
+                "code": "<label class=\"etiqueta\"><?= traducir('NUMERO DE CONTACTO','CONTACT NUMBER'); ?></label>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 189,
+                "code": "<label class=\"etiqueta\"><?= traducir('INFORMACION ADICIONAL', 'ADDITIONAL INFORMATION'); ?></label>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 190,
+                "code": "<textarea name=\"mensaje_adicional\" id=\"mensaje_adicional\" class=\"form-control text-uppercase\" onblur=\"mayusculas(event, this)\" placeholder=\"<?= traducir('Ingrese informacion adicional','Enter additional information','Ingrese informacion adicional'); ?>\"></textarea>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 198,
+                "code": "<button type=\"button\" class=\"btn btn-md btn-dark\" id=\"btn_enviar_reserva\"><?= traducir(\"ENVIAR RESERVA DE TOUR\",\"SEND TOUR BOOKING\") ?></button>"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 321,
+                "code": "nombre            : { required: '<?= traducir('Ingrese su nombre completo', 'Enter your full name') ?>' },"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 322,
+                "code": "email             : { required: '<?= traducir('Ingrese su email', 'Enter your email') ?>', email: '<?= traducir('Ingrese un email valido', 'Enter a valid email', 'Entre com um email v\u00e1lido') ?>' },"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 323,
+                "code": "pais              : { required: '<?= traducir('Elija su pais', 'Choose your country') ?>' },"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 324,
+                "code": "fecha_salida      : { required: '<?= traducir('Elija fecha de viaje', 'Choose travel date') ?>' },"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 325,
+                "code": "adultos           : { required: '<?= traducir('Seleccione cantidad de pasajeros', 'Select number of passengers') ?>' },"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 326,
+                "code": "jovenes           : { required: '<?= traducir('Seleccione cantidad de pasajeros', 'Select number of passengers') ?>' },"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 327,
+                "code": "menores           : { required: '<?= traducir('Seleccione cantidad de pasajeros', 'Select number of passengers') ?>' },"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 328,
+                "code": "infantes          : { required: '<?= traducir('Seleccione cantidad de pasajeros', 'Select number of passengers') ?>' },"
+            },
+            {
+                "symbol": "traducir",
+                "file": "template-parts/tour.php",
+                "line": 329,
+                "code": "mensaje_adicional : { required: '<?= traducir('Escriba su mensaje', 'Write your message') ?>' },"
+            }
+        ]
+    },
+    "icl_object_id": {
+        "count": 4,
+        "files": {
+            "inc/class-hook.php": 4
+        },
+        "items": [
+            {
+                "symbol": "icl_object_id",
+                "file": "inc/class-hook.php",
+                "line": 88,
+                "code": "if( function_exists( 'icl_object_id' ) ){"
+            },
+            {
+                "symbol": "icl_object_id",
+                "file": "inc/class-hook.php",
+                "line": 89,
+                "code": "$post_id_header = icl_object_id($post_id_header, 'ova_framework_hf_el', false);"
+            },
+            {
+                "symbol": "icl_object_id",
+                "file": "inc/class-hook.php",
+                "line": 154,
+                "code": "if( function_exists( 'icl_object_id' ) ){"
+            },
+            {
+                "symbol": "icl_object_id",
+                "file": "inc/class-hook.php",
+                "line": 155,
+                "code": "$post_id_footer = icl_object_id($post_id_footer, 'ova_framework_hf_el', false);"
+            }
+        ]
+    },
+    "ICL_LANGUAGE_CODE": {
+        "count": 3,
+        "files": {
+            "inc/ecoterra.php": 1,
+            "inc/short-codes.php": 1,
+            "template-parts/tour.php": 1
+        },
+        "items": [
+            {
+                "symbol": "ICL_LANGUAGE_CODE",
+                "file": "inc/ecoterra.php",
+                "line": 125,
+                "code": "$idioma_actual = defined( 'ICL_LANGUAGE_CODE' ) ? ICL_LANGUAGE_CODE : 'es';"
+            },
+            {
+                "symbol": "ICL_LANGUAGE_CODE",
+                "file": "inc/short-codes.php",
+                "line": 256,
+                "code": "$idioma_actual      = defined( 'ICL_LANGUAGE_CODE' ) ? ICL_LANGUAGE_CODE : 'es';"
+            },
+            {
+                "symbol": "ICL_LANGUAGE_CODE",
+                "file": "template-parts/tour.php",
+                "line": 214,
+                "code": "var idioma='<?= ICL_LANGUAGE_CODE ?>';"
+            }
+        ]
+    },
+    "icl_get_languages": {
+        "count": 4,
+        "files": {
+            "inc/short-codes.php": 4
+        },
+        "items": [
+            {
+                "symbol": "icl_get_languages",
+                "file": "inc/short-codes.php",
+                "line": 362,
+                "code": "if ( function_exists( 'icl_get_languages' ) ) {"
+            },
+            {
+                "symbol": "icl_get_languages",
+                "file": "inc/short-codes.php",
+                "line": 363,
+                "code": "$languages = icl_get_languages( 'skip_missing=0&orderby=custom' );"
+            },
+            {
+                "symbol": "icl_get_languages",
+                "file": "inc/short-codes.php",
+                "line": 431,
+                "code": "if ( function_exists( 'icl_get_languages' ) ) {"
+            },
+            {
+                "symbol": "icl_get_languages",
+                "file": "inc/short-codes.php",
+                "line": 432,
+                "code": "$languages = icl_get_languages( 'skip_missing=0&orderby=custom' );"
+            }
+        ]
+    }
+}

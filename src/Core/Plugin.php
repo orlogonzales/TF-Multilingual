@@ -18,6 +18,8 @@ use TF\Multilingual\Admin\PostEditorialUi;
 use TF\Multilingual\Admin\StringEditorialUi;
 use TF\Multilingual\Admin\TermEditorialUi;
 use TF\Multilingual\Diagnostic\DiagnosticService;
+use TF\Multilingual\API\ServicioTraduccionPublico;
+use TF\Multilingual\Compatibilidad\AdaptadorCompatibilidadWpml;
 use TF\Multilingual\Domain\CustomField\CustomFieldPolicyRegistry;
 use TF\Multilingual\Domain\CustomField\SharedMetaSynchronizer;
 use TF\Multilingual\Domain\Language\LanguageRegistry;
@@ -316,6 +318,20 @@ class Plugin {
 	private ?LocalizadorPublicoNativo $localizador_publico_nativo = null;
 
 	/**
+	 * Servicio de API pública soberana de TF Multilingual.
+	 *
+	 * @var ServicioTraduccionPublico|null
+	 */
+	private ?ServicioTraduccionPublico $servicio_traduccion_publico = null;
+
+	/**
+	 * Adaptador de compatibilidad heredada con WPML (opcional y desactivado por defecto).
+	 *
+	 * @var AdaptadorCompatibilidadWpml|null
+	 */
+	private ?AdaptadorCompatibilidadWpml $adaptador_compatibilidad_wpml = null;
+
+	/**
 	 * Retrieves the singleton instance.
 	 *
 	 * @return self
@@ -505,6 +521,22 @@ class Plugin {
 		);
 		$this->diagnostic_ui                    = new DiagnosticUi(
 			$this->diagnostic_service
+		);
+
+		$this->servicio_traduccion_publico = new ServicioTraduccionPublico(
+			$this->language_registry,
+			$this->current_language_resolver,
+			$translation_resolver,
+			$this->rewrite_manager
+		);
+
+		// DT-TFML-058: Adaptador opcional DESACTIVADO POR DEFECTO. Solo se activa mediante filtro explícito.
+		$habilitar_adaptador_wpml            = (bool) ( function_exists( 'apply_filters' )
+			? apply_filters( 'tfml_enable_wpml_compatibility_adapter', false )
+			: false );
+		$this->adaptador_compatibilidad_wpml = new AdaptadorCompatibilidadWpml(
+			$this->servicio_traduccion_publico,
+			$habilitar_adaptador_wpml
 		);
 
 		$this->rewrite_manager->init_hooks();
@@ -1119,6 +1151,24 @@ class Plugin {
 	 */
 	public function get_localizador_publico_nativo(): ?LocalizadorPublicoNativo {
 		return $this->localizador_publico_nativo;
+	}
+
+	/**
+	 * Retorna el servicio de API pública soberana de traducción de TF Multilingual.
+	 *
+	 * @return ServicioTraduccionPublico|null
+	 */
+	public function get_servicio_traduccion_publico(): ?ServicioTraduccionPublico {
+		return $this->servicio_traduccion_publico;
+	}
+
+	/**
+	 * Retorna el adaptador opcional de compatibilidad con WPML.
+	 *
+	 * @return AdaptadorCompatibilidadWpml|null
+	 */
+	public function get_adaptador_compatibilidad_wpml(): ?AdaptadorCompatibilidadWpml {
+		return $this->adaptador_compatibilidad_wpml;
 	}
 
 	/**

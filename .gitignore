@@ -23,6 +23,9 @@ Thumbs.db
 # Logs and scratch
 *.log
 /scratch/*
+!/scratch/verify_fase_3_28.php
+!/scratch/theme_contracts_inventory.json
+!/scratch/audit_theme_contracts.php
 !/scratch/verify_fase_3_27.php
 !/scratch/verify_fase_3_26.php
 !/scratch/verify_fase_3_25.php
