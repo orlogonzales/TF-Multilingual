@@ -1347,6 +1347,47 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Verificación Integral Fase 3.23 (`scratch/verify_fase_3_23.php`): **503/503 controles PASS (100%)**.
   - `composer validate --strict`: PASS.
 
+---
+
+## [Fase 3.24] - 2026-10-11
+
+### Auditoría Integral Post-Migración y Diagnóstico de Brechas Funcionales (DT-TFML-054)
+- **Certificación y Congelamiento del Baseline Post-Migración en Laboratorio:**
+  - Auditoría exhaustiva en `cms_ect_lab` ratificando el congelamiento exacto de **120 grupos** en `etk_t_tfml_groups` y **133 elementos** en `etk_t_tfml_group_elements` (100,0% del universo clasificado como IMPORTABLE).
+  - Cero grupos duplicados, cero elementos duplicados, 0 registros en `etk_t_tfml_media_translations`, 0 en `etk_t_tfml_strings` y 0 en `etk_t_tfml_string_translations`.
+  - Checkpoint oficial en estado `completed` con 18 ítems procesados (Lote 10), último TRID `34840`, y lock de ejecución liberado.
+- **Diagnóstico Causa-Raíz de la Ausencia del Tema `ecoCMS`:**
+  - Constatación de configuración en BD `cms_ect_lab` (`etk_t_options`): `template = 'ecoCMS'`, `stylesheet = 'ecoCMS'`, `current_theme = 'ecoCMS'`.
+  - Constatación física: el directorio `D:/laragon/www/lab.ecoterra/wp-content/themes` está completamente vacío, provocando el fallo visual y el estado formal `BLOCKED` para renderizado HTML de etiquetas lingüísticas, canonicals, hreflang y menús.
+  - Caracterización del tema en origen: tema autónomo (no child theme) versión 1.0.0, Text Domain `qomfort`, dependiente de plugins `ova-framework`, `elementor` y `elementor-pro`.
+  - Diseño de procedimiento controlado de incorporación física (copia aislada estricta, sin enlaces simbólicos ni directorios compartidos) con salvaguardas perimetrales activas.
+- **Diagnóstico Quirúrgico del TRID 197 (Página de Inicio) y Causa de HTTP 404 en `/en/`:**
+  - Configuración Core: `show_on_front = 'page'`, `page_on_front = 197`.
+  - Estructura en WPML: TRID 197 contiene Post 197 (`es` - Inicio, canónica), Post 8356 (`en` - Home, traducción inglesa) y Post 8839 (`fr` - Accueil, traducción francesa).
+  - Causa raíz de brecha funcional: Al tener una traducción en francés (`fr`) y estar `fr` inactivo en TFML, el planificador clasificó el TRID completo como `BLOCKED_BY_LANGUAGE`.
+  - En consecuencia, el par en inglés no fue importado a tablas de TFML, `ContentTranslationResolver::resolve_element_id('post', 197, 'en')` devuelve estrictamente `null`, y las peticiones a `http://lab.ecoterra.test/en/` devuelven `404 Not Found`.
+  - Propuesta para fase posterior: Derivación quirúrgica del TRID 197 registrando el par activo `es` <-> `en` en TFML y dejando `fr` retenido en `pending_translations`, sin activar francés en frontend.
+- **Auditoría Estructural de los 129 Grupos No Importables del Universo WPML (249 Totales):**
+  - **`BLOCKED_BY_LANGUAGE` (52 grupos / 139 elementos):** 23 `page`, 14 `nav_menu_item`, 11 `rooms`, 2 `ova_framework_hf_el`, 1 `category`, 1 `nav_menu`. Entidades íntegras y válidas retenidas únicamente por miembros en francés (`fr`).
+  - **`SKIPPED` (24 grupos / 48 elementos):** 21 comentarios de blog (`comment`) y 3 taxonomías técnicas (`translation_priority`). No aplicables para tablas de traducción TFML.
+  - **`ORPHAN` (53 grupos / 53 elementos):** 20 `product`, 19 `page`, 10 `tours`, 3 `post`, 1 `mc4wp-form`. Entidades eliminadas de WordPress Core cuyos registros huérfanos persisten en `icl_translations`. Deben permanecer excluidas.
+- **Diagnóstico de Integraciones (Elementor vs WPBakery):**
+  - WPBakery: 0 registros de metadatos `vc_*` o `wpb*` en `etk_t_postmeta`. WPBakery no aplica al sitio (desestimado).
+  - Elementor: Confirmada presencia activa en 398 publicaciones con metadatos `_elementor_data`.
+- **Comprobaciones HTTP Reales No Destructivas:**
+  - Raíz (`/`): HTTP 200 OK con cabecera `X-Robots-Tag: noindex, nofollow, noarchive`.
+  - Prefijo `/en/`: HTTP 404 Not Found (por TRID 197 no importado; sin errores 500 ni loops).
+  - Prefijo `/fr/`: HTTP 404 Not Found (idioma inactivo, rechazo limpio sin aliasing espurio).
+- **Preservación Inmutable de Centinelas:**
+  - `cms_ect_lab`: Conserva exactamente 120 grupos acumulados y 133 elementos, lock liberado.
+  - `cms_ect`: Centinela intacto con 3.403 registros y hash MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0 verificado en pre y post-flight).
+- **Métricas de Calidad:**
+  - PHPUnit: **532 tests (533 total), 1.830 assertions, 0 errors, 0 failures, 1 skipped** (100% PASS).
+  - PHPCS / WPCS: **168/168 archivos analizados, 0 errors, 0 warnings** (100% PASS).
+  - Verificación Integral Fase 3.24 (`scratch/verify_fase_3_24.php`): **50/50 controles PASS (100%)**.
+  - `composer validate --strict`: PASS.
+
+
 
 
 

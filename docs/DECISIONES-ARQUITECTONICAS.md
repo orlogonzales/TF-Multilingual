@@ -1099,6 +1099,39 @@
 - **JUSTIFICACIÓN:** Ejecutar el décimo y último lote del catálogo de migración importable en laboratorio aislado, certificar la inviolabilidad de metadatos de navegación y relaciones de menú, asegurar la idempotencia y reversibilidad selectiva, consolidar el 100% del universo importable (120 grupos / 133 elementos) y preservar las entidades no importables.
 - **CONSECUENCIAS:** El laboratorio alcanza el 100% del universo importable (120 grupos y 133 elementos en tablas TFML). Quedan identificadas y delimitadas las brechas funcionales de frontend y el tratamiento de entidades no importables antes de abordar cualquier certificación integral para producción.
 
+### ADR-050: Auditoría Integral Post-Migración, Congelamiento de Baseline de Datos, Diagnóstico de Brechas Funcionales y Plan de Incorporación Controlada del Tema ecoCMS (Fase 3.24)
+- **FECHA:** 2026-10-11
+- **DECISIÓN:**
+  1. **Congelamiento y Certificación del Baseline Post-Migración (120 Grupos / 133 Elementos):**
+     - Se auditó exhaustivamente la base de datos de laboratorio `cms_ect_lab` ratificando el congelamiento exacto de 120 grupos en `etk_t_tfml_groups` y 133 elementos en `etk_t_tfml_group_elements`, correspondientes al 100,0% del catálogo importable saneado (10 lotes migrados).
+     - Se certificó formalmente: 0 grupos duplicados, 0 elementos duplicados, 0 registros en `etk_t_tfml_media_translations`, 0 registros en `etk_t_tfml_strings` y 0 registros en `etk_t_tfml_string_translations`.
+     - Checkpoint oficial consolidado en estado `completed` con 18 ítems procesados (Lote 10), último TRID `34840`, y lock de ejecución liberado (`is_locked = false`).
+  2. **Diagnóstico Causa-Raíz de la Ausencia del Tema ecoCMS:**
+     - En `cms_ect_lab` (tabla `etk_t_options`), las opciones `template`, `stylesheet` y `current_theme` están configuradas en `'ecoCMS'`.
+     - El directorio `wp-content/themes` en `lab.ecoterra` se encuentra completamente vacío (ausencia física del tema), lo cual constituye la causa raíz técnica y única del fallo visual y de la imposibilidad de evaluar `<html lang>`, `canonical`, `hreflang` en el cuerpo HTML y navegación en frontend.
+     - Se auditó el tema de origen en `cms.ecoterra`: es un tema autónomo (no child theme) versión 1.0.0, Text Domain `qomfort`, dependiente de los plugins `ova-framework`, `elementor` y `elementor-pro`, y sin dependencias de WPBakery.
+     - Se formuló un protocolo de incorporación física controlada mediante copia estricta (prohibiendo enlaces simbólicos o carpetas compartidas) con salvaguardas perimetrales activas (`X-Robots-Tag: noindex`, `wp_mail` desactivado, HTTP externo bloqueado).
+  3. **Diagnóstico Funcional del TRID 197 (Página de Inicio) y Causa del HTTP 404 en `/en/`:**
+     - Configuración Core: `show_on_front = 'page'`, `page_on_front = 197`.
+     - Anatomía en WPML: TRID 197 agrupa la página 197 (`es` - Inicio, canónica), página 8356 (`en` - Home, traducción inglesa) y página 8839 (`fr` - Accueil, traducción francesa).
+     - Causa del bloqueo: El planificador WPML clasificó todo el TRID 197 como `BLOCKED_BY_LANGUAGE` debido a la presencia del miembro en francés (`fr`), idioma no configurado en TFML.
+     - Por consiguiente, la página 8356 no fue importada al grupo de TFML, `ContentTranslationResolver::resolve_element_id('post', 197, 'en')` devuelve estrictamente `null`, y las solicitudes HTTP a `http://lab.ecoterra.test/en/` devuelven `404 Not Found` (comportamiento esperado y correcto dado el estado actual de los datos).
+     - Se propone para una microfase posterior la derivación quirúrgica del TRID 197 registrando el par activo `es` <-> `en` en TFML y dejando la traducción francesa en `pending_translations`, sin activar francés en el frontend.
+  4. **Auditoría Estructural de los 129 Grupos No Importables del Universo WPML (249 Totales):**
+     - `BLOCKED_BY_LANGUAGE` (52 grupos / 139 elementos): 23 `page`, 14 `nav_menu_item`, 11 `rooms`, 2 `ova_framework_hf_el`, 1 `category`, 1 `nav_menu`. Son entidades íntegras bloqueadas exclusivamente por tener variantes en francés (`fr`).
+     - `SKIPPED` (24 grupos / 48 elementos): 21 comentarios de blog (`comment`) y 3 taxonomías técnicas internas de WPML (`translation_priority`). No deben importarse a tablas TFML.
+     - `ORPHAN` (53 grupos / 53 elementos): 20 `product`, 19 `page`, 10 `tours`, 3 `post`, 1 `mc4wp-form`. Entidades eliminadas físicamente de WordPress Core cuyos residuos permean en `icl_translations`. Deben permanecer excluidas.
+  5. **Diagnóstico de Integraciones (Elementor vs WPBakery):**
+     - WPBakery: Se constató un recuento exacto de 0 registros con prefijo `vc_*` o `wpb*` en `etk_t_postmeta`. WPBakery no aplica al sitio de Ecoterra Lodge.
+     - Elementor: Confirmada presencia activa en 398 publicaciones con metadatos `_elementor_data`.
+  6. **Invarianza Absoluta del Centinela en Origen (`cms_ect`):**
+     - Verificación pre y post-flight en `cms_ect`: 3.403 filas exactas y checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (**Delta = 0**).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.24 / Directiva DT-TFML-054 — Auditoría Integral Post-Migración y Diagnóstico de Brechas Funcionales.
+- **JUSTIFICACIÓN:** Completada la migración del 100% del universo importable, se requiere una auditoría exhaustiva de solo lectura para certificar el estado de los datos en laboratorio, identificar las causas raíz del bloqueo de frontend (tema `ecoCMS` ausente y TRID 197), desglosar la totalidad de entidades no importables y establecer la hoja de ruta técnica para las fases subsiguientes.
+- **CONSECUENCIAS:** Se mantiene el congelamiento total de datos de migración, se delimitan los riesgos P0, P1 y P2, y se provee la fundamentación técnica indispensable para que la Dirección Técnica autorice las microfases de incorporación del tema, derivación de TRID 197 y certificación funcional de frontend.
+
+
 
 
 
