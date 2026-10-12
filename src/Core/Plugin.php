@@ -38,6 +38,7 @@ use TF\Multilingual\Domain\Translation\ContentTranslationResolver;
 use TF\Multilingual\Domain\Translation\TranslationGroupRepository;
 use TF\Multilingual\Editorial\TranslationEditorialService;
 use TF\Multilingual\Integration\IntegrationManager;
+use TF\Multilingual\Localizacion\LocalizadorPublicoNativo;
 use TF\Multilingual\Migration\MigrationManager;
 use TF\Multilingual\Query\QueryLanguageFilter;
 use TF\Multilingual\Query\TermQueryLanguageFilter;
@@ -308,6 +309,13 @@ class Plugin {
 	private ?MigrationManager $migration_manager = null;
 
 	/**
+	 * Localizador público nativo de WordPress.
+	 *
+	 * @var LocalizadorPublicoNativo|null
+	 */
+	private ?LocalizadorPublicoNativo $localizador_publico_nativo = null;
+
+	/**
 	 * Retrieves the singleton instance.
 	 *
 	 * @return self
@@ -356,6 +364,11 @@ class Plugin {
 			$this->current_language_resolver
 		);
 		$this->term_query_filter         = new TermQueryLanguageFilter(
+			$this->language_registry,
+			$this->current_language_resolver
+		);
+
+		$this->localizador_publico_nativo = new LocalizadorPublicoNativo(
 			$this->language_registry,
 			$this->current_language_resolver
 		);
@@ -495,6 +508,7 @@ class Plugin {
 		);
 
 		$this->rewrite_manager->init_hooks();
+		$this->localizador_publico_nativo->registrar_ganchos();
 		$this->query_filter->init_hooks();
 		$this->term_query_filter->init_hooks();
 		$this->shared_meta_synchronizer->init_hooks();
@@ -1096,6 +1110,15 @@ class Plugin {
 	 */
 	public function get_version(): string {
 		return self::VERSION;
+	}
+
+	/**
+	 * Retorna la instancia del localizador público nativo.
+	 *
+	 * @return LocalizadorPublicoNativo|null
+	 */
+	public function get_localizador_publico_nativo(): ?LocalizadorPublicoNativo {
+		return $this->localizador_publico_nativo;
 	}
 
 	/**

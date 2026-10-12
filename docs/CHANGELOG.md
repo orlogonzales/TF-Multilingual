@@ -1460,9 +1460,37 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - `cms_ect`: Centinela intacto con 3.403 registros y hash MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0 verificado en pre y post-flight).
 - **Métricas de Calidad:**
   - PHPUnit: **532 tests (533 total), 1.830 assertions, 0 errors, 0 failures, 1 skipped** (100% PASS).
-  - PHPCS / WPCS: **168/168 archivos analizados, 0 errors, 0 warnings** (100% PASS).
-  - Verificación Integral Fase 3.26 (`scratch/verify_fase_3_26.php`): **56/56 controles PASS (100%)**.
+## [Fase 3.27] - 2026-10-11
+
+### Corrección del Idioma HTML y Localización Pública Nativa de WordPress (DT-TFML-057)
+- **Implementación del Componente Canónico de Localización:**
+  - Nueva clase `TF\Multilingual\Localizacion\LocalizadorPublicoNativo` en `src/Localizacion/LocalizadorPublicoNativo.php`.
+  - Integración nativa con `CurrentLanguageResolver` y `LanguageRegistry`.
+  - Intercepción limpia mediante los hooks canónicos de WordPress Core `locale` y `determine_locale` (con prioridad 10).
+- **Resolución Rigurosa de Contextos y Aislamiento Administrativo:**
+  - Método `es_contexto_publico_elegible()` que previene alteraciones en el área de administración (`is_admin()`), tareas programadas (`wp_doing_cron()`), llamadas internas (`wp_doing_ajax()`) y comandos de consola (`WP_CLI`), salvo activación explícita para pruebas unitarias (`habilitar_en_cli_para_pruebas()`).
+  - Protección antirrecursión mediante bandera interna en memoria (`$en_resolucion`).
+- **Invarianza Estricta de Base de Datos y WPLANG:**
+  - Cero mutaciones en la opción `WPLANG` en la base de datos `cms_ect_lab`, manteniéndose vacía (`""`) a nivel persistente.
+  - Corrección 100% en memoria en tiempo de ejecución.
+  - Cero modificaciones a la base de datos de producción `cms_ect`.
+  - Los 120 grupos y 133 elementos migrados en `cms_ect_lab` permanecen intactos (Delta = 0).
+  - Centinela WPML en `cms_ect` preserva 3.403 registros y hash MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+- **Acreditación Empírica en Frontend (lab.ecoterra.test):**
+  - Corrección demostrada de `<html lang="en-US">` a `<html lang="es-ES">` en todas las URLs públicas en español:
+    - Portada raíz (`/`): HTTP 200 OK, `<html lang="es-ES" >`.
+    - Página monolingüe migrada (`/old-blog/`): HTTP 200 OK, `<html lang="es-ES" >`.
+    - Categoría de blog (`/category/blog/`): HTTP 200 OK, `<html lang="es-ES" >`.
+    - Etiqueta de blog (`/tag/cusco/`): HTTP 200 OK, `<html lang="es-ES" >`.
+    - Entrada individual de blog (`/sin-categorizar/recomendaciones-para-disfrutar-machu-picchu/`): HTTP 200 OK, `<html lang="es-ES" >`.
+    - Ruta en inglés (`/en/`): `<html lang="en-US" >`.
+    - Ruta en idioma inactivo (`/fr/`): `<html lang="es-ES" >` (idioma francés inactivo no se habilita).
+- **Métricas de Calidad y Verificación:**
+  - PHPUnit: **540 tests (541 total), 1.872 assertions, 0 errors, 0 failures, 1 skipped** (100% PASS).
+  - PHPCS / WPCS: **170/170 archivos analizados, 0 errors, 0 warnings** (100% PASS).
+  - Verificación Integral Fase 3.27 (`scratch/verify_fase_3_27.php`): **45/45 controles PASS (100%)**.
   - `composer validate --strict`: PASS.
+
 
 
 

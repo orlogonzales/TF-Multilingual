@@ -1205,7 +1205,48 @@
 - **ESTADO:** **ACEPTADA**
 - **CONTEXTO:** Fase 3.26 / Directiva DT-TFML-056 — Diagnóstico y diseño seguro de la portada bilingüe y compatibilidad del tema.
 - **JUSTIFICACIÓN:** Resolver técnicamente los diagnósticos requeridos por Dirección Técnica sobre la discrepancia de atributo `<html lang>`, la ausencia de respuesta en `/en/`, las alternativas de importación del TRID 197, la cuantificación de compatibilidad de `ecoCMS` y la dependencia de Elementor, manteniendo estrictamente el modo no destructivo de solo lectura.
-- **CONSECUENCIAS:** Se sientan las bases arquitectónicas y de diseño técnico para que la Dirección Técnica autorice las siguientes microfases operativas: registro del filtro `locale` en TFML, puente de compatibilidad temática `ICL_LANGUAGE_CODE`/stubs, e importación controlada del par activo del TRID 197.
+### ADR-053: Localización Pública Nativa de WordPress y Corrección del Atributo <html lang> sin Mutación de WPLANG (Fase 3.27)
+- **FECHA:** 2026-10-11
+- **DECISIÓN:**
+  1. **Implementación del Componente Canónico de Localización:**
+     - Se creó la clase `TF\Multilingual\Localizacion\LocalizadorPublicoNativo` en el espacio de nombres `TF\Multilingual\Localizacion`.
+     - El componente colabora directamente con `CurrentLanguageResolver` y `LanguageRegistry`.
+     - Se integra en el ciclo de vida del plugin a través de `Plugin::init()` y `Plugin::registrar_ganchos()`.
+  2. **Intercepción de Hooks Nativos de WordPress Core (`locale` y `determine_locale`):**
+     - En WordPress Core, `language_attributes()` invoca `get_bloginfo('language')`, el cual a su vez consulta `get_locale()` y sustituye el guión bajo por guión medio (`_` -> `-`). `language_attributes()` **no** pasa por `determine_locale()`.
+     - Por consiguiente, `LocalizadorPublicoNativo` se engancha simultáneamente a:
+       - `locale` (prioridad 10): alimenta de manera directa a `get_locale()`, `language_attributes()` y la carga de traducciones MO/PO.
+       - `determine_locale` (prioridad 10): satisface el estándar moderno de WordPress 5.0+ para la resolución del locale en el bootstrap.
+  3. **Discriminación Rigurosa de Contexto Público vs Administrativo:**
+     - El método `es_contexto_publico_elegible()` preserva la soberanía del entorno administrativo y procesos asíncronos. Se abstiene de intervenir (`return false`) si:
+       - `is_admin()` es verdadero (protegiendo las preferencias de usuario en WP-Admin y menús administrativos).
+       - `wp_doing_cron()` es verdadero.
+       - `wp_doing_ajax()` es verdadero (a menos que se trate de llamadas públicas explícitas no administrativas).
+       - Se ejecuta bajo WP-CLI, salvo activación explícita mediante `habilitar_en_cli_para_pruebas(true)` para tests unitarios y scripts de verificación.
+  4. **Resolución de Locales Regionales e Idiomas Desconocidos:**
+     - Si el idioma activo es `'es'`, resuelve `'es_ES'`.
+     - Si el idioma activo es `'en'`, resuelve `'en_US'`.
+     - Para idiomas activos registrados en `LanguageRegistry`, se extrae su código regional (`locale` / `facebook_locale`), o se compone `{código}_{CÓDIGO}` si no está definido.
+     - Si la petición es para un idioma inactivo o bloqueado (p. ej. `/fr/`) o si `get_current_language()` retorna `null`, el localizador se abstiene de intervenir, permitiendo que WordPress conserve su comportamiento por defecto sin habilitar idiomas no autorizados.
+  5. **Protección Antirrecursión e Invarianza de la Opción WPLANG:**
+     - Se implementó un semáforo interno `$en_resolucion` para evitar ciclos infinitos si llamadas a funciones de traducción interna o filtros satélites vuelven a disparar `get_locale()`.
+     - Se respeta estrictamente la directiva de no mutar la opción `WPLANG` en la base de datos `cms_ect_lab`, manteniéndose vacía (`""`) a nivel de almacenamiento persistente. La adaptación es 100% en memoria en tiempo de ejecución.
+  6. **Acreditación Empírica en Frontend y Quality Gates:**
+     - Solicitudes HTTP reales contra `http://lab.ecoterra.test` certifican que todas las páginas en español emiten `<html lang="es-ES" >` (frente a `lang="en-US"` previo):
+       - `/` -> HTTP 200 OK | `<html lang="es-ES" >`.
+       - `/old-blog/` -> HTTP 200 OK | `<html lang="es-ES" >`.
+       - `/category/blog/` -> HTTP 200 OK | `<html lang="es-ES" >`.
+       - `/tag/cusco/` -> HTTP 200 OK | `<html lang="es-ES" >`.
+       - `/sin-categorizar/recomendaciones-para-disfrutar-machu-picchu/` -> HTTP 200 OK | `<html lang="es-ES" >`.
+       - `/en/` -> `<html lang="en-US" >`.
+       - `/fr/` -> `<html lang="es-ES" >` (idioma inactivo no habilitado).
+     - Suite de pruebas unitarias con 11 tests específicos en `LocalizadorPublicoNativoTest.php`. Total general del plugin: 540 tests, 1872 assertions PASS.
+     - Centinelas de base de datos inalterados: `cms_ect` con 3.403 filas (MD5 `4241ca7e7ec6399a594537cb04790c10`), `cms_ect_lab` con 120 grupos y 133 elementos (Delta = 0).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.27 / Directiva DT-TFML-057 — Corrección del idioma HTML y localización pública nativa de WordPress.
+- **JUSTIFICACIÓN:** Resolver de raíz la emisión errónea de `lang="en-US"` en las páginas públicas en español de Ecoterra Lodge, garantizando accesibilidad web, SEO multilingüe canónico y compatibilidad nativa con WordPress Core sin manipulación frágil del DOM ni mutaciones persistentes de la base de datos.
+- **CONSECUENCIAS:** Las páginas públicas emiten el atributo de idioma formal correspondiente al idioma resuelto por la URL. La administración de WordPress y los procesos internos no son alterados. Se prepara el camino para la integración de compatibilidad temática de menús y el TRID 197 en fases posteriores.
+
 
 
 
