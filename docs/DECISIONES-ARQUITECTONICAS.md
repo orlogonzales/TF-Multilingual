@@ -1131,6 +1131,44 @@
 - **JUSTIFICACIÓN:** Completada la migración del 100% del universo importable, se requiere una auditoría exhaustiva de solo lectura para certificar el estado de los datos en laboratorio, identificar las causas raíz del bloqueo de frontend (tema `ecoCMS` ausente y TRID 197), desglosar la totalidad de entidades no importables y establecer la hoja de ruta técnica para las fases subsiguientes.
 - **CONSECUENCIAS:** Se mantiene el congelamiento total de datos de migración, se delimitan los riesgos P0, P1 y P2, y se provee la fundamentación técnica indispensable para que la Dirección Técnica autorice las microfases de incorporación del tema, derivación de TRID 197 y certificación funcional de frontend.
 
+### ADR-051: Restauración Controlada del Entorno Visual en Laboratorio Mediante Copia Física Aislada de ecoCMS y ova-framework, Certificación de Matriz HTTP/HTML y Diagnóstico de Navegación (Fase 3.25)
+- **FECHA:** 2026-10-11
+- **DECISIÓN:**
+  1. **Incorporación Física Aislada del Tema ecoCMS (175 Archivos):**
+     - Se realizó una copia física independiente desde `D:/laragon/www/cms.ecoterra/wp-content/themes/ecoCMS` hacia `D:/laragon/www/lab.ecoterra/wp-content/themes/ecoCMS`.
+     - Se certificó formalmente: 175 archivos copiados físicamente, 0 enlaces simbólicos, 0 junctions NTFS, 0 directorios compartidos y 100% de coincidencia en tamaño e integridad criptográfica SHA-256 (0 discrepancias).
+     - El tema de origen permanece estrictamente intacto y desvinculado del laboratorio.
+  2. **Evaluación e Incorporación de la Dependencia ova-framework (6 Archivos):**
+     - Se auditó el código de `ova-framework` en origen: no ejecuta consultas de escritura automática, tareas cron, envíos de correo, mutaciones a tablas de WPML ni conexiones remotas no autorizadas.
+     - Se realizó la copia física independiente de sus 6 archivos hacia `D:/laragon/www/lab.ecoterra/wp-content/plugins/ova-framework` con 100% de paridad SHA-256.
+     - Habilitó el registro nativo de los Custom Post Types `rooms` y `ova_framework_hf_el` requeridos por las plantillas del tema.
+  3. **Arranque Controlado de WordPress y Renderizado Real:**
+     - WordPress en `lab.ecoterra` reconoció de forma inmediata `ecoCMS` como tema activo (`template`, `stylesheet`, `current_theme` en `etk_t_options`).
+     - Se verificó la transición del frontend: de un documento vacío de 0 bytes (en Fase 3.24) a un renderizado HTML estructural completo de 52.217 bytes en la ruta raíz (`/`), con `<header>`, `<footer>`, estilos y scripts locales.
+  4. **Ejecución de la Matriz HTTP y HTML Obligatoria (11 Rutas Evaluadas):**
+     - `/`: HTTP 200 OK (52.217 bytes, canonical, `X-Robots-Tag: noindex, nofollow, noarchive`).
+     - `/en/`: HTTP 404 Not Found (31.062 bytes, renderizado de plantilla 404 de `ecoCMS`; comportamiento esperado por bloqueo del TRID 197).
+     - `/fr/`: HTTP 404 Not Found (31.062 bytes, rechazo limpio de idioma inactivo sin aliasing espurio).
+     - `/old-blog/` (Página monolingüe migrada): HTTP 200 OK (31.865 bytes, canonical localizado).
+     - `/blog/recomendaciones-para-disfrutar-machu-picchu/` (Entrada blog migrada): HTTP 200 OK (51.107 bytes, contenido editorial y layout completo).
+     - `/category/blog/` (Categoría migrada): HTTP 200 OK (49.588 bytes, archivo de taxonomía).
+     - `/tag/cusco/` (Etiqueta migrada): HTTP 200 OK (41.544 bytes, archivo de etiqueta).
+     - Tours bilingües y Producto WooCommerce: códigos HTTP controlados sin errores 500.
+     - Cero errores críticos PHP o excepciones fatales en runtime.
+  5. **Diagnóstico Anatómico de Menús, Navegación y Selector de Idiomas:**
+     - En base de datos existen tres menús editoriales: `Menu Principal` (ES, ID 43), `Menu - ES - Inglés` (EN, ID 98) y `Menu Principal - Francés` (FR, ID 105).
+     - En `nav_menu_locations`, la ubicación del tema `primary` se encuentra sin asignar (`''`) debido a que en origen el sitio delegaba la cabecera al constructor Elementor (`ova_framework_hf_el`).
+     - En `template-parts/header-default.php`, la navegación clásica requiere la asignación explícita de ubicación o la activación de Elementor Pro para renderizar las plantillas de cabecera.
+     - Se detectó que el helper temático `traducir()` en `ecoCMS/inc/ecoterra.php` consulta la constante histórica `ICL_LANGUAGE_CODE`, retornando español como fallback al no estar definida.
+  6. **Invarianza Absoluta de Datos y Centinela en Origen:**
+     - `cms_ect_lab`: Conserva exactamente 120 grupos y 133 elementos (100% universo importable). Checkpoint `completed`, TRID 34840, lock liberado.
+     - `cms_ect`: Intacto con 3.403 filas en `etk_t_icl_translations` y hash MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.25 / Directiva DT-TFML-055 — Restauración controlada del entorno visual en laboratorio.
+- **JUSTIFICACIÓN:** Cumplir el mandato de incorporar una copia física aislada del tema `ecoCMS` y la dependencia `ova-framework`, habilitar el renderizado real del frontend, ejecutar la matriz de 11 rutas HTTP/HTML obligatorias y diagnosticar la interacción entre el tema y TF Multilingual manteniendo blindados los datos y el aislamiento.
+- **CONSECUENCIAS:** Queda superado el bloqueo de renderizado HTML (0 bytes -> 52KB). Se documentan las dependencias restantes (Elementor para cabecera compleja y TRID 197 para `/en/`), habilitando el paso hacia la derivación quirúrgica del TRID 197 en la Fase 3.26.
+
+
 
 
 

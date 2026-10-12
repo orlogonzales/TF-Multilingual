@@ -1387,6 +1387,46 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Verificación Integral Fase 3.24 (`scratch/verify_fase_3_24.php`): **50/50 controles PASS (100%)**.
   - `composer validate --strict`: PASS.
 
+---
+
+## [Fase 3.25] - 2026-10-11
+
+### Restauración Controlada del Entorno Visual en Laboratorio (DT-TFML-055)
+- **Incorporación Física Aislada del Tema `ecoCMS` (175 Archivos):**
+  - Despliegue mediante copia física independiente desde `D:/laragon/www/cms.ecoterra/wp-content/themes/ecoCMS` hacia `D:/laragon/www/lab.ecoterra/wp-content/themes/ecoCMS`.
+  - Cero symlinks, cero junctions, cero archivos compartidos: 100% de paridad en tamaño y checksums SHA-256 (175/175 archivos coincidentes, 0 discrepancias).
+  - Tema de producción permanece 100% inalterado y fuera del repositorio del plugin.
+- **Evaluación y Copia Controlada de `ova-framework` (6 Archivos):**
+  - Inspección previa de código: sin escrituras no controladas, llamadas HTTP externas, tareas cron ni desvíos de aislamiento.
+  - Copia física independiente hacia `D:/laragon/www/lab.ecoterra/wp-content/plugins/ova-framework` (6/6 archivos con 100% paridad SHA-256).
+  - Registro de CPTs requeridos: `rooms` y constructor de cabeceras/pies `ova_framework_hf_el`.
+- **Inicio de WordPress y Renderizado Real:**
+  - Reconocimiento de `ecoCMS` como tema activo (`template`, `stylesheet`, `current_theme`).
+  - Transición de documento vacío (0 bytes en Fase 3.24) a renderizado HTML estructural completo de 52.217 bytes en `/`, con `<header>`, `<footer>`, estilos y scripts locales.
+- **Ejecución de la Matriz HTTP y HTML Obligatoria (11 Rutas Evaluadas):**
+  - Ruta raíz (`/`): HTTP 200 OK (52.217 bytes, canonical, `X-Robots-Tag: noindex, nofollow, noarchive`).
+  - Prefijo `/en/`: HTTP 404 Not Found (31.062 bytes, renderizado de plantilla 404 de `ecoCMS`; comportamiento esperado por TRID 197 bloqueado).
+  - Prefijo `/fr/`: HTTP 404 Not Found (31.062 bytes, rechazo limpio de idioma no habilitado).
+  - Página monolingüe migrada (`/old-blog/`): HTTP 200 OK (31.865 bytes, canonical localizado).
+  - Entrada de blog migrada (`/blog/recomendaciones-para-disfrutar-machu-picchu/`): HTTP 200 OK (51.107 bytes, contenido editorial y maquetación de blog completa).
+  - Categoría migrada (`/category/blog/`): HTTP 200 OK (49.588 bytes, listado de taxonomía).
+  - Etiqueta migrada (`/tag/cusco/`): HTTP 200 OK (41.544 bytes, listado de taxonomía).
+  - Tours bilingües y Producto WooCommerce: códigos de respuesta controlados sin errores fatales 500.
+  - Cero errores críticos PHP o excepciones no capturadas.
+- **Auditoría de Menús, Navegación y Selector de Idioma:**
+  - Detección de tres menús en base de datos: `Menu Principal` (ES, ID 43), `Menu - ES - Inglés` (EN, ID 98) y `Menu Principal - Francés` (FR, ID 105).
+  - Ubicación de tema `primary` sin asignar (`''`) en `nav_menu_locations`, debido a que en origen la cabecera dependía de Elementor Pro (`ova_framework_hf_el`).
+  - Detección del helper `traducir()` en `ecoCMS/inc/ecoterra.php` que consulta `ICL_LANGUAGE_CODE` para desvíos lingüísticos.
+- **Preservación Inmutable de Centinelas:**
+  - `cms_ect_lab`: Conserva exactamente 120 grupos acumulados y 133 elementos, lock liberado.
+  - `cms_ect`: Centinela intacto con 3.403 registros y hash MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0 verificado en pre y post-flight).
+- **Métricas de Calidad:**
+  - PHPUnit: **532 tests (533 total), 1.830 assertions, 0 errors, 0 failures, 1 skipped** (100% PASS).
+  - PHPCS / WPCS: **168/168 archivos analizados, 0 errors, 0 warnings** (100% PASS).
+  - Verificación Integral Fase 3.25 (`scratch/verify_fase_3_25.php`): **60/60 controles PASS (100%)**.
+  - `composer validate --strict`: PASS.
+
+
 
 
 
