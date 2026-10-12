@@ -40,6 +40,12 @@ class MigrationPlan {
 	public const CLASSIFICATION_IMPORTABLE = 'IMPORTABLE';
 
 	/**
+	 * Classification: Group is partially imported with a validated subset of active languages,
+	 * while inactive languages are explicitly retained and tracked.
+	 */
+	public const CLASSIFICATION_PARTIAL_RETAINED = 'PARTIAL_RETAINED';
+
+	/**
 	 * Classification: Group is blocked by pending/unregistered languages.
 	 */
 	public const CLASSIFICATION_BLOCKED_BY_LANGUAGE = 'BLOCKED_BY_LANGUAGE';
@@ -274,18 +280,33 @@ class MigrationPlan {
 	 * Guarantees that:
 	 * 1. The original plan is untouched and preserved.
 	 * 2. All selected TRIDs must exist in the original plan.
-	 * 3. All selected TRIDs must be classified as CLASSIFICATION_IMPORTABLE (no blocked/orphan/skipped groups allowed).
+	 * 3. All selected TRIDs must be classified as CLASSIFICATION_IMPORTABLE or explicitly authorized with retained languages.
 	 * 4. The derived plan receives STATUS_READY because all selected groups have active, verified language pairs.
 	 * 5. Lineage is cryptographically bound to the parent plan via parent_fingerprint.
 	 *
-	 * @param array<int, int> $selected_trids Array of TRIDs to include in the partial/pilot plan.
-	 * @param string          $label          Human-readable label for the pilot batch.
+	 * @param array<int, int>                                         $selected_trids      Array of TRIDs to include in the partial/pilot plan.
+	 * @param string                                                  $label               Human-readable label for the pilot batch.
+	 * @param array<int, array<string, mixed>|bool>|array<int, int>   $authorized_retained Optional authorizations for groups with retained languages.
 	 * @return self New immutable partial migration plan.
 	 * @throws InvalidArgumentException If selected TRIDs are empty or contain invalid/unimportable groups.
 	 */
-	public function derive_partial_plan( array $selected_trids, string $label = 'pilot' ): self {
+	public function derive_partial_plan(
+		array $selected_trids,
+		string $label = 'pilot',
+		array $authorized_retained = array()
+	): self {
 		if ( empty( $selected_trids ) ) {
 			throw new InvalidArgumentException( 'No se puede derivar un plan parcial con una lista vacía de TRIDs.' );
+		}
+
+		// Normalize authorized retained TRIDs map.
+		$normalized_retained = array();
+		foreach ( $authorized_retained as $key => $val ) {
+			if ( is_int( $val ) ) {
+				$normalized_retained[ $val ] = array();
+			} elseif ( is_int( $key ) && ( is_array( $val ) || true === $val ) ) {
+				$normalized_retained[ $key ] = is_array( $val ) ? $val : array();
+			}
 		}
 
 		$selected_trids_map = array_fill_keys( array_map( 'intval', $selected_trids ), true );
@@ -294,8 +315,10 @@ class MigrationPlan {
 			$indexed_groups[ (int) ( $group['trid'] ?? 0 ) ] = $group;
 		}
 
-		$filtered_groups = array();
-		$total_elements  = 0;
+		$filtered_groups        = array();
+		$total_elements         = 0;
+		$total_pending_elements = 0;
+		$partial_retained_count = 0;
 
 		foreach ( array_keys( $selected_trids_map ) as $trid ) {
 			if ( ! isset( $indexed_groups[ $trid ] ) ) {
@@ -304,20 +327,75 @@ class MigrationPlan {
 				);
 			}
 
-			$group = $indexed_groups[ $trid ];
-			if ( self::CLASSIFICATION_IMPORTABLE !== ( $group['classification'] ?? '' ) ) {
+			$group          = $indexed_groups[ $trid ];
+			$classification = (string) ( $group['classification'] ?? '' );
+
+			if ( self::CLASSIFICATION_IMPORTABLE === $classification ) {
+				$filtered_groups[] = $group;
+				$total_elements   += count( (array) ( $group['translations'] ?? array() ) );
+			} elseif ( self::CLASSIFICATION_BLOCKED_BY_LANGUAGE === $classification && isset( $normalized_retained[ $trid ] ) ) {
+				$retained_auth = $normalized_retained[ $trid ];
+				$active_trans  = (array) ( $group['translations'] ?? array() );
+				$pending_trans = (array) ( $group['pending_translations'] ?? array() );
+
+				if ( empty( $active_trans ) ) {
+					throw new InvalidArgumentException(
+						sprintf( 'El TRID %d no posee traducciones activas para importar parcialmente.', $trid )
+					);
+				}
+
+				if ( empty( $pending_trans ) ) {
+					throw new InvalidArgumentException(
+						sprintf( 'El TRID %d no posee traducciones en idiomas inactivos para retener.', $trid )
+					);
+				}
+
+				// If specific authorized languages are specified, filter active translations:
+				if ( ! empty( $retained_auth['authorized_languages'] ) ) {
+					$allowed_langs = array_map( 'strtolower', (array) $retained_auth['authorized_languages'] );
+					$active_trans  = array_filter(
+						$active_trans,
+						fn( string $l ) => in_array( strtolower( $l ), $allowed_langs, true ),
+						ARRAY_FILTER_USE_KEY
+					);
+				}
+
+				$canonical_id   = isset( $group['canonical_id'] ) ? (int) $group['canonical_id'] : null;
+				$canonical_lang = isset( $group['canonical_lang'] ) ? (string) $group['canonical_lang'] : null;
+
+				// Invariant: canonical element must be present in the active translations.
+				if ( null === $canonical_id || null === $canonical_lang || ! in_array( $canonical_id, $active_trans, true ) ) {
+					throw new InvalidArgumentException(
+						sprintf( 'El TRID %d no tiene un elemento canónico válido dentro de las traducciones activas autorizadas.', $trid )
+					);
+				}
+
+				$partial_group                         = $group;
+				$partial_group['classification']       = self::CLASSIFICATION_PARTIAL_RETAINED;
+				$partial_group['translations']         = $active_trans;
+				$partial_group['pending_translations'] = $pending_trans;
+				$partial_group['reasons']              = array_merge(
+					(array) ( $group['reasons'] ?? array() ),
+					array( 'Importación parcial autorizada: subconjunto de idiomas activos listo; idiomas inactivos retenidos.' )
+				);
+
+				$filtered_groups[]       = $partial_group;
+				$total_elements         += count( $active_trans );
+				$total_pending_elements += count( $pending_trans );
+				++$partial_retained_count;
+			} else {
 				throw new InvalidArgumentException(
 					sprintf(
-						'El TRID %d no es elegible para el plan parcial: su clasificación es "%s" (se requiere "%s").',
+						'El TRID %d no es elegible para el plan parcial: su clasificación es "%s" (se requiere "%s"%s).',
 						$trid,
-						$group['classification'] ?? '',
-						self::CLASSIFICATION_IMPORTABLE
+						$classification,
+						self::CLASSIFICATION_IMPORTABLE,
+						self::CLASSIFICATION_BLOCKED_BY_LANGUAGE === $classification
+							? ' con autorización explícita para idiomas retenidos'
+							: ''
 					)
 				);
 			}
-
-			$filtered_groups[] = $group;
-			$total_elements   += count( (array) ( $group['translations'] ?? array() ) );
 		}
 
 		// Sort filtered groups deterministically by TRID ascending.
@@ -326,13 +404,14 @@ class MigrationPlan {
 		$derived_summary = array(
 			'total_groups'            => count( $filtered_groups ),
 			'importable_groups'       => count( $filtered_groups ),
+			'partial_retained_groups' => $partial_retained_count,
 			'blocked_language_groups' => 0,
 			'skipped_groups'          => 0,
 			'conflict_groups'         => 0,
 			'orphan_groups'           => 0,
 			'total_elements'          => $total_elements,
 			'importable_elements'     => $total_elements,
-			'pending_elements'        => 0,
+			'pending_elements'        => $total_pending_elements,
 		);
 
 		return new self(
@@ -352,6 +431,33 @@ class MigrationPlan {
 				'label'              => $label,
 			)
 		);
+	}
+
+	/**
+	 * Derives a partial migration plan with explicit support for retained language groups.
+	 *
+	 * @param array<int, int|array<string, mixed>> $authorized_selections List of TRIDs or authorized specifications.
+	 * @param string                               $label                 Human-readable label for the plan.
+	 * @return self New immutable partial migration plan.
+	 */
+	public function derive_partial_plan_with_retained_languages(
+		array $authorized_selections,
+		string $label = 'partial-retained'
+	): self {
+		$selected_trids      = array();
+		$authorized_retained = array();
+
+		foreach ( $authorized_selections as $item ) {
+			if ( is_int( $item ) ) {
+				$selected_trids[] = $item;
+			} elseif ( is_array( $item ) && isset( $item['trid'] ) ) {
+				$trid                         = (int) $item['trid'];
+				$selected_trids[]             = $trid;
+				$authorized_retained[ $trid ] = $item;
+			}
+		}
+
+		return $this->derive_partial_plan( $selected_trids, $label, $authorized_retained );
 	}
 
 	/**

@@ -1316,6 +1316,45 @@
 - **JUSTIFICACIÓN:** Resolver categóricamente la observación de seguridad arquitectónica de la Fase 3.28, asegurando que cuando el adaptador WPML esté inactivo no exista residuo alguno en la tabla global de funciones de PHP (`function_exists` = false), garantizando coexistencia limpia sin efectos colaterales sobre temas u otros plugins.
 - **CONSECUENCIAS:** Se alcanza un blindaje robusto del ciclo de vida del adaptador. La Superficie A permanece como la vía primaria y pura, mientras la Superficie B queda herméticamente sellada cuando no se requiere.
 
+### ADR-056: Soporte Transaccional para Grupos WPML con Idiomas Inactivos Retenidos y Registro de Traducciones Retenidas (Fase 3.30)
+- **FECHA:** 2026-10-11
+- **DECISIÓN:**
+  1. **Conservación de la Clasificación Histórica en Planes Maestros:**
+     - `WpmlMigrationPlanner::generate_plan()` mantiene invariable la clasificación `BLOCKED_BY_LANGUAGE` para todos aquellos grupos del catálogo WPML que contengan elementos pertenecientes a idiomas inactivos (los 52 grupos detectados originalmente, incluido el TRID 197).
+     - La clasificación `PARTIAL_RETAINED` no se asigna automáticamente ni de manera indiscriminada en el escaneo general para no mutar los fingerprints criptográficos de planes preexistentes.
+  2. **Derivación Explícita y Trazable de Planes Parciales (`derive_partial_plan`):**
+     - Se extiende `MigrationPlan::derive_partial_plan(array $selected_trids, string $label, array $authorized_retained)` permitiendo a un operador técnico autorizar formalmente la derivación de grupos clasificados originalmente como `BLOCKED_BY_LANGUAGE`.
+     - Cuando se autoriza expresamente la exclusión controlada de idiomas inactivos (ej. retención de francés en TRID 197), el grupo derivado adquiere formalmente la clasificación `MigrationPlan::CLASSIFICATION_PARTIAL_RETAINED` ('PARTIAL_RETAINED').
+     - Los miembros en idiomas activos (ej. ES:197, EN:8356) se conservan en `$group['translations']` para su ejecución normal en TFML (`tfml_groups` y `tfml_group_elements`).
+     - Los miembros en idiomas inactivos (ej. FR:8839) se preservan intactos en `$group['pending_translations']` como traducciones retenidas.
+     - Se implementa el helper tipado `derive_partial_plan_with_retained_languages()` para simplificar y blindar la invocación.
+  3. **Componente Persistente y Auditable: `RetainedTranslationRegistry`:**
+     - Para no contaminar las 5 tablas canónicas de TFML (preservando `tfml_schema_version = '1.0.0'` sin alteraciones DDL), se implementa `RetainedTranslationRegistry`.
+     - Almacena el inventario de elementos retenidos en la Options API de WordPress (`tfml_retained_translations`), indexado por fuente (`wpml`), identificador de origen (`source_trid`), ID de grupo TFML asignado (`tfml_group_id`), tipo/subtipo y mapa de traducciones retenidas (`pending_translations`).
+     - Valida colisiones relacionales y unicidad: rechaza que un mismo elemento retenido sea registrado más de una vez en grupos distintos.
+     - Calcula una huella criptográfica determinista SHA-256 (`fingerprint`) para auditar la integridad del registro.
+     - Proporciona el mecanismo de promoción controlada `promote_retained_translation($group_id, $language_code, ...)` para cuando en el futuro se active formalmente un idioma inactivo en `LanguageRegistry`.
+     - Proporciona `remove_by_group_id($group_id)` para limpieza atómica durante operaciones de reversión/rollback.
+  4. **Adaptación Transaccional del Ejecutor (`WpmlMigrationExecutor`):**
+     - Se inyecta `RetainedTranslationRegistry` en el ejecutor.
+     - En `validate_plan()`: admite formalmente grupos con clasificación `PARTIAL_RETAINED` en planes parciales/derivados.
+     - En `execute_batch()`: procesa grupos `PARTIAL_RETAINED`, transfiriendo `$group['pending_translations']` al método de inserción.
+     - En `import_group()`: registra de forma idempotente las traducciones retenidas en `RetainedTranslationRegistry`.
+     - En `run()`: contabiliza `imported_partial_retained` en el resumen global y persiste el mapa de retenidas en el manifiesto de lote (`tfml_migration_manifest_{token}`).
+     - En `reconcile()`: verifica que los miembros activos estén en `tfml_group_elements`, que los miembros retenidos **NO** hayan sido insertados en la base de datos relacional de TFML, y que existan debidamente auditados en `RetainedTranslationRegistry`.
+  5. **Integración Atómica en el Servicio de Rollback (`WpmlMigrationRollbackService`):**
+     - Se inyecta `RetainedTranslationRegistry` en el servicio de reversión.
+     - Al revertir grupos migrados con traducciones retenidas, `rollback_groups()` invoca `$this->retained_registry->remove_by_group_id($group_id)`, eliminando atómicamente el registro retenido de la Options API sin dejar estados huérfanos.
+  6. **Contrato Técnico y Restricción Estricta de No-Ejecución:**
+     - En cumplimiento de `DT-TFML-060`, **NO** se ejecutó la importación real del TRID 197 sobre la base de datos de laboratorio `cms_ect_lab`.
+     - El baseline permanece congelado en 120 grupos y 133 elementos (Delta = 0).
+     - La base de datos de origen `cms_ect` permanece estrictamente invariante en 3.403 registros y MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.30 / Directiva DT-TFML-060 — Soporte transaccional para grupos WPML con idiomas inactivos retenidos y registro de traducciones retenidas.
+- **JUSTIFICACIÓN:** Permitir el rescate técnico e importación segura de grupos históricos con mezclas de idiomas activos e inactivos (como la portada TRID 197: ES/EN activos, FR inactivo) sin corromper la integridad referencial de TFML ni perder la trazabilidad de los contenidos en idiomas no habilitados.
+- **CONSECUENCIAS:** Queda habilitada la capacidad técnica para importar grupos parciales retenidos de manera transaccional, con soporte completo de verificación, reconciliación, idempotencia, rollback atómico y futura promoción cuando los idiomas secundarios se activen.
+
+
 
 
 

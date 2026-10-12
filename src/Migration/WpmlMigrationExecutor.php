@@ -82,6 +82,13 @@ class WpmlMigrationExecutor {
 	private SchemaManager $schema_manager;
 
 	/**
+	 * Retained translation registry.
+	 *
+	 * @var RetainedTranslationRegistry
+	 */
+	private RetainedTranslationRegistry $retained_registry;
+
+	/**
 	 * Explicit authorization flag.
 	 *
 	 * @var bool
@@ -105,6 +112,7 @@ class WpmlMigrationExecutor {
 	 * @param MigrationExecutionLock|null        $lock                  Lock manager.
 	 * @param WordPressElementValidator|null     $element_validator     Element validator.
 	 * @param SchemaManager|null                 $schema_manager        Schema manager.
+	 * @param RetainedTranslationRegistry|null   $retained_registry     Retained translation registry.
 	 */
 	public function __construct(
 		?wpdb $db = null,
@@ -113,7 +121,8 @@ class WpmlMigrationExecutor {
 		?MigrationCheckpointRepository $checkpoint_repository = null,
 		?MigrationExecutionLock $lock = null,
 		?WordPressElementValidator $element_validator = null,
-		?SchemaManager $schema_manager = null
+		?SchemaManager $schema_manager = null,
+		?RetainedTranslationRegistry $retained_registry = null
 	) {
 		global $wpdb;
 
@@ -124,6 +133,16 @@ class WpmlMigrationExecutor {
 		$this->lock                  = null !== $lock ? $lock : new MigrationExecutionLock();
 		$this->element_validator     = null !== $element_validator ? $element_validator : new WordPressElementValidator();
 		$this->schema_manager        = null !== $schema_manager ? $schema_manager : new SchemaManager( $this->db );
+		$this->retained_registry     = null !== $retained_registry ? $retained_registry : new RetainedTranslationRegistry();
+	}
+
+	/**
+	 * Gets the retained translation registry.
+	 *
+	 * @return RetainedTranslationRegistry
+	 */
+	public function get_retained_registry(): RetainedTranslationRegistry {
+		return $this->retained_registry;
 	}
 
 	/**
@@ -228,14 +247,15 @@ class WpmlMigrationExecutor {
 			$errors[] = 'El plan de migración no contiene grupos planificados para procesar.';
 		}
 
-		// If plan is partial/derived, all planned groups must strictly be CLASSIFICATION_IMPORTABLE.
+		// If plan is partial/derived, all planned groups must strictly be CLASSIFICATION_IMPORTABLE or CLASSIFICATION_PARTIAL_RETAINED.
 		if ( $plan->is_partial() ) {
 			foreach ( $groups as $group ) {
-				if ( MigrationPlan::CLASSIFICATION_IMPORTABLE !== ( $group['classification'] ?? '' ) ) {
+				$cl = (string) ( $group['classification'] ?? '' );
+				if ( MigrationPlan::CLASSIFICATION_IMPORTABLE !== $cl && MigrationPlan::CLASSIFICATION_PARTIAL_RETAINED !== $cl ) {
 					$errors[] = sprintf(
 						'El plan parcial derivado contiene el grupo TRID %d no elegible con clasificación "%s".',
 						(int) ( $group['trid'] ?? 0 ),
-						$group['classification'] ?? ''
+						$cl
 					);
 				}
 			}
@@ -246,7 +266,8 @@ class WpmlMigrationExecutor {
 
 		// Freshness check: Verify elements, trash status, WPML source divergence, and TFML collisions.
 		foreach ( $groups as $group ) {
-			if ( MigrationPlan::CLASSIFICATION_IMPORTABLE !== ( $group['classification'] ?? '' ) ) {
+			$cl = (string) ( $group['classification'] ?? '' );
+			if ( MigrationPlan::CLASSIFICATION_IMPORTABLE !== $cl && MigrationPlan::CLASSIFICATION_PARTIAL_RETAINED !== $cl ) {
 				continue;
 			}
 
@@ -502,6 +523,21 @@ class WpmlMigrationExecutor {
 						$batch_results[] = $import_result;
 						break;
 
+					case MigrationPlan::CLASSIFICATION_PARTIAL_RETAINED:
+						$pending_trans   = (array) ( $group['pending_translations'] ?? array() );
+						$import_result   = $this->import_group(
+							$current_trid,
+							$element_type,
+							$subtype,
+							$canonical_id,
+							$canonical_lang,
+							$translations,
+							$pending_trans,
+							$plan->get_fingerprint()
+						);
+						$batch_results[] = $import_result;
+						break;
+
 					case MigrationPlan::CLASSIFICATION_BLOCKED_BY_LANGUAGE:
 						$pending_langs   = array_keys( (array) ( $group['pending_translations'] ?? array() ) );
 						$batch_results[] = array(
@@ -604,13 +640,15 @@ class WpmlMigrationExecutor {
 	/**
 	 * Imports a single group idempotently.
 	 *
-	 * @param int                $trid           Source TRID.
-	 * @param string             $element_type   Element type ('post', 'term').
-	 * @param string             $subtype        Subtype (post_type or taxonomy).
-	 * @param int|null           $canonical_id   Canonical element ID.
-	 * @param string|null        $canonical_lang Canonical language code.
-	 * @param array<string, int> $translations   Translations map (lang => element_id).
-	 * @return array{trid: int, status: string, group_id: ?int, message: string}
+	 * @param int                $trid                  Source TRID.
+	 * @param string             $element_type          Element type ('post', 'term').
+	 * @param string             $subtype               Subtype (post_type or taxonomy).
+	 * @param int|null           $canonical_id          Canonical element ID.
+	 * @param string|null        $canonical_lang        Canonical language code.
+	 * @param array<string, int> $translations          Translations map (lang => element_id).
+	 * @param array<string, int> $retained_translations Retained translations map (lang => element_id).
+	 * @param string             $plan_fingerprint      Cryptographic fingerprint of the plan.
+	 * @return array{trid: int, status: string, group_id: ?int, message: string, retained_translations?: array<string, int>}
 	 * @throws MigrationExecutionException If element mapping is in conflict across multiple groups.
 	 */
 	private function import_group(
@@ -619,7 +657,9 @@ class WpmlMigrationExecutor {
 		string $subtype,
 		?int $canonical_id,
 		?string $canonical_lang,
-		array $translations
+		array $translations,
+		array $retained_translations = array(),
+		string $plan_fingerprint = ''
 	): array {
 		if ( empty( $translations ) || null === $canonical_id || null === $canonical_lang ) {
 			return array(
@@ -646,11 +686,24 @@ class WpmlMigrationExecutor {
 		if ( count( $translations ) === $found_count && 1 === count( $existing_groups ) ) {
 			$existing_group_id = (int) array_key_first( $existing_groups );
 
+			if ( ! empty( $retained_translations ) ) {
+				$this->retained_registry->register(
+					'wpml',
+					$trid,
+					$existing_group_id,
+					$element_type,
+					$subtype,
+					$retained_translations,
+					$plan_fingerprint
+				);
+			}
+
 			return array(
-				'trid'     => $trid,
-				'status'   => 'idempotent_skipped',
-				'group_id' => $existing_group_id,
-				'message'  => 'Grupo ya importado previamente (idempotencia garantizada).',
+				'trid'                  => $trid,
+				'status'                => 'idempotent_skipped',
+				'group_id'              => $existing_group_id,
+				'retained_translations' => $retained_translations,
+				'message'               => 'Grupo ya importado previamente (idempotencia garantizada).',
 			);
 		}
 
@@ -691,11 +744,31 @@ class WpmlMigrationExecutor {
 			);
 		}
 
+		if ( ! empty( $retained_translations ) ) {
+			$this->retained_registry->register(
+				'wpml',
+				$trid,
+				(int) $persisted->get_id(),
+				$element_type,
+				$subtype,
+				$retained_translations,
+				$plan_fingerprint
+			);
+		}
+
 		return array(
-			'trid'     => $trid,
-			'status'   => 'imported',
-			'group_id' => $persisted->get_id(),
-			'message'  => sprintf( 'Grupo importado exitosamente con %d elementos.', count( $translations ) ),
+			'trid'                  => $trid,
+			'status'                => ! empty( $retained_translations ) ? 'imported_partial_retained' : 'imported',
+			'group_id'              => $persisted->get_id(),
+			'retained_translations' => $retained_translations,
+			'message'               => ! empty( $retained_translations )
+				? sprintf(
+					'Grupo importado parcialmente con %d elementos activos; %d elementos retenidos en idiomas inactivos (%s).',
+					count( $translations ),
+					count( $retained_translations ),
+					implode( ', ', array_keys( $retained_translations ) )
+				)
+				: sprintf( 'Grupo importado exitosamente con %d elementos.', count( $translations ) ),
 		);
 	}
 
@@ -754,7 +827,7 @@ class WpmlMigrationExecutor {
 			foreach ( $batch_results as $res ) {
 				$all_results[] = $res;
 				$status        = (string) ( $res['status'] ?? '' );
-				if ( 'imported' === $status ) {
+				if ( 'imported' === $status || 'imported_partial_retained' === $status ) {
 					++$imported_groups;
 				} elseif ( 'idempotent_skipped' === $status ) {
 					++$skipped_groups;
@@ -776,10 +849,19 @@ class WpmlMigrationExecutor {
 		$imported_elements = (int) ( $reconciliation['tfml_imported_elements'] ?? 0 );
 
 		// Extract imported group IDs and register execution manifest for ownership tracking.
-		$imported_group_ids = array();
+		$imported_group_ids        = array();
+		$retained_manifest_records = array();
 		foreach ( $all_results as $res ) {
-			if ( 'imported' === ( $res['status'] ?? '' ) && ! empty( $res['group_id'] ) ) {
+			$st = (string) ( $res['status'] ?? '' );
+			if ( ( 'imported' === $st || 'imported_partial_retained' === $st ) && ! empty( $res['group_id'] ) ) {
 				$imported_group_ids[] = (int) $res['group_id'];
+			}
+			if ( ! empty( $res['retained_translations'] ) ) {
+				$retained_manifest_records[] = array(
+					'trid'                  => (int) ( $res['trid'] ?? 0 ),
+					'group_id'              => (int) ( $res['group_id'] ?? 0 ),
+					'retained_translations' => (array) $res['retained_translations'],
+				);
 			}
 		}
 		$imported_group_ids = array_values( array_unique( $imported_group_ids ) );
@@ -788,12 +870,13 @@ class WpmlMigrationExecutor {
 			update_option(
 				WpmlMigrationRollbackService::OPTION_MANIFEST_PREFIX . $token,
 				array(
-					'execution_id'       => $token,
-					'source'             => 'wpml',
-					'plan_fingerprint'   => $plan->get_fingerprint(),
-					'imported_group_ids' => $imported_group_ids,
-					'started_at'         => $started_at,
-					'finished_at'        => gmdate( 'Y-m-d H:i:s' ),
+					'execution_id'          => $token,
+					'source'                => 'wpml',
+					'plan_fingerprint'      => $plan->get_fingerprint(),
+					'imported_group_ids'    => $imported_group_ids,
+					'retained_translations' => $retained_manifest_records,
+					'started_at'            => $started_at,
+					'finished_at'           => gmdate( 'Y-m-d H:i:s' ),
 				),
 				false
 			);
@@ -854,7 +937,7 @@ class WpmlMigrationExecutor {
 			$translations   = (array) ( $g['translations'] ?? array() );
 			$trid           = (int) ( $g['trid'] ?? 0 );
 
-			if ( MigrationPlan::CLASSIFICATION_IMPORTABLE === $classification ) {
+			if ( MigrationPlan::CLASSIFICATION_IMPORTABLE === $classification || MigrationPlan::CLASSIFICATION_PARTIAL_RETAINED === $classification ) {
 				$found_groups = array();
 				foreach ( $translations as $lang => $eid ) {
 					$element_id = (int) $eid;
@@ -927,11 +1010,37 @@ class WpmlMigrationExecutor {
 						}
 					}
 
+					// For partial groups with retained translations, verify that retained elements
+					// were NOT inserted as active elements in TFML, and ARE present in RetainedTranslationRegistry.
+					if ( MigrationPlan::CLASSIFICATION_PARTIAL_RETAINED === $classification ) {
+						$pending_translations = (array) ( $g['pending_translations'] ?? array() );
+						foreach ( $pending_translations as $pend_lang => $pend_eid ) {
+							$found_pend = $this->group_repository->find_by_element( $element_type, (int) $pend_eid );
+							if ( null !== $found_pend ) {
+								$discrepancies[] = sprintf(
+									'TRID %d: Elemento retenido ID %d (%s) fue insertado indebidamente en tabla activa de TFML (grupo ID %d).',
+									$trid,
+									(int) $pend_eid,
+									$pend_lang,
+									(int) $found_pend->get_id()
+								);
+							}
+						}
+
+						$retained_record = $this->retained_registry->get( 'wpml', $trid );
+						if ( null === $retained_record ) {
+							$discrepancies[] = sprintf(
+								'TRID %d: Grupo con clasificación PARTIAL_RETAINED no posee registro en RetainedTranslationRegistry.',
+								$trid
+							);
+						}
+					}
+
 					++$imported_groups_count;
 					$imported_elements_count += count( $translations );
 				} else {
 					if ( empty( $found_groups ) ) {
-						$discrepancies[] = sprintf( 'TRID %d: Grupo planificado como IMPORTABLE no fue encontrado en TFML.', $trid );
+						$discrepancies[] = sprintf( 'TRID %d: Grupo planificado como IMPORTABLE/PARTIAL_RETAINED no fue encontrado en TFML.', $trid );
 					} else {
 						$discrepancies[] = sprintf(
 							'TRID %d: Elementos fragmentados en múltiples grupos TFML (%s).',
@@ -948,7 +1057,8 @@ class WpmlMigrationExecutor {
 		$summary             = $plan->get_summary();
 		$expected_importable = isset( $summary['importable_groups'] )
 			? (int) $summary['importable_groups']
-			: count( $plan->get_groups_by_classification( MigrationPlan::CLASSIFICATION_IMPORTABLE ) );
+			: ( count( $plan->get_groups_by_classification( MigrationPlan::CLASSIFICATION_IMPORTABLE ) )
+				+ count( $plan->get_groups_by_classification( MigrationPlan::CLASSIFICATION_PARTIAL_RETAINED ) ) );
 		$integrity_verified  = empty( $discrepancies ) && ( $imported_groups_count === $expected_importable );
 
 		return array(

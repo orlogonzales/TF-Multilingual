@@ -53,18 +53,27 @@ class WpmlMigrationRollbackService {
 	private MigrationExecutionLock $lock;
 
 	/**
+	 * Retained translation registry.
+	 *
+	 * @var RetainedTranslationRegistry
+	 */
+	private RetainedTranslationRegistry $retained_registry;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param wpdb|null                          $db                    Database instance.
 	 * @param TranslationGroupRepository|null    $group_repository      Group repository.
 	 * @param MigrationCheckpointRepository|null $checkpoint_repository Checkpoint repository.
 	 * @param MigrationExecutionLock|null        $lock                  Lock manager.
+	 * @param RetainedTranslationRegistry|null   $retained_registry     Retained translation registry.
 	 */
 	public function __construct(
 		?wpdb $db = null,
 		?TranslationGroupRepository $group_repository = null,
 		?MigrationCheckpointRepository $checkpoint_repository = null,
-		?MigrationExecutionLock $lock = null
+		?MigrationExecutionLock $lock = null,
+		?RetainedTranslationRegistry $retained_registry = null
 	) {
 		global $wpdb;
 
@@ -72,6 +81,7 @@ class WpmlMigrationRollbackService {
 		$this->group_repository      = null !== $group_repository ? $group_repository : new TranslationGroupRepository( $this->db );
 		$this->checkpoint_repository = null !== $checkpoint_repository ? $checkpoint_repository : new MigrationCheckpointRepository();
 		$this->lock                  = null !== $lock ? $lock : new MigrationExecutionLock();
+		$this->retained_registry     = null !== $retained_registry ? $retained_registry : new RetainedTranslationRegistry();
 	}
 
 	/**
@@ -310,6 +320,7 @@ class WpmlMigrationRollbackService {
 				if ( $deleted ) {
 					++$reverted_groups_count;
 					$reverted_elements_count += $elements_count;
+					$this->retained_registry->remove_by_group_id( (int) $group_id );
 				}
 			}
 

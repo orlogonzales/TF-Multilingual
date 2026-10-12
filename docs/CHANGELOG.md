@@ -1560,6 +1560,62 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - PHPCS / WPCS: **174/174 archivos analizados, 0 errors, 0 warnings** (100% PASS).
   - `composer validate --strict`: PASS.
 
+---
+
+## [Fase 3.30] - 2026-10-11
+
+### Soporte Transaccional para Grupos WPML con Idiomas Inactivos Retenidos (DT-TFML-060)
+- **Extensión del Sistema de Planificación (`MigrationPlan`):**
+  - Incorporación de la constante de clasificación `MigrationPlan::CLASSIFICATION_PARTIAL_RETAINED = 'PARTIAL_RETAINED'`.
+  - Extensión del método `derive_partial_plan(array $selected_trids, string $label, array $authorized_retained)` permitiendo derivar formalmente grupos clasificados originalmente como `BLOCKED_BY_LANGUAGE` mediante autorización explícita del operador técnico.
+  - Implementación del helper tipado `derive_partial_plan_with_retained_languages()` para simplificar y blindar la invocación.
+  - Los miembros en idiomas activos (ES/EN) se preservan en `translations` para inserción relacional estándar en TFML, y los miembros en idiomas inactivos (FR) se aíslan en `pending_translations`.
+  - Actualización del cálculo de métricas en `get_summary()`: se desglosan `partial_retained_groups` y `pending_elements` con compatibilidad retrospectiva integral.
+- **Componente Persistente y Auditable: `RetainedTranslationRegistry`:**
+  - Creación de `TF\Multilingual\Migration\RetainedTranslationRegistry` para registrar, auditar y custodiar de forma persistente las traducciones retenidas en la Options API (`tfml_retained_translations`) sin alterar el esquema relacional de las 5 tablas maestras (`tfml_schema_version = '1.0.0'`).
+  - Verificación de unicidad y prevención de colisiones relacionales entre elementos y grupos.
+  - Cálculo determinista de huella criptográfica SHA-256 (`fingerprint`) por entrada de traducción retenida.
+  - Mecanismo de promoción controlada `promote_retained_translation()` para cuando en el futuro se active un idioma secundario en `LanguageRegistry`.
+  - Mecanismo de purga y limpieza atómica `remove_by_group_id()` integrado en el ciclo de vida de reversión.
+- **Adaptación Transaccional del Ejecutor (`WpmlMigrationExecutor`):**
+  - Inyección de `RetainedTranslationRegistry`.
+  - `validate_plan()`: admite formalmente grupos `PARTIAL_RETAINED` en planes parciales/derivados.
+  - `execute_batch()`: ejecuta grupos `PARTIAL_RETAINED` e instruye el registro de los miembros retenidos.
+  - `import_group()`: registra de forma idempotente las traducciones retenidas en `RetainedTranslationRegistry`.
+  - `run()`: contabiliza `imported_partial_retained` en el resumen global y persiste el mapa de retenidas en el manifiesto de lote (`tfml_migration_manifest_{token}`).
+  - `reconcile()`: verifica miembros activos en `tfml_group_elements`, comprueba que los miembros retenidos **NO** fueron insertados en la base relacional de TFML, y certifica su presencia auditada en `RetainedTranslationRegistry`.
+- **Integración Atómica en Rollback (`WpmlMigrationRollbackService`):**
+  - Inyección de `RetainedTranslationRegistry`.
+  - `rollback_groups()`: invoca `$this->retained_registry->remove_by_group_id($group_id)` tras revertir el grupo TFML, asegurando que no queden residuos huérfanos en la Options API.
+- **Batería de los 15 Escenarios Automatizados de DT-TFML-060:**
+  - Verificación exhaustiva en memoria y aislamiento de los 15 escenarios exigidos por la directiva técnica:
+    1. TRID con ES/EN activos y FR inactivo.
+    2. Derivación formal y asignación de `PARTIAL_RETAINED`.
+    3. Conservación del miembro francés en `pending_translations`.
+    4. Rechazo de incorporación automática sin autorización explícita.
+    5. Rechazo de TRIDs ajenos o no presentes en el plan.
+    6. Rechazo de posts inexistentes en WordPress Core.
+    7. Rechazo de tipos inconsistentes con WordPress Core.
+    8. Rechazo de códigos lingüísticos desconocidos o no normalizables.
+    9. Rechazo de colisiones relacionales en elementos ya asignados.
+    10. Promoción exitosa al activar el idioma en el futuro.
+    11. Idempotencia y estabilidad determinista del fingerprint ante registro repetido.
+    12. Rollback atómico y purga completa del registro retenido.
+    13. Reconciliación con trazabilidad criptográfica (`parent_fingerprint`).
+    14. Resumen de plan con métricas discriminadas (`partial_retained_groups`, `pending_elements`).
+    15. Aislamiento absoluto: cero escrituras en la base de datos `cms_ect_lab`.
+- **Restricción Estricta de No-Ejecución y Centinelas:**
+  - **TRID 197 permanece estrictamente NO importado** en `cms_ect_lab` (Delta = 0).
+  - Base de datos `cms_ect`: 3.403 registros en `etk_t_icl_translations`, hash MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+  - Base de datos `cms_ect_lab`: 120 grupos y 133 elementos congelados intactos (Delta = 0).
+  - Frontend HTTP real verificado: 200 OK en portada (`/`), `/old-blog/`, `/category/blog/`, `/tag/cusco/` con `lang="es-ES"`, 404 en `/en/` y `/fr/`.
+- **Métricas de Calidad y Verificación:**
+  - PHPUnit: **569 tests, 1.996 assertions, 0 errors, 0 failures** (100% PASS).
+  - PHPCS / WPCS: **177/177 archivos analizados, 0 errors, 0 warnings** (100% PASS).
+  - Verificador de Fase 3.30 (`scratch/verify_fase_3_30.php`): **53/53 controles PASS (100%)**.
+  - `composer validate --strict`: PASS.
+
+
 
 
 
