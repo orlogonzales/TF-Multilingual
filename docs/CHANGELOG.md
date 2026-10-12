@@ -1313,5 +1313,40 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Verificación Integral Fase 3.22 (`scratch/verify_fase_3_22.php`): **250/250 controles PASS (100%)**.
   - `composer validate --strict`: PASS.
 
+---
+
+## [Fase 3.23] - 2026-10-11
+
+### Migración Controlada del Décimo Lote: Elementos de Menú WordPress y Cobertura 100% Universo Importable (DT-TFML-053)
+- **Ejecución Transaccional del Lote 10 (`batch-10-nav-menu-items`):**
+  - Migración exitosa de los 18 grupos y 18 elementos correspondientes a elementos de menú de navegación (`post:nav_menu_item`) en `cms_ect_lab` (TRIDs `[9210, 34659, 34701, 34789, 34792, 34824, 34826, 34828, 34829, 34832, 34833, 34834, 34835, 34836, 34837, 34838, 34839, 34840]`, Posts `[8363, 9243, 9376, 9657, 9671, 9902, 10076, 10080, 10081, 10151, 10152, 10153, 10154, 10155, 10156, 10157, 10158, 10159]`).
+  - Carácter lingüístico: 9 elementos en español (`es`) y 9 elementos en inglés (`en`).
+  - Huella criptográfica inmutable ratificada: `19b7f15c730a7f0059b7d6873a37b07ed2bcd63f499c5a30fc921ae5d4957acc`.
+  - Nuevo estado acumulado en la base de datos: exactamente **120 grupos** en `etk_t_tfml_groups` (102 previos + 18 de lote 10) y **133 elementos** en `etk_t_tfml_group_elements` (115 previos + 18 de lote 10), alcanzando el **100,0% del universo clasificado como IMPORTABLE**.
+  - Manifiesto de ejecución persistido y checkpoint actualizado a `completed` con 18 ítems procesados. Lock liberado.
+- **Invarianza Criptográfica de Estructura de Navegación (Delta Cero Absoluto):**
+  - Captura y comparación de snapshots pre y post-migración sobre los 18 elementos de menú: certificación de Delta Cero absoluto en `etk_t_posts`, `etk_t_postmeta` (metadatos de navegación `_menu_item_type`, `_menu_item_object`, `_menu_item_object_id`, `_menu_item_menu_item_parent`, `_menu_item_url`, `_menu_item_target`, `_menu_item_classes`, `_menu_item_xfn`) y relaciones taxonómicas con `nav_menu` en `etk_t_term_relationships`. Cero reescrituras de IDs de destino o de jerarquía de menús.
+- **Idempotencia y Reversibilidad Aislada del Lote 10:**
+  - Re-ejecución inmediata del Lote 10 sobre el laboratorio evalúa los 18 grupos sin generar duplicados: los 18 TRIDs reportan formalmente `idempotent_skipped` y los conteos de base de datos se mantienen inmutables en 120 grupos y 133 elementos.
+  - Rollback selectivo mediante `rollback_groups` sobre los IDs del Lote 10 revierte exclusivamente este lote, retornando la base de datos a 102 grupos y 115 elementos.
+  - Los 102 grupos acumulados de los lotes 1 al 9 permanecen 100% blindados e intactos.
+  - Re-ejecución posterior restaura el estado final de 120 grupos y 133 elementos, con certificación profunda de reconciliación (`reconcile()`) al 100% (`integrity_verified = true`, 0 discrepancias).
+- **Reconciliación Global de los 10 Lotes y Preservación de No Importables:**
+  - Culminación del 100% del universo importable saneado: 120 grupos importados / 120 importables previstos (100%), 133 elementos importados / 133 importables previstos (100%). Cero grupos pendientes del catálogo importable. Cero grupos duplicados y cero elementos duplicados en tablas TFML.
+  - Preservación íntegra de entidades no importables del plan global WPML: 52 grupos `BLOCKED_BY_LANGUAGE`, 24 grupos `SKIPPED` y 53 grupos `ORPHAN` conservados sin alteración.
+- **Diferenciación de Alcance y Frontera Frontend:**
+  - Distinción formal: Cobertura del universo importable (100%) vs migración global WPML (pendiente de entidades bloqueadas/omitidas/huérfanas).
+  - El renderizado visual de menús y etiquetas HTML (`<html lang>`, canonical y hreflang) permanece formalmente catalogado como `BLOCKED` por la ausencia física del tema `ecoCMS` en el laboratorio.
+  - Preparación para producción no autorizada.
+- **Preservación Inmutable de Centinelas:**
+  - `cms_ect_lab`: Conserva exactamente 120 grupos acumulados y 133 elementos, lock liberado.
+  - `cms_ect`: Centinela intacto con 3.403 registros y hash MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0 verificado en pre y post-flight).
+- **Métricas de Calidad:**
+  - PHPUnit: **532 tests (533 total), 1.830 assertions, 0 errors, 0 failures, 1 skipped** (100% PASS).
+  - PHPCS / WPCS: **168/168 archivos analizados, 0 errors, 0 warnings** (100% PASS).
+  - Verificación Integral Fase 3.23 (`scratch/verify_fase_3_23.php`): **503/503 controles PASS (100%)**.
+  - `composer validate --strict`: PASS.
+
+
 
 

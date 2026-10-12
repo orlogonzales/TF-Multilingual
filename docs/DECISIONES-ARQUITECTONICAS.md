@@ -1067,5 +1067,38 @@
 - **JUSTIFICACIÓN:** Ejecutar el noveno lote incremental WPML -> TFML sobre publicaciones nativas (`post`) y formularios de contacto (`wpcf7_contact_form`) en laboratorio aislado, certificar la inviolabilidad de metadatos de configuración y shortcodes, validar la resolución monolingüe limpia en la API de dominio, y consolidar el acumulado en 102 grupos y 115 elementos.
 - **CONSECUENCIAS:** El laboratorio avanza al estado acumulado de 102 grupos y 115 elementos (85,0% de grupos y 86,5% de elementos importables del universo WPML), y el último lote pendiente (18 grupos: Lote 10 `batch-10-nav-menu-items`) permanece intacto en estado `STATUS_READY`.
 
+### ADR-049: Migración Controlada del Décimo Lote (batch-10-nav-menu-items), Cobertura del 100% del Universo Importable, Invarianza Criptográfica de Navegación, Reconciliación Global y Preservación de Entidades No Importables (Fase 3.23)
+- **FECHA:** 2026-10-11
+- **DECISIÓN:**
+  1. **Ejecución Transaccional del Lote 10 (`batch-10-nav-menu-items`):**
+     - Se ejecutó la migración de los 18 TRIDs autorizados obtenidos exclusivamente del catálogo oficial de Fase 3.15: `[9210, 34659, 34701, 34789, 34792, 34824, 34826, 34828, 34829, 34832, 34833, 34834, 34835, 34836, 34837, 34838, 34839, 34840]`.
+     - Subtipo y tipo de post involucrados: exactamente 18 grupos con tipo `post` y subtipo `nav_menu_item` (elementos de menú WordPress).
+     - Cardinalidad verificada: exactamente 18 grupos y 18 elementos (9 elementos en idioma español y 9 elementos en idioma inglés: Posts `[8363, 9243, 9376, 9657, 9671, 9902, 10076, 10080, 10081, 10151, 10152, 10153, 10154, 10155, 10156, 10157, 10158, 10159]`).
+     - Huella criptográfica inmutable ratificada: `19b7f15c730a7f0059b7d6873a37b07ed2bcd63f499c5a30fc921ae5d4957acc`.
+     - Nuevo estado acumulado en la base de datos del laboratorio: exactamente **120 grupos** en `etk_t_tfml_groups` (102 previos + 18 nuevos) y **133 elementos** en `etk_t_tfml_group_elements` (115 previos + 18 nuevos), alcanzando el **100,0% del universo clasificado como IMPORTABLE**.
+     - Manifiesto oficial persistido y checkpoint completado con 18 ítems procesados. Lock liberado.
+  2. **Preservación Criptográfica de Menús de Navegación (Delta Cero Absoluto):**
+     - Se capturó un snapshot exhaustivo pre y post-migración sobre los 18 elementos de menú.
+     - Se certificó que las tablas nativas de WordPress (`etk_t_posts`, `etk_t_postmeta`, `etk_t_term_relationships`) permanecen 100% idénticas (Delta = 0 en títulos, slugs, contenido, estados, tipos, `menu_order`, `post_parent`, metadatos de navegación `_menu_item_type`, `_menu_item_object`, `_menu_item_object_id`, `_menu_item_menu_item_parent`, `_menu_item_url`, `_menu_item_target`, `_menu_item_classes`, `_menu_item_xfn` y asignaciones taxonómicas en `nav_menu`).
+     - Se cumplió estrictamente la prohibición de reescribir IDs de destino o jerarquías de navegación.
+  3. **Idempotencia y Reversibilidad Aislada en Base de Datos Real:**
+     - Segunda ejecución consecutiva sobre el Lote 10 reportó 18 resultados `idempotent_skipped` (0 duplicados). Conteos inmutables en 120 grupos y 133 elementos.
+     - Rollback selectivo mediante `rollback_groups` sobre los IDs del manifiesto del Lote 10 revirtió exclusivamente los 18 grupos del Lote 10, retornando la base de datos de manera exacta a 102 grupos y 115 elementos, con los 102 grupos previos (lotes 1 al 9) 100% blindados e inalterados.
+     - Re-ejecución posterior restauró el estado final de 120 grupos y 133 elementos con 100% de reconciliación profunda (`integrity_verified = true`, 18 grupos verificados, 0 discrepancias).
+  4. **Reconciliación Global de los Diez Lotes y Preservación de No Importables:**
+     - Universo importable completado al 100%: 120 de 120 grupos previstos y 133 de 133 elementos previstos. Cero grupos pendientes del catálogo importable. Cero grupos duplicados y cero elementos duplicados en tablas TFML.
+     - Preservación íntegra de entidades no importables del plan global WPML: 52 grupos `BLOCKED_BY_LANGUAGE`, 24 grupos `SKIPPED` y 53 grupos `ORPHAN` conservados en sus estados analíticos sin alteración.
+  5. **Diferenciación Rigurosa de Alcance y Frontera Frontend:**
+     - Se establece taxativamente la diferencia entre la cobertura total del universo importable (120/120 grupos, 133/133 elementos) y la migración global WPML (la cual excluye entidades bloqueadas, omitidas y huérfanas que requieren fases posteriores específicas).
+     - Se mantiene formalmente la condición de `BLOCKED` para el renderizado visual de menús y etiquetas HTML (`<html lang>`, canonical y hreflang) por la ausencia física del tema `ecoCMS` en el laboratorio.
+     - El entorno permanece exclusivamente en laboratorio aislado; la preparación para producción no está autorizada.
+  6. **Invarianza Absoluta del Centinela en Origen (`cms_ect`):**
+     - Verificación pre y post-flight en `cms_ect`: 3.403 filas exactas y checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (**Delta = 0**).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.23 / Directiva DT-TFML-053 — Migración transaccional del lote 10: Elementos de menú WordPress.
+- **JUSTIFICACIÓN:** Ejecutar el décimo y último lote del catálogo de migración importable en laboratorio aislado, certificar la inviolabilidad de metadatos de navegación y relaciones de menú, asegurar la idempotencia y reversibilidad selectiva, consolidar el 100% del universo importable (120 grupos / 133 elementos) y preservar las entidades no importables.
+- **CONSECUENCIAS:** El laboratorio alcanza el 100% del universo importable (120 grupos y 133 elementos en tablas TFML). Quedan identificadas y delimitadas las brechas funcionales de frontend y el tratamiento de entidades no importables antes de abordar cualquier certificación integral para producción.
+
+
 
 
