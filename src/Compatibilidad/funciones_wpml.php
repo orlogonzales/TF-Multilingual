@@ -9,6 +9,10 @@ declare( strict_types=1 );
 
 use TF\Multilingual\Compatibilidad\AdaptadorCompatibilidadWpml;
 
+if ( ! defined( 'TFML_WPML_FUNCTIONS_LOADED' ) ) {
+	define( 'TFML_WPML_FUNCTIONS_LOADED', true );
+}
+
 if ( ! function_exists( 'icl_object_id' ) ) {
 	/**
 	 * Emulación acotada y segura de la función clásica icl_object_id().

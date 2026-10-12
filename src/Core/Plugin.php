@@ -530,10 +530,21 @@ class Plugin {
 			$this->rewrite_manager
 		);
 
-		// DT-TFML-058: Adaptador opcional DESACTIVADO POR DEFECTO. Solo se activa mediante filtro explícito.
+		// DT-TFML-059: Configuración determinista de compatibilidad WPML.
+		// Fuentes jerárquicas:
+		// 1. Constante opcional en wp-config.php (TFML_ENABLE_WPML_COMPATIBILITY).
+		// 2. Opción persistida en Options API (tfml_enable_wpml_compatibility_adapter).
+		// 3. Filtro extensible de WordPress (tfml_enable_wpml_compatibility_adapter).
+		$habilitar_por_defecto = false;
+		if ( defined( 'TFML_ENABLE_WPML_COMPATIBILITY' ) ) {
+			$habilitar_por_defecto = (bool) constant( 'TFML_ENABLE_WPML_COMPATIBILITY' );
+		} elseif ( function_exists( 'get_option' ) ) {
+			$habilitar_por_defecto = (bool) get_option( 'tfml_enable_wpml_compatibility_adapter', false );
+		}
+
 		$habilitar_adaptador_wpml            = (bool) ( function_exists( 'apply_filters' )
-			? apply_filters( 'tfml_enable_wpml_compatibility_adapter', false )
-			: false );
+			? apply_filters( 'tfml_enable_wpml_compatibility_adapter', $habilitar_por_defecto )
+			: $habilitar_por_defecto );
 		$this->adaptador_compatibilidad_wpml = new AdaptadorCompatibilidadWpml(
 			$this->servicio_traduccion_publico,
 			$habilitar_adaptador_wpml

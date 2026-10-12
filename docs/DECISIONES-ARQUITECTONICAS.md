@@ -1276,6 +1276,47 @@
 - **JUSTIFICACIÓN:** Permitir que temas y complementos diseñados para el ecosistema histórico de WPML (`ecoCMS`, `ova-framework`) puedan operar armónicamente sobre TF Multilingual sin acoplamiento espurio, garantizando que el Core del plugin permanezca 100% nativo, modular e independiente.
 - **CONSECUENCIAS:** Se establece una frontera nítida de compatibilidad heredada que minimiza deuda técnica, evita colisiones de constantes globales y habilita la futura activación modular de funcionalidades visuales avanzadas de forma segura y controlada.
 
+---
+
+### ADR-055: Blindaje de Activación y Aislamiento de Símbolos Globales del Adaptador de Compatibilidad WPML (Fase 3.29)
+- **FECHA:** 2026-10-11
+- **DECISIÓN:**
+  1. **Determinismo de Arranque y Respeto al Ciclo de Vida de PHP:**
+     - En el motor de PHP, las funciones declaradas en el ámbito global mediante `function icl_object_id()` no pueden ser eliminadas (unloaded/undefined) durante el ciclo de vida del proceso.
+     - Por consiguiente, el registro de envoltorios globales (`funciones_wpml.php`) deja de ser una alternancia dinámica dentro del mismo proceso para convertirse en una decisión determinista evaluada durante el arranque (*boot-time*).
+     - Si el adaptador está desactivado (comportamiento por omisión de TF Multilingual), el archivo `funciones_wpml.php` **NUNCA** es requerido ni cargado, garantizando que `function_exists('icl_object_id')` e `function_exists('icl_get_languages')` retornen estrictamente `false`.
+  2. **Salvaguardas de Detección de WPML Real y Auto-inhibición:**
+     - Antes de registrar envoltorios globales o inicializar el adaptador, se ejecuta `detectar_presencia_wpml_real()`, verificando la existencia de la clase `SitePress`, las constantes `ICL_SITEPRESS_VERSION` o `WPML_PLUGIN_PATH`, o la definición preexistente de funciones sin nuestro centinela.
+     - Si se detecta un WPML real o activo, el adaptador se auto-inhibe inmediatamente sin producir errores fatales (`$this->habilitado = false`, emitiendo advertencia de diagnóstico), cediendo el control total al plugin original sin colisiones de símbolos.
+  3. **Salvaguardas contra Colisión de Símbolos Ajenos y Centinela de Integridad:**
+     - Se incorporó la constante centinela `TFML_WPML_FUNCTIONS_LOADED` en `src/Compatibilidad/funciones_wpml.php`.
+     - Si alguna función `icl_object_id` o `icl_get_languages` ya se encuentra declarada sin dicha constante centinela, el método `detectar_colision_simbolos()` detecta la colisión, auto-inhibe el adaptador y preserva la implementación preexistente intacta sin emitir fatal errors por redeclaración.
+  4. **Configuración Jerárquica de Activación:**
+     - La habilitación del adaptador puede ser controlada formalmente mediante:
+       1. Constante de arranque: `define('TFML_ENABLE_WPML_COMPATIBILITY', true);` (ideal para `wp-config.php` y testing temprano).
+       2. Opción de base de datos / repositorio de ajustes: `get_option('tfml_enable_wpml_compatibility_adapter', false)`.
+       3. Filtro nativo de WordPress: `apply_filters('tfml_enable_wpml_compatibility_adapter', bool)`.
+  5. **Verificación Formal en Procesos Aislados y Quality Gates:**
+     - Se validó el aislamiento en 14 escenarios obligatorios independientes mediante subprocesos PHP CLI (`proc_open`) en `scratch/verify_fase_3_29.php`:
+       - Escenario 1: TFML desactivado -> `function_exists('icl_object_id') === false`, `function_exists('icl_get_languages') === false`, `defined('ICL_LANGUAGE_CODE') === false`.
+       - Escenario 2: API pública nativa (Superficie A) opera al 100% sin adaptador.
+       - Escenario 3: Adaptador habilitado explícitamente -> funciones globales operan fielmente, contratos auditados pasan, `ICL_LANGUAGE_CODE` permanece NO definida, francés estrictamente excluido.
+       - Escenario 4: WPML real presente simulado -> detección exitosa, adaptador se auto-inhibe, emite diagnóstico formal sin registrar wrappers.
+       - Escenario 5: Símbolos preexistentes ajenos -> detección de colisión, auto-inhibición limpia sin fatal por redeclaración.
+       - Escenarios Frontend HTTP: Verificación HTTP real contra `lab.ecoterra.test` (Portada `/`, `/old-blog/`, `/category/blog/`, `/tag/cusco/`, `/en/`, `/fr/`, >40KB render de tema).
+     - Total: 79/79 controles superados con éxito (100% PASS).
+     - Suite PHPUnit: 557 tests, 1923 aserciones PASS.
+     - PHPCS: 174/174 archivos conformes WPCS (0 errores, 0 warnings).
+  6. **Invarianza Estricta de Centinelas y Datos:**
+     - Base de datos `cms_ect`: 3.403 registros en `etk_t_icl_translations`, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+     - Base de datos `cms_ect_lab`: 120 grupos y 133 elementos congelados intactos (Delta = 0).
+     - TRID 197 no importado en esta fase.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.29 / Directiva DT-TFML-059 — Blindaje de activación y ausencia de efectos secundarios del adaptador de compatibilidad WPML.
+- **JUSTIFICACIÓN:** Resolver categóricamente la observación de seguridad arquitectónica de la Fase 3.28, asegurando que cuando el adaptador WPML esté inactivo no exista residuo alguno en la tabla global de funciones de PHP (`function_exists` = false), garantizando coexistencia limpia sin efectos colaterales sobre temas u otros plugins.
+- **CONSECUENCIAS:** Se alcanza un blindaje robusto del ciclo de vida del adaptador. La Superficie A permanece como la vía primaria y pura, mientras la Superficie B queda herméticamente sellada cuando no se requiere.
+
+
 
 
 

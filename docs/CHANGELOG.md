@@ -1522,6 +1522,45 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - Verificación Integral Fase 3.28 (`scratch/verify_fase_3_28.php`): **68/68 controles PASS (100%)**.
   - `composer validate --strict`: PASS.
 
+---
+
+## [Fase 3.29] - 2026-10-11
+
+### Blindaje de Activación y Ausencia de Efectos Secundarios del Adaptador de Compatibilidad WPML (DT-TFML-059)
+- **Aislamiento Absoluto de Símbolos Globales en Desactivación:**
+  - Resolución definitiva de la observación de seguridad arquitectónica de la Fase 3.28: cuando el adaptador está desactivado (estado por omisión del plugin), `function_exists('icl_object_id')` e `function_exists('icl_get_languages')` retornan estrictamente `false`.
+  - La carga del archivo `src/Compatibilidad/funciones_wpml.php` queda condicionada exclusivamente a que el adaptador esté habilitado durante el arranque (*boot-time*), impidiendo la contaminación irreversible de la tabla global de funciones de PHP.
+- **Salvaguardas de Detección de WPML Real y Auto-inhibición:**
+  - Implementación de `detectar_presencia_wpml_real()` en `AdaptadorCompatibilidadWpml`.
+  - Detección activa de la clase `SitePress`, constantes `ICL_SITEPRESS_VERSION` y `WPML_PLUGIN_PATH`.
+  - Si un WPML real está presente o activo, el adaptador se auto-inhibe de inmediato (`$habilitado = false`, registrando el motivo) sin emitir errores fatales, cediendo el control total al plugin original.
+- **Detección de Colisiones de Símbolos y Centinela de Integridad:**
+  - Incorporación de la constante centinela `TFML_WPML_FUNCTIONS_LOADED` en `src/Compatibilidad/funciones_wpml.php`.
+  - Implementación de `detectar_colision_simbolos()`: si las funciones `icl_object_id` o `icl_get_languages` ya existen sin nuestro centinela, el adaptador se auto-inhibe limpiamente, preservando la función ajena intacta y evitando errores fatales por redeclaración.
+- **Configuración Jerárquica de Activación:**
+  - Soporte de activación en tres niveles jerárquicos en `src/Core/Plugin.php`:
+    1. Constante de arranque: `TFML_ENABLE_WPML_COMPATIBILITY`.
+    2. Opción de WordPress: `tfml_enable_wpml_compatibility_adapter`.
+    3. Filtro extensible: `tfml_enable_wpml_compatibility_adapter` (por defecto `false`).
+- **Verificación en Procesos PHP Aislados (14 Escenarios Obligatorios):**
+  - Implementación del script de certificación `scratch/verify_fase_3_29.php` con subprocesos PHP CLI independientes (`proc_open`):
+    - Escenario 1: TFML desactivado -> `function_exists` = false para funciones WPML, `ICL_LANGUAGE_CODE` no definida.
+    - Escenario 2: Superficie A (API pública pura) operativa al 100% sin adaptador.
+    - Escenario 3: Adaptador habilitado explícitamente -> funciones globales operativas, contratos auditados pasan, `ICL_LANGUAGE_CODE` no definida, francés estrictamente excluido.
+    - Escenario 4: WPML real simulado -> detección exitosa y auto-inhibición limpia sin wrappers.
+    - Escenario 5: Símbolos preexistentes ajenos -> detección de colisión y preservación de símbolos ajenos sin colisión fatal.
+    - Frontend HTTP real en `lab.ecoterra.test` (rutas `/`, `/old-blog/`, `/category/blog/`, `/tag/cusco/`, `/en/`, `/fr/`, >40KB render de tema).
+  - Resultado: **79/79 controles PASS (100%)**.
+- **Preservación Inmutable de Centinelas y Datos:**
+  - Base de datos `cms_ect`: 3.403 registros en `etk_t_icl_translations`, checksum MD5 `4241ca7e7ec6399a594537cb04790c10` (Delta = 0).
+  - Base de datos `cms_ect_lab`: 120 grupos y 133 elementos congelados intactos (Delta = 0).
+  - TRID 197 no importado; Elementor no instalado; Francés (`fr`) permanece inactivo.
+- **Métricas de Calidad:**
+  - PHPUnit: **557 tests, 1.923 assertions, 0 errors, 0 failures** (100% PASS).
+  - PHPCS / WPCS: **174/174 archivos analizados, 0 errors, 0 warnings** (100% PASS).
+  - `composer validate --strict`: PASS.
+
+
 
 
 

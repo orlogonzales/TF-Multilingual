@@ -48,6 +48,20 @@ class AdaptadorCompatibilidadWpml {
 	private bool $habilitado = false;
 
 	/**
+	 * Indica si los envoltorios globales fueron efectivamente registrados en este proceso PHP.
+	 *
+	 * @var bool
+	 */
+	private bool $envoltorios_registrados = false;
+
+	/**
+	 * Motivo de inhibición si se detectó colisión o presencia de WPML real.
+	 *
+	 * @var string|null
+	 */
+	private ?string $motivo_inhibicion = null;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param ServicioTraduccionPublico $servicio_api Servicio público de traducción.
@@ -58,7 +72,7 @@ class AdaptadorCompatibilidadWpml {
 		$this->habilitado   = $habilitado;
 
 		if ( $this->habilitado ) {
-			$this->activar();
+			$this->registrar_envoltorios_globales();
 		}
 	}
 
@@ -91,20 +105,124 @@ class AdaptadorCompatibilidadWpml {
 	}
 
 	/**
-	 * Activa el adaptador y registra las funciones globales si no existen previamente.
+	 * Detecta si WPML real se encuentra instalado o activo en el entorno runtime.
 	 *
-	 * @return void
+	 * @return bool True si se detecta SitePress o constantes oficiales de WPML.
 	 */
-	public function activar(): void {
-		$this->habilitado       = true;
-		self::$instancia_activa = $this;
-
-		// Cargar funciones envolventes globales únicamente si no existen previamente.
-		require_once __DIR__ . '/funciones_wpml.php';
+	public function detectar_presencia_wpml_real(): bool {
+		if ( class_exists( 'SitePress' ) ) {
+			return true;
+		}
+		if ( defined( 'ICL_SITEPRESS_VERSION' ) ) {
+			return true;
+		}
+		if ( defined( 'WPML_PLUGIN_PATH' ) ) {
+			return true;
+		}
+		return false;
 	}
 
 	/**
-	 * Desactiva el adaptador en runtime.
+	 * Detecta si los símbolos globales heredados ya fueron declarados externamente.
+	 *
+	 * @return bool True si las funciones icl_* ya existen y no fueron registradas por TFML.
+	 */
+	public function detectar_colision_simbolos(): bool {
+		if ( ( function_exists( 'icl_object_id' ) || function_exists( 'icl_get_languages' ) )
+			&& ! defined( 'TFML_WPML_FUNCTIONS_LOADED' ) ) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Evalúa si el contexto y entorno son admisibles para registrar las funciones globales.
+	 *
+	 * Reglas de seguridad (DT-TFML-059):
+	 * 1. El adaptador debe estar explícitamente habilitado.
+	 * 2. No debe detectarse WPML real en el entorno.
+	 * 3. No deben existir colisiones de símbolos globales previos.
+	 *
+	 * @return bool True si es seguro proceder con el registro.
+	 */
+	public function es_admisible_para_registro(): bool {
+		if ( $this->envoltorios_registrados ) {
+			return true;
+		}
+
+		if ( $this->detectar_presencia_wpml_real() ) {
+			$this->motivo_inhibicion = 'WPML real detectado en el runtime. Adaptador inhibido para evitar interferencias.';
+			return false;
+		}
+
+		if ( $this->detectar_colision_simbolos() ) {
+			$this->motivo_inhibicion = 'Colisión de símbolos globales: icl_object_id o icl_get_languages ya declarados externamente.';
+			return false;
+		}
+
+		if ( ! $this->habilitado ) {
+			if ( null === $this->motivo_inhibicion ) {
+				$this->motivo_inhibicion = 'Adaptador desactivado por configuración o filtro.';
+			}
+			return false;
+		}
+
+		$this->motivo_inhibicion = null;
+		return true;
+	}
+
+	/**
+	 * Obtiene el motivo por el cual el adaptador fue inhibido, si corresponde.
+	 *
+	 * @return string|null
+	 */
+	public function get_motivo_inhibicion(): ?string {
+		return $this->motivo_inhibicion;
+	}
+
+	/**
+	 * Registra de manera segura e idempotente las funciones envolventes globales.
+	 *
+	 * @return bool True si las funciones fueron registradas o ya estaban activas.
+	 */
+	public function registrar_envoltorios_globales(): bool {
+		if ( $this->envoltorios_registrados ) {
+			return true;
+		}
+
+		if ( ! $this->es_admisible_para_registro() ) {
+			$this->habilitado = false;
+			return false;
+		}
+
+		self::$instancia_activa = $this;
+
+		// Cargar funciones envolventes globales únicamente tras superar todas las salvaguardas.
+		require_once __DIR__ . '/funciones_wpml.php';
+
+		$this->envoltorios_registrados = true;
+		return true;
+	}
+
+	/**
+	 * Activa el adaptador y registra las funciones globales si el entorno es admisible.
+	 *
+	 * @return bool True si el adaptador quedó habilitado y los envoltorios registrados.
+	 */
+	public function activar(): bool {
+		$this->habilitado = true;
+		return $this->registrar_envoltorios_globales();
+	}
+
+	/**
+	 * Desactiva la delegación del adaptador en memoria.
+	 *
+	 * Advertencia de ciclo de vida PHP (DT-TFML-059):
+	 * Las funciones globales en PHP no pueden eliminarse del runtime una vez declaradas.
+	 * Desactivar el adaptador desacopla la instancia activa, degradando las llamadas
+	 * existentes a respuestas neutras (null/array vacío), pero NO elimina los símbolos
+	 * de la tabla de funciones de PHP. Por seguridad arquitectónica, la activación
+	 * debe determinarse en el arranque del request y no alternarse dinámicamente.
 	 *
 	 * @return void
 	 */
@@ -113,6 +231,15 @@ class AdaptadorCompatibilidadWpml {
 		if ( self::$instancia_activa === $this ) {
 			self::$instancia_activa = null;
 		}
+	}
+
+	/**
+	 * Indica si los envoltorios globales fueron efectivamente registrados en este proceso PHP.
+	 *
+	 * @return bool
+	 */
+	public function estan_envoltorios_registrados(): bool {
+		return $this->envoltorios_registrados;
 	}
 
 	/**

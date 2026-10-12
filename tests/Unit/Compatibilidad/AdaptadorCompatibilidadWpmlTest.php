@@ -154,6 +154,39 @@ class AdaptadorCompatibilidadWpmlTest extends TestCase {
 	}
 
 	/**
+	 * Test: es_admisible_para_registro retorna false cuando está desactivado.
+	 *
+	 * @return void
+	 */
+	public function test_es_admisible_retorna_false_si_desactivado(): void {
+		$adaptador = new AdaptadorCompatibilidadWpml( $this->servicio_api, false );
+		$this->assertFalse( $adaptador->es_admisible_para_registro() );
+		$this->assertStringContainsString( 'desactivado', (string) $adaptador->get_motivo_inhibicion() );
+	}
+
+	/**
+	 * Test: Detección de presencia de WPML real en el entorno.
+	 *
+	 * @return void
+	 */
+	public function test_detectar_presencia_wpml_real(): void {
+		$adaptador = new AdaptadorCompatibilidadWpml( $this->servicio_api, false );
+		// En el entorno de test unitario aislado no existe SitePress.
+		$this->assertFalse( $adaptador->detectar_presencia_wpml_real() );
+	}
+
+	/**
+	 * Test: estan_envoltorios_registrados refleja el estado exacto.
+	 *
+	 * @return void
+	 */
+	public function test_estan_envoltorios_registrados(): void {
+		$adaptador_inactivo = new AdaptadorCompatibilidadWpml( $this->servicio_api, false );
+		// Si está inactivo, nunca intenta registrar envoltorios.
+		$this->assertFalse( $adaptador_inactivo->estan_envoltorios_registrados() );
+	}
+
+	/**
 	 * Test: API pública nativa (Superficie A) opera sin depender del adaptador.
 	 *
 	 * @return void
