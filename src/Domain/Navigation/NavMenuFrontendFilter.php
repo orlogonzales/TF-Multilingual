@@ -260,10 +260,16 @@ class NavMenuFrontendFilter {
 			if ( null !== $translated && $translated->get_element_id() > 0 ) {
 				$trans_id        = $translated->get_element_id();
 				$item->object_id = (string) $trans_id;
-				$permalink       = $this->get_post_permalink( $trans_id );
-				if ( ! empty( $permalink ) ) {
-					$item->url = $permalink;
+				if ( $this->url_generator->is_front_page_for_language( $trans_id, $current_lang ) ) {
+					$item->url = $this->url_generator->home_url( $current_lang );
+				} else {
+					$permalink = $this->get_post_permalink( $trans_id );
+					if ( ! empty( $permalink ) ) {
+						$item->url = $permalink;
+					}
 				}
+			} elseif ( $this->url_generator->is_front_page_for_language( $object_id, $current_lang ) ) {
+				$item->url = $this->url_generator->home_url( $current_lang );
 			}
 			return;
 		}

@@ -232,7 +232,11 @@ if ( ! function_exists( 'get_option' ) ) {
 	 * @return mixed
 	 */
 	function get_option( string $option, mixed $default_value = false ): mixed {
-		return $GLOBALS['wp_test_options'][ $option ] ?? $default_value;
+		$value = $GLOBALS['wp_test_options'][ $option ] ?? $default_value;
+		if ( function_exists( 'apply_filters' ) ) {
+			return apply_filters( "option_{$option}", $value, $option );
+		}
+		return $value;
 	}
 }
 
@@ -352,6 +356,13 @@ if ( ! class_exists( 'WP_Query' ) ) {
 	class WP_Query {
 
 		/**
+		 * Raw query arguments array.
+		 *
+		 * @var array<string, mixed>
+		 */
+		public array $query = array();
+
+		/**
 		 * Query variables array.
 		 *
 		 * @var array<string, mixed>
@@ -394,11 +405,40 @@ if ( ! class_exists( 'WP_Query' ) ) {
 		public bool $is_archive = false;
 
 		/**
+		 * Whether this is a home query.
+		 *
+		 * @var bool
+		 */
+		public bool $is_home = false;
+
+		/**
+		 * Whether this is a page query.
+		 *
+		 * @var bool
+		 */
+		public bool $is_page = false;
+
+		/**
+		 * Whether this is a 404 query.
+		 *
+		 * @var bool
+		 */
+		public bool $is_404 = false;
+
+		/**
+		 * Whether this is a feed query.
+		 *
+		 * @var bool
+		 */
+		public bool $is_feed = false;
+
+		/**
 		 * Constructor.
 		 *
 		 * @param array<string, mixed> $args Query variables.
 		 */
 		public function __construct( array $args = array() ) {
+			$this->query      = $args;
 			$this->query_vars = $args;
 		}
 
@@ -698,11 +738,17 @@ if ( ! function_exists( 'get_post_status' ) ) {
 	 * @return string|false Post status or false.
 	 */
 	function get_post_status( mixed $post = null ): string|false {
+		if ( is_object( $post ) && isset( $post->post_status ) ) {
+			return (string) $post->post_status;
+		}
+		$post_id = is_object( $post ) ? ( $post->ID ?? 0 ) : (int) $post;
 		if ( isset( $GLOBALS['wp_test_post_status'] ) && is_array( $GLOBALS['wp_test_post_status'] ) ) {
-			$post_id = is_object( $post ) ? ( $post->ID ?? 0 ) : (int) $post;
 			if ( isset( $GLOBALS['wp_test_post_status'][ $post_id ] ) ) {
 				return (string) $GLOBALS['wp_test_post_status'][ $post_id ];
 			}
+		}
+		if ( $post_id > 0 && isset( $GLOBALS['wp_test_posts'][ $post_id ] ) && is_object( $GLOBALS['wp_test_posts'][ $post_id ] ) && isset( $GLOBALS['wp_test_posts'][ $post_id ]->post_status ) ) {
+			return (string) $GLOBALS['wp_test_posts'][ $post_id ]->post_status;
 		}
 		return 'publish';
 	}
@@ -1012,7 +1058,7 @@ if ( ! function_exists( 'is_admin' ) ) {
 	 * @return bool
 	 */
 	function is_admin(): bool {
-		return false;
+		return (bool) ( $GLOBALS['wp_test_is_admin'] ?? false );
 	}
 }
 
@@ -1023,7 +1069,7 @@ if ( ! function_exists( 'wp_doing_cron' ) ) {
 	 * @return bool
 	 */
 	function wp_doing_cron(): bool {
-		return false;
+		return (bool) ( $GLOBALS['wp_test_doing_cron'] ?? false );
 	}
 }
 
@@ -1034,7 +1080,7 @@ if ( ! function_exists( 'wp_doing_ajax' ) ) {
 	 * @return bool
 	 */
 	function wp_doing_ajax(): bool {
-		return false;
+		return (bool) ( $GLOBALS['wp_test_doing_ajax'] ?? false );
 	}
 }
 
@@ -1045,7 +1091,7 @@ if ( ! function_exists( 'wp_is_json_request' ) ) {
 	 * @return bool
 	 */
 	function wp_is_json_request(): bool {
-		return false;
+		return (bool) ( $GLOBALS['wp_test_is_json_request'] ?? false );
 	}
 }
 

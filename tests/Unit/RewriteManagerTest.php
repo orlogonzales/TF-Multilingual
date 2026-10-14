@@ -118,4 +118,26 @@ class RewriteManagerTest extends TestCase {
 
 		$this->assertSame( $existing_rules, $filtered );
 	}
+
+	/**
+	 * Tests filter_option_rewrite_rules dynamically prefixes cached rules and is idempotent.
+	 *
+	 * @return void
+	 */
+	public function test_filter_option_rewrite_rules_and_idempotency(): void {
+		$this->assertFalse( $this->manager->filter_option_rewrite_rules( false ) );
+		$this->assertSame( '', $this->manager->filter_option_rewrite_rules( '' ) );
+		$this->assertSame( array(), $this->manager->filter_option_rewrite_rules( array() ) );
+
+		$cached_rules = array(
+			'(.?.+?)(?:/([0-9]+))?/?$' => 'index.php?pagename=$matches[1]&page=$matches[2]',
+		);
+
+		$first_pass  = $this->manager->filter_option_rewrite_rules( $cached_rules );
+		$second_pass = $this->manager->filter_option_rewrite_rules( $first_pass );
+
+		$this->assertIsArray( $first_pass );
+		$this->assertArrayHasKey( '^(en|pt\-br)/?$', $first_pass );
+		$this->assertSame( $first_pass, $second_pass );
+	}
 }

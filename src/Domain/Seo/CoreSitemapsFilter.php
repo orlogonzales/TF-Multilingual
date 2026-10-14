@@ -132,7 +132,11 @@ class CoreSitemapsFilter {
 		}
 
 		if ( isset( $entry['loc'] ) && is_string( $entry['loc'] ) && '' !== $entry['loc'] ) {
-			$entry['loc'] = $this->url_generator->localize_url( $entry['loc'], $lang_code );
+			if ( $this->url_generator->is_front_page_for_language( (int) $post_obj->ID, $lang_code ) ) {
+				$entry['loc'] = $this->url_generator->home_url( $lang_code );
+			} else {
+				$entry['loc'] = $this->url_generator->localize_url( $entry['loc'], $lang_code );
+			}
 		}
 
 		return $entry;

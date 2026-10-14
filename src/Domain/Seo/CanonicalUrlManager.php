@@ -100,6 +100,10 @@ class CanonicalUrlManager {
 			return $canonical;
 		}
 
+		if ( function_exists( 'is_404' ) && is_404() ) {
+			return '';
+		}
+
 		if ( ! $this->language_registry->is_configured() ) {
 			return $canonical;
 		}
@@ -193,6 +197,10 @@ class CanonicalUrlManager {
 
 		if ( null === $lang_code || ! $this->language_registry->is_active( $lang_code ) ) {
 			return $canonical;
+		}
+
+		if ( $this->url_generator->is_front_page_for_language( $post_id, $lang_code ) ) {
+			return $this->url_generator->home_url( $lang_code );
 		}
 
 		return $this->url_generator->localize_url( $canonical, $lang_code );

@@ -69,23 +69,43 @@ class LocalizedUrlGenerator {
 	private bool $is_resolving_link = false;
 
 	/**
+	 * Resolvedor opcional de portada multilingüe.
+	 *
+	 * @var ResolvedorPortadaMultilingue|null
+	 */
+	private ?ResolvedorPortadaMultilingue $resolvedor_portada = null;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param LanguageRegistry           $language_registry Language registry.
-	 * @param UrlLanguageResolver        $url_resolver     URL language resolver.
-	 * @param ContentTranslationResolver $content_resolver Content translation resolver.
-	 * @param string|null                $home_url         Optional home URL override.
+	 * @param LanguageRegistry                  $language_registry  Language registry.
+	 * @param UrlLanguageResolver               $url_resolver       URL language resolver.
+	 * @param ContentTranslationResolver        $content_resolver   Content translation resolver.
+	 * @param string|null                       $home_url           Optional home URL override.
+	 * @param ResolvedorPortadaMultilingue|null $resolvedor_portada Optional front-page resolver.
 	 */
 	public function __construct(
 		LanguageRegistry $language_registry,
 		UrlLanguageResolver $url_resolver,
 		ContentTranslationResolver $content_resolver,
-		?string $home_url = null
+		?string $home_url = null,
+		?ResolvedorPortadaMultilingue $resolvedor_portada = null
 	) {
-		$this->language_registry = $language_registry;
-		$this->url_resolver      = $url_resolver;
-		$this->content_resolver  = $content_resolver;
-		$this->home_url          = $home_url;
+		$this->language_registry  = $language_registry;
+		$this->url_resolver       = $url_resolver;
+		$this->content_resolver   = $content_resolver;
+		$this->home_url           = $home_url;
+		$this->resolvedor_portada = $resolvedor_portada;
+	}
+
+	/**
+	 * Asigna la instancia del resolvedor de portada multilingüe.
+	 *
+	 * @param ResolvedorPortadaMultilingue|null $resolvedor_portada Instancia del resolvedor.
+	 * @return void
+	 */
+	public function set_resolvedor_portada( ?ResolvedorPortadaMultilingue $resolvedor_portada ): void {
+		$this->resolvedor_portada = $resolvedor_portada;
 	}
 
 	/**
@@ -242,7 +262,12 @@ class LocalizedUrlGenerator {
 			}
 
 			$translated_post_id = $translated_element->get_element_id();
-			$permalink          = function_exists( 'get_permalink' ) ? get_permalink( $translated_post_id ) : false;
+
+			if ( $this->is_front_page_for_language( $translated_post_id, $code ) ) {
+				return $this->home_url( $code );
+			}
+
+			$permalink = function_exists( 'get_permalink' ) ? get_permalink( $translated_post_id ) : false;
 
 			if ( ! is_string( $permalink ) || '' === $permalink ) {
 				return null;
@@ -251,6 +276,56 @@ class LocalizedUrlGenerator {
 			return $this->localize_url( $permalink, $code );
 		} finally {
 			$this->is_resolving_link = false;
+		}
+	}
+
+	/**
+	 * Determines whether a given post ID is the published static front page for the target language.
+	 *
+	 * @param int    $post_id       Post ID to evaluate.
+	 * @param string $language_code Canonical language code.
+	 * @return bool True if the post is the static front page for that language.
+	 */
+	public function is_front_page_for_language( int $post_id, string $language_code ): bool {
+		if ( $post_id <= 0 ) {
+			return false;
+		}
+
+		if ( null !== $this->resolvedor_portada ) {
+			return $this->resolvedor_portada->es_portada_de_idioma( $post_id, $language_code );
+		}
+
+		$show_on_front = function_exists( 'get_option' ) ? get_option( 'show_on_front', 'posts' ) : 'posts';
+		if ( 'page' !== $show_on_front ) {
+			return false;
+		}
+
+		$base_front_id = function_exists( 'get_option' ) ? (int) get_option( 'page_on_front', 0 ) : 0;
+		if ( $base_front_id <= 0 ) {
+			return false;
+		}
+
+		try {
+			$code = $this->validate_target_language( $language_code );
+		} catch ( \Throwable $e ) {
+			return false;
+		}
+
+		$status = function_exists( 'get_post_status' ) ? get_post_status( $post_id ) : 'publish';
+		if ( 'publish' !== $status ) {
+			return false;
+		}
+
+		$default_code = $this->language_registry->get_default_code();
+		if ( $code === $default_code ) {
+			return $post_id === $base_front_id;
+		}
+
+		try {
+			$resolved_id = $this->content_resolver->resolve_element_id( 'post', $base_front_id, $code );
+			return null !== $resolved_id && $resolved_id === $post_id;
+		} catch ( \Throwable $e ) {
+			return false;
 		}
 	}
 

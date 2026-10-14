@@ -47,6 +47,7 @@ use TF\Multilingual\Query\TermQueryLanguageFilter;
 use TF\Multilingual\Rest\RestApiRegistrar;
 use TF\Multilingual\Routing\CurrentLanguageResolver;
 use TF\Multilingual\Routing\LocalizedUrlGenerator;
+use TF\Multilingual\Routing\ResolvedorPortadaMultilingue;
 use TF\Multilingual\Routing\RewriteManager;
 use TF\Multilingual\Routing\UrlLanguageResolver;
 
@@ -332,6 +333,13 @@ class Plugin {
 	private ?AdaptadorCompatibilidadWpml $adaptador_compatibilidad_wpml = null;
 
 	/**
+	 * Resolvedor nativo de portada multilingüe.
+	 *
+	 * @var ResolvedorPortadaMultilingue|null
+	 */
+	private ?ResolvedorPortadaMultilingue $resolvedor_portada_multilingue = null;
+
+	/**
 	 * Retrieves the singleton instance.
 	 *
 	 * @return self
@@ -443,17 +451,24 @@ class Plugin {
 			$this->language_registry
 		);
 
-		$settings_repository                    = new SettingsRepository();
-		$this->nav_menu_location_repository     = new NavMenuLocationRepository(
+		$settings_repository                  = new SettingsRepository();
+		$this->nav_menu_location_repository   = new NavMenuLocationRepository(
 			$settings_repository,
 			$this->language_registry,
 			$translation_resolver
 		);
-		$url_generator                          = new LocalizedUrlGenerator(
+		$url_generator                        = new LocalizedUrlGenerator(
 			$this->language_registry,
 			$url_resolver,
 			$translation_resolver
 		);
+		$this->resolvedor_portada_multilingue = new ResolvedorPortadaMultilingue(
+			$this->language_registry,
+			$this->current_language_resolver,
+			$translation_resolver,
+			$url_generator
+		);
+		$url_generator->set_resolvedor_portada( $this->resolvedor_portada_multilingue );
 		$this->nav_menu_frontend_filter         = new NavMenuFrontendFilter(
 			$this->nav_menu_location_repository,
 			$this->current_language_resolver,
@@ -552,6 +567,7 @@ class Plugin {
 
 		$this->rewrite_manager->init_hooks();
 		$this->localizador_publico_nativo->registrar_ganchos();
+		$this->resolvedor_portada_multilingue->registrar_ganchos();
 		$this->query_filter->init_hooks();
 		$this->term_query_filter->init_hooks();
 		$this->shared_meta_synchronizer->init_hooks();
@@ -1180,6 +1196,15 @@ class Plugin {
 	 */
 	public function get_adaptador_compatibilidad_wpml(): ?AdaptadorCompatibilidadWpml {
 		return $this->adaptador_compatibilidad_wpml;
+	}
+
+	/**
+	 * Retorna la instancia del resolvedor nativo de portada multilingüe.
+	 *
+	 * @return ResolvedorPortadaMultilingue|null
+	 */
+	public function get_resolvedor_portada_multilingue(): ?ResolvedorPortadaMultilingue {
+		return $this->resolvedor_portada_multilingue;
 	}
 
 	/**

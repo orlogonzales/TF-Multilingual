@@ -67,7 +67,25 @@ class RewriteManager {
 	public function init_hooks(): void {
 		add_filter( 'query_vars', array( $this, 'register_query_vars' ) );
 		add_filter( 'rewrite_rules_array', array( $this, 'filter_rewrite_rules' ) );
+		add_filter( 'option_rewrite_rules', array( $this, 'filter_option_rewrite_rules' ) );
 		add_action( 'parse_request', array( $this, 'on_parse_request' ) );
+	}
+
+	/**
+	 * Dynamically filters the cached rewrite_rules option at runtime without mutating wp_options.
+	 *
+	 * Preserves non-array or empty values (such as false or '') so WordPress Core can detect
+	 * when rules need regeneration.
+	 *
+	 * @param mixed $rules Value of rewrite_rules option.
+	 * @return mixed Filtered rewrite rules array or original value.
+	 */
+	public function filter_option_rewrite_rules( mixed $rules ): mixed {
+		if ( ! is_array( $rules ) || empty( $rules ) ) {
+			return $rules;
+		}
+
+		return $this->filter_rewrite_rules( $rules );
 	}
 
 	/**
@@ -110,11 +128,18 @@ class RewriteManager {
 	 * @return array<string, string>
 	 */
 	public function generate_multilingual_rules( array $existing_rules, array $secondary_languages ): array {
-		$lang_regex = implode( '|', array_map( 'preg_quote', $secondary_languages ) );
-		$new_rules  = array();
+		$lang_regex    = implode( '|', array_map( 'preg_quote', $secondary_languages ) );
+		$home_rule_key = "^({$lang_regex})/?$";
+
+		// Idempotency guard: if rules are already prefixed for the active secondary languages, return as-is.
+		if ( isset( $existing_rules[ $home_rule_key ] ) ) {
+			return $existing_rules;
+		}
+
+		$new_rules = array();
 
 		// 1. Language homepage rule at the top.
-		$new_rules[ "^({$lang_regex})/?$" ] = 'index.php?' . self::QUERY_VAR . '=$matches[1]';
+		$new_rules[ $home_rule_key ] = 'index.php?' . self::QUERY_VAR . '=$matches[1]';
 
 		// 2. Prefixed rules for secondary languages.
 		foreach ( $existing_rules as $pattern => $query ) {

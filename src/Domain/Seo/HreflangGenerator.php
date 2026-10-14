@@ -140,12 +140,20 @@ class HreflangGenerator {
 			}
 
 			if ( $this->language_registry->is_active( $lang_code ) ) {
-				$permalink = function_exists( 'get_permalink' ) ? get_permalink( $post_id ) : '';
-				if ( is_string( $permalink ) && '' !== $permalink ) {
-					$url                    = $this->url_generator->localize_url( $permalink, $lang_code );
+				if ( $this->url_generator->is_front_page_for_language( $post_id, $lang_code ) ) {
+					$url                    = $this->url_generator->home_url( $lang_code );
 					$variants[ $lang_code ] = $url;
 					if ( $lang_code === $default_code ) {
 						$variants['x-default'] = $url;
+					}
+				} else {
+					$permalink = function_exists( 'get_permalink' ) ? get_permalink( $post_id ) : '';
+					if ( is_string( $permalink ) && '' !== $permalink ) {
+						$url                    = $this->url_generator->localize_url( $permalink, $lang_code );
+						$variants[ $lang_code ] = $url;
+						if ( $lang_code === $default_code ) {
+							$variants['x-default'] = $url;
+						}
 					}
 				}
 			}
@@ -165,6 +173,11 @@ class HreflangGenerator {
 
 			// Strict publication invariant: only published siblings are indexed.
 			if ( ! $sibling_post instanceof WP_Post || 'publish' !== $sibling_post->post_status ) {
+				continue;
+			}
+
+			if ( $this->url_generator->is_front_page_for_language( $sibling_id, $lang_code ) ) {
+				$variants[ $lang_code ] = $this->url_generator->home_url( $lang_code );
 				continue;
 			}
 
@@ -256,6 +269,14 @@ class HreflangGenerator {
 	 * @return array<string, string> Map of hreflang code => localized URL.
 	 */
 	public function get_front_page_hreflang_variants(): array {
+		$show_on_front = function_exists( 'get_option' ) ? get_option( 'show_on_front', 'posts' ) : 'posts';
+		if ( 'page' === $show_on_front ) {
+			$page_on_front = function_exists( 'get_option' ) ? (int) get_option( 'page_on_front', 0 ) : 0;
+			if ( $page_on_front > 0 ) {
+				return $this->get_post_hreflang_variants( $page_on_front );
+			}
+		}
+
 		$variants     = array();
 		$default_lang = $this->language_registry->get_default();
 		$default_code = null !== $default_lang ? $default_lang->get_code() : 'es';
