@@ -1636,12 +1636,17 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - PHPCS / WPCS: **178/178 archivos analizados, 0 errors, 0 warnings** (100% PASS).
     - Verificador de Fase 3.31 (`scratch/verify_fase_3_31.php`): **40/40 controles PASS (100%)**.
     - Invarianza absoluta certificada en `cms_ect` (3.403 filas, MD5 `4241ca7e7ec6399a594537cb04790c10`) y `cms_ect_lab` (120 grupos, 133 elementos, TRID 197 no importado).
-
-
-
-
-
-
-
-
-
+- **Importación Piloto Controlada de la Portada Bilingüe TRID 197 en Laboratorio (Fase 3.32 / Directiva DT-TFML-062 — ADR-058):**
+  - **Conciliación de Observaciones de Auditoría de Fase 3.31:**
+    - Conciliación exacta del conteo de PHPUnit: paso de `570` pruebas totales en Fase 3.30 (`569` ejecutadas + `1` omitida) a `580` pruebas totales en Fase 3.31 (`579` ejecutadas + `1` omitida, `2.053` aserciones) por la adición de exactamente **10 métodos `test_*`** en `TransactionalRetainedRecoveryTest.php` que agrupan los 15 escenarios de fallo inducido sin eliminar ni sustituir pruebas existentes.
+    - Delimitación explícita del alcance de concurrencia de `MigrationExecutionLock` (exclusión cooperativa vía `INSERT IGNORE` en InnoDB + *fencing token* pre-commit).
+    - Verificación del respaldo histórico inicial (`D:/laragon/backup/tfml_staging/preflight_backup_cms_ect_snapshot.sql`, `2026-10-11 13:24:35`, SHA-256 `f4db11d9c18bd393fb684a38128a1f7be65b76a09249484ef39de67ba73c4b1a`) y generación de respaldo específico pre-piloto de `cms_ect_lab` (`D:/laragon/backup/tfml_staging/cms_ect_lab_pre_fase_3_32_pilot_trid197_20261013_233600.sql`, `17.597.240` bytes, SHA-256 `8b40a59daac02844b4a6c7d1414108db2b8836383f4ca2978dc9d141fa74c515`, baseline `a9ea9cd2c6854132c82a1deadbbb4aeeaac630f7`) con restauración íntegra validada en base desechable (`cms_ect_lab_restore_verify`, eliminada tras verificación).
+  - **Ejecución Transaccional del Lote Piloto `pilot-trid-197-partial` en `cms_ect_lab`:**
+    - Derivación del plan parcial `pilot-trid-197-partial` (`fingerprint = cb9c45034eb0117cd619ce215394a801dfcafe9243a839f355d5896d9e0d17d7`, `parent_fingerprint = 08a93f721373c7fdb5395544faff69684ab1affd9ba7aa1ed1e67fd4a17bb949`) exclusivamente para el `TRID 197`.
+    - Creación atómica del grupo TFML **`group_id = 587`** (`post/page`, `canonical_element_id = 197`), enlaces activos `673` (`197 -> es`) y `674` (`8356 -> en`), y registro retenido `wpml:197` en `RetainedTranslationRegistry` (`fr => 8839`, `fingerprint = 723016cbe0a5ee2044468f882a5f81f9cc3c4154b07c3c7acb18efc3adc81260`), junto con manifiesto `tfml_migration_manifest_pilot-trid-197-partial` y checkpoint `completed`.
+    - Consolidación en `cms_ect_lab` de **121 grupos TFML**, **135 elementos activos**, **1 elemento francés retenido** (`8839` ausente de tablas activas) y **0 duplicados**.
+  - **Certificación de Resolver, Reconciliación, Idempotencia y Pruebas HTTP:**
+    - Verificación de resolución bidireccional `197 (es) <-> 8356 (en)` en `ContentTranslationResolver` y `ServicioTraduccionPublico`, preservación de procedencia canónica y rechazo de `fr` e idiomas inexistentes.
+    - Reconciliación sin discrepancias tanto del lote piloto (`1` grupo / `2` activos / `1` retenido) como del universo acumulado (`121` grupos / `135` elementos activos / `1` retenido), y prueba controlada de idempotencia (`idempotent_skipped`, `0` escrituras duplicadas).
+    - Comprobación HTTP en vivo sobre `http://lab.ecoterra.test/`: `/` responde `HTTP 200` con `lang="es-ES"` y emite `hreflang` bilingüe (`es`, `en`, `x-default`); `/fr/` responde `HTTP 404` (`lang="es-ES"`); `/en/` responde `HTTP 404` (`lang="en-US"`, `0` errores PHP) y queda registrado como **`BLOCKED BY ROUTING`** conforme a `DT-TFML-062`.
+    - Creación del verificador reproducible `scratch/verify_fase_3_32.php` (**40 controles: 39 PASS, 1 BLOCKED por diseño de fase, 0 FAIL**).
