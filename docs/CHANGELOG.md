@@ -1614,6 +1614,28 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - PHPCS / WPCS: **177/177 archivos analizados, 0 errors, 0 warnings** (100% PASS).
   - Verificador de Fase 3.30 (`scratch/verify_fase_3_30.php`): **53/53 controles PASS (100%)**.
   - `composer validate --strict`: PASS.
+- **Blindaje Transaccional y Certificación de Recuperación de Traducciones Retenidas (Fase 3.31 / Directiva DT-TFML-061 — ADR-057):**
+  - **Unificación de Conexión Transaccional (`$wpdb`) y Persistencia SQL Directa sobre `{$db->prefix}options` (InnoDB):**
+    - Inyección de la instancia compartida `$wpdb` (`$this->db`) en `RetainedTranslationRegistry`, `MigrationCheckpointRepository`, `MigrationExecutionLock` y `WpmlMigrationRollbackService`.
+    - Ejecución de lecturas, escrituras y borrados mediante SQL parametrizado directo sobre `{$this->db->prefix}options` (motor **InnoDB**) cuando hay conexión MySQL activa (`has_real_db()`), participando en la misma transacción `START TRANSACTION` / `SAVEPOINT` / `COMMIT` / `ROLLBACK` que `tfml_groups` y `tfml_group_elements`.
+  - **Eliminación de Lecturas Sucias en `WP_Object_Cache` tras `ROLLBACK` SQL:**
+    - Invalidación explícita de claves en `WP_Object_Cache` (`tfml_retained_translations`, `tfml_migration_checkpoint_wpml`, `alloptions`, `notoptions` y manifiestos) en `TranslationGroupRepository::rollback_transaction()`, `RetainedTranslationRegistry::invalidate_option_cache()`, `MigrationCheckpointRepository` y `WpmlMigrationRollbackService`.
+  - **Verificación Post-Escritura del Estado Persistido:**
+    - Resolución de la ambigüedad de `update_option() === false` (sin cambios vs. fallo de escritura) mediante verificación de `'' === $this->db->last_error` y comparación de huella criptográfica SHA-256 del estado releído en `RetainedTranslationRegistry::persist_and_verify()`, `MigrationCheckpointRepository::save()` y `WpmlMigrationRollbackService::save_execution_manifest()`.
+  - **Blindaje de Frontera Transaccional en `execute_batch()`, `promote_retained_translation()` y `rollback_groups()`:**
+    - Inclusión de `$this->checkpoint_repository->save()` y `$this->persist_batch_manifest()` **antes** de `commit_transaction()` en `WpmlMigrationExecutor::execute_batch()`.
+    - Envoltura transaccional de `RetainedTranslationRegistry::promote_retained_translation()` con `begin_transaction()` / `commit_transaction()` / `rollback_transaction()` y validación de colisión activa (`find_by_element()`).
+    - Verificación de estado post-borrado de registros retenidos dentro de la transacción de `WpmlMigrationRollbackService::rollback_groups()`.
+    - Detección en `WpmlMigrationExecutor::reconcile()` de registros retenidos faltantes, corruptos (`verify_record_integrity()`) y huérfanos sin grupo TFML activo.
+  - **Clarificación de Alcance DDL:**
+    - Preservación estricta de `tfml_schema_version = '1.0.0'` (5 tablas maestras de TFML) sin aplicar migraciones DDL no autorizadas sobre `cms_ect_lab`, aprovechando el motor **InnoDB** de `etk_t_options`.
+  - **Certificación de los 15 Escenarios Obligatorios en PHPUnit y Base de Datos MySQL Efímera (`cms_ect_lab_tx_test`):**
+    - Creación de `tests/Unit/Migration/TransactionalRetainedRecoveryTest.php` y `scratch/verify_fase_3_31.php` certificando los 15 escenarios de fallo inducido, interrupción antes de `COMMIT`, reejecución idempotente, colisiones, promoción atómica, reconciliación de huérfanos, rollback atómico e idempotente y bloqueo de concurrencia.
+  - **Métricas de Calidad y Verificación:**
+    - PHPUnit: **580 tests, 2.053 assertions, 0 errors, 0 failures** (100% PASS).
+    - PHPCS / WPCS: **178/178 archivos analizados, 0 errors, 0 warnings** (100% PASS).
+    - Verificador de Fase 3.31 (`scratch/verify_fase_3_31.php`): **40/40 controles PASS (100%)**.
+    - Invarianza absoluta certificada en `cms_ect` (3.403 filas, MD5 `4241ca7e7ec6399a594537cb04790c10`) y `cms_ect_lab` (120 grupos, 133 elementos, TRID 197 no importado).
 
 
 

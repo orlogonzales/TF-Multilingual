@@ -15,6 +15,7 @@ use TF\Multilingual\Domain\Translation\Exceptions\InvalidTranslationElementExcep
 use TF\Multilingual\Domain\Translation\Exceptions\TranslationConflictException;
 use TF\Multilingual\Domain\Translation\Exceptions\TranslationDomainException;
 use TF\Multilingual\Domain\Translation\Exceptions\TranslationGroupNotFoundException;
+use Throwable;
 use wpdb;
 
 /**
@@ -174,7 +175,7 @@ class TranslationGroupRepository {
 			$this->commit_transaction();
 
 			return $persisted_group;
-		} catch ( TranslationDomainException $e ) {
+		} catch ( Throwable $e ) {
 			$this->rollback_transaction();
 			throw $e;
 		}
@@ -568,7 +569,7 @@ class TranslationGroupRepository {
 
 		try {
 			// 1. Delete relation row.
-			$this->db->delete(
+			$deleted_rel = $this->db->delete(
 				$this->table_group_elements,
 				array(
 					'group_id'      => $group_id,
@@ -576,30 +577,39 @@ class TranslationGroupRepository {
 				),
 				array( '%d', '%s' )
 			);
+			if ( false === $deleted_rel ) {
+				$this->handle_db_error( sprintf( 'Failed to delete translation element relation from group %d.', $group_id ) );
+			}
 
 			// 2. Handle group lifecycle.
 			if ( 0 === $remaining_count ) {
 				// Empty group policy: purge orphaned group row automatically.
-				$this->db->delete(
+				$deleted_grp = $this->db->delete(
 					$this->table_groups,
 					array( 'id' => $group_id ),
 					array( '%d' )
 				);
+				if ( false === $deleted_grp ) {
+					$this->handle_db_error( sprintf( 'Failed to purge empty translation group %d.', $group_id ) );
+				}
 			} elseif ( $is_canonical && null !== $new_canonical_element_id ) {
 				// Update canonical element pointer.
-				$this->db->update(
+				$updated_grp = $this->db->update(
 					$this->table_groups,
 					array( 'canonical_element_id' => $new_canonical_element_id ),
 					array( 'id' => $group_id ),
 					array( '%d' ),
 					array( '%d' )
 				);
+				if ( false === $updated_grp ) {
+					$this->handle_db_error( sprintf( 'Failed to update canonical element for group %d.', $group_id ) );
+				}
 			}
 
 			$this->commit_transaction();
 
 			return true;
-		} catch ( TranslationDomainException $e ) {
+		} catch ( Throwable $e ) {
 			$this->rollback_transaction();
 			throw $e;
 		}
@@ -639,6 +649,7 @@ class TranslationGroupRepository {
 	 * @param int $group_id Group ID.
 	 * @return bool True on success.
 	 * @throws TranslationGroupNotFoundException If group does not exist.
+	 * @throws TranslationDomainException If deletion fails.
 	 */
 	public function delete( int $group_id ): bool {
 		$group = $this->find_or_fail( $group_id );
@@ -647,27 +658,34 @@ class TranslationGroupRepository {
 
 		try {
 			// Delete all member relations.
-			$this->db->delete(
+			$deleted_elements = $this->db->delete(
 				$this->table_group_elements,
 				array( 'group_id' => $group_id ),
 				array( '%d' )
 			);
+			if ( false === $deleted_elements ) {
+				$this->handle_db_error( sprintf( 'Failed to delete translation elements for group %d.', $group_id ) );
+			}
 
 			// Delete group header.
-			$this->db->delete(
+			$deleted_group = $this->db->delete(
 				$this->table_groups,
 				array( 'id' => $group_id ),
 				array( '%d' )
 			);
+			if ( false === $deleted_group ) {
+				$this->handle_db_error( sprintf( 'Failed to delete translation group %d.', $group_id ) );
+			}
 
 			$this->commit_transaction();
 
 			return true;
-		} catch ( TranslationDomainException $e ) {
+		} catch ( Throwable $e ) {
 			$this->rollback_transaction();
 			throw $e;
 		}
 	}
+
 
 	/**
 	 * Paginates translation groups by element type and optional subtype.
@@ -899,7 +917,8 @@ class TranslationGroupRepository {
 	}
 
 	/**
-	 * Rolls back an active database transaction.
+	 * Rolls back an active database transaction and invalidates option caches
+	 * that may have been mutated inside the aborted transaction.
 	 *
 	 * @return void
 	 */
@@ -909,6 +928,13 @@ class TranslationGroupRepository {
 			$this->db->query( 'ROLLBACK' );
 		} else {
 			$this->db->query( 'ROLLBACK TO SAVEPOINT tfml_tx_' . ( self::$transaction_depth + 1 ) );
+		}
+
+		if ( function_exists( 'wp_cache_delete' ) ) {
+			wp_cache_delete( 'tfml_retained_translations', 'options' );
+			wp_cache_delete( 'tfml_migration_checkpoint_wpml', 'options' );
+			wp_cache_delete( 'alloptions', 'options' );
+			wp_cache_delete( 'notoptions', 'options' );
 		}
 	}
 }

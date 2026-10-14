@@ -19,8 +19,8 @@ use wpdb;
  * Class WpmlMigrationRollbackService
  *
  * Provides transactional, non-destructive rollback capabilities for TFML groups created
- * by a specific migration run, guaranteeing zero modifications to WordPress Core entities
- * and zero mutations to WPML tables.
+ * by a specific migration run, guaranteeing zero modifications to WordPress Core entities,
+ * zero mutations to WPML tables, and atomic cleanup of RetainedTranslationRegistry.
  */
 class WpmlMigrationRollbackService {
 
@@ -60,6 +60,13 @@ class WpmlMigrationRollbackService {
 	private RetainedTranslationRegistry $retained_registry;
 
 	/**
+	 * Fault injection flag for manifest persistence testing.
+	 *
+	 * @var bool
+	 */
+	private bool $simulate_manifest_write_failure = false;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param wpdb|null                          $db                    Database instance.
@@ -79,9 +86,9 @@ class WpmlMigrationRollbackService {
 
 		$this->db                    = null !== $db ? $db : $wpdb;
 		$this->group_repository      = null !== $group_repository ? $group_repository : new TranslationGroupRepository( $this->db );
-		$this->checkpoint_repository = null !== $checkpoint_repository ? $checkpoint_repository : new MigrationCheckpointRepository();
-		$this->lock                  = null !== $lock ? $lock : new MigrationExecutionLock();
-		$this->retained_registry     = null !== $retained_registry ? $retained_registry : new RetainedTranslationRegistry();
+		$this->checkpoint_repository = null !== $checkpoint_repository ? $checkpoint_repository : new MigrationCheckpointRepository( $this->db );
+		$this->lock                  = null !== $lock ? $lock : new MigrationExecutionLock( $this->db );
+		$this->retained_registry     = null !== $retained_registry ? $retained_registry : new RetainedTranslationRegistry( $this->db );
 	}
 
 	/**
@@ -90,34 +97,110 @@ class WpmlMigrationRollbackService {
 	public const OPTION_MANIFEST_PREFIX = 'tfml_migration_manifest_';
 
 	/**
+	 * Enables or disables simulated manifest write failure.
+	 *
+	 * @param bool $simulate Whether to simulate failure.
+	 * @return void
+	 */
+	public function set_simulate_manifest_write_failure( bool $simulate ): void {
+		$this->simulate_manifest_write_failure = $simulate;
+	}
+
+	/**
 	 * Gets the persisted execution manifest for an execution token.
 	 *
 	 * @param string $execution_id Execution token.
 	 * @return array<string, mixed>|null
 	 */
 	public function get_execution_manifest( string $execution_id ): ?array {
-		if ( '' === trim( $execution_id ) || ! function_exists( 'get_option' ) ) {
+		if ( '' === trim( $execution_id ) ) {
 			return null;
 		}
 
-		$manifest = get_option( self::OPTION_MANIFEST_PREFIX . $execution_id, null );
+		$key = self::OPTION_MANIFEST_PREFIX . $execution_id;
+
+		if ( $this->has_real_db() ) {
+			$table   = $this->get_options_table();
+			$query   = $this->db->prepare(
+				"SELECT `option_value` FROM `{$table}` WHERE `option_name` = %s LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$key
+			);
+			$raw_val = $this->db->get_var( $query );
+			if ( null === $raw_val || false === $raw_val ) {
+				return null;
+			}
+
+			$manifest = function_exists( 'maybe_unserialize' )
+				? maybe_unserialize( $raw_val )
+				: @unserialize( (string) $raw_val ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize,WordPress.PHP.NoSilencedErrors.Discouraged
+
+			return is_array( $manifest ) ? $manifest : null;
+		}
+
+		if ( ! function_exists( 'get_option' ) ) {
+			return null;
+		}
+
+		$manifest = get_option( $key, null );
 
 		return is_array( $manifest ) ? $manifest : null;
 	}
 
 	/**
-	 * Saves or registers an execution manifest.
+	 * Saves or registers an execution manifest and verifies persisted state.
 	 *
 	 * @param string               $execution_id Execution token.
 	 * @param array<string, mixed> $data         Manifest data.
 	 * @return bool
+	 * @throws MigrationExecutionException If manifest write or verification fails.
 	 */
 	public function save_execution_manifest( string $execution_id, array $data ): bool {
-		if ( '' === trim( $execution_id ) || ! function_exists( 'update_option' ) ) {
+		if ( '' === trim( $execution_id ) ) {
 			return false;
 		}
 
-		return update_option( self::OPTION_MANIFEST_PREFIX . $execution_id, $data, false );
+		if ( $this->simulate_manifest_write_failure ) {
+			throw new MigrationExecutionException(
+				sprintf( 'Fallo inducido al persistir el manifiesto de ejecución "%s".', $execution_id )
+			);
+		}
+
+		$key = self::OPTION_MANIFEST_PREFIX . $execution_id;
+
+		if ( $this->has_real_db() ) {
+			$table      = $this->get_options_table();
+			$serialized = function_exists( 'maybe_serialize' )
+				? maybe_serialize( $data )
+				: serialize( $data ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize
+
+			$sql = $this->db->prepare(
+				"INSERT INTO `{$table}` (`option_name`, `option_value`, `autoload`) VALUES (%s, %s, 'no') ON DUPLICATE KEY UPDATE `option_value` = VALUES(`option_value`), `autoload` = 'no'", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$key,
+				$serialized
+			);
+
+			$res = $this->db->query( $sql );
+			$this->invalidate_cache( $key );
+
+			if ( false === $res || '' !== $this->db->last_error ) {
+				throw new MigrationExecutionException(
+					sprintf( 'Error SQL al persistir el manifiesto "%s": %s', $key, $this->db->last_error )
+				);
+			}
+		} elseif ( function_exists( 'update_option' ) ) {
+			update_option( $key, $data, false );
+		} else {
+			return false;
+		}
+
+		$persisted = $this->get_execution_manifest( $execution_id );
+		if ( ! is_array( $persisted ) || ( $persisted['execution_id'] ?? '' ) !== ( $data['execution_id'] ?? $execution_id ) ) {
+			throw new MigrationExecutionException(
+				sprintf( 'Fallo de verificación post-escritura del manifiesto "%s".', $execution_id )
+			);
+		}
+
+		return true;
 	}
 
 	/**
@@ -127,11 +210,28 @@ class WpmlMigrationRollbackService {
 	 * @return bool
 	 */
 	public function delete_execution_manifest( string $execution_id ): bool {
-		if ( '' === trim( $execution_id ) || ! function_exists( 'delete_option' ) ) {
+		if ( '' === trim( $execution_id ) ) {
 			return false;
 		}
 
-		return delete_option( self::OPTION_MANIFEST_PREFIX . $execution_id );
+		$key = self::OPTION_MANIFEST_PREFIX . $execution_id;
+
+		if ( $this->has_real_db() ) {
+			$table = $this->get_options_table();
+			$sql   = $this->db->prepare(
+				"DELETE FROM `{$table}` WHERE `option_name` = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$key
+			);
+			$this->db->query( $sql );
+			$this->invalidate_cache( $key );
+			return true;
+		}
+
+		if ( ! function_exists( 'delete_option' ) ) {
+			return false;
+		}
+
+		return delete_option( $key );
 	}
 
 	/**
@@ -248,7 +348,7 @@ class WpmlMigrationRollbackService {
 	}
 
 	/**
-	 * Atomically reverts a list of TFML groups.
+	 * Atomically reverts a list of TFML groups and their associated retained translations.
 	 *
 	 * @param array<int, int> $group_ids    List of group IDs.
 	 * @param string          $execution_id Execution token or identifier.
@@ -309,18 +409,38 @@ class WpmlMigrationRollbackService {
 		$this->group_repository->begin_transaction();
 
 		try {
+			// If groups were already reverted in a prior rollback run (idempotent re-execution),
+			// ensure any residual retained entries for requested IDs are cleaned up.
+			if ( empty( $eligible ) && empty( $blocked ) ) {
+				foreach ( $group_ids as $gid ) {
+					$this->retained_registry->remove_by_group_id( (int) $gid );
+				}
+			}
+
 			foreach ( $eligible as $group_id ) {
 				$group = $this->group_repository->find( (int) $group_id );
 				if ( null === $group ) {
+					$this->retained_registry->remove_by_group_id( (int) $group_id );
 					continue;
 				}
 
 				$elements_count = count( $group->get_elements() );
 				$deleted        = $this->group_repository->delete( (int) $group_id );
-				if ( $deleted ) {
-					++$reverted_groups_count;
-					$reverted_elements_count += $elements_count;
-					$this->retained_registry->remove_by_group_id( (int) $group_id );
+				if ( ! $deleted ) {
+					throw new MigrationExecutionException(
+						sprintf( 'No se pudo eliminar el grupo TFML ID %d durante el rollback.', (int) $group_id )
+					);
+				}
+
+				++$reverted_groups_count;
+				$reverted_elements_count += $elements_count;
+				$this->retained_registry->remove_by_group_id( (int) $group_id );
+
+				// Verify post-delete state inside transaction.
+				if ( null !== $this->retained_registry->get_by_group_id( (int) $group_id ) ) {
+					throw new MigrationExecutionException(
+						sprintf( 'Inconsistencia en rollback: El registro retenido del grupo ID %d permanece activo tras su purga.', (int) $group_id )
+					);
 				}
 			}
 
@@ -341,12 +461,45 @@ class WpmlMigrationRollbackService {
 			);
 		} catch ( Throwable $e ) {
 			$this->group_repository->rollback_transaction();
+			$this->retained_registry->invalidate_option_cache();
 
 			throw new MigrationExecutionException(
 				sprintf( 'Fallo transaccional durante el rollback de la ejecución "%s": %s', $execution_id, $e->getMessage() ),
 				0,
 				$e
 			);
+		}
+	}
+
+	/**
+	 * Determines whether a live MySQL connection is available on $this->db.
+	 *
+	 * @return bool
+	 */
+	private function has_real_db(): bool {
+		return isset( $this->db->dbh ) && null !== $this->db->dbh;
+	}
+
+	/**
+	 * Returns the options table name for the active database connection.
+	 *
+	 * @return string
+	 */
+	private function get_options_table(): string {
+		return $this->db->prefix . 'options';
+	}
+
+	/**
+	 * Invalidates WordPress option caches for the given key.
+	 *
+	 * @param string $key Option key.
+	 * @return void
+	 */
+	private function invalidate_cache( string $key ): void {
+		if ( function_exists( 'wp_cache_delete' ) ) {
+			wp_cache_delete( $key, 'options' );
+			wp_cache_delete( 'alloptions', 'options' );
+			wp_cache_delete( 'notoptions', 'options' );
 		}
 	}
 }

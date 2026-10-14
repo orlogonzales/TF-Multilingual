@@ -103,6 +103,20 @@ class WpmlMigrationExecutor {
 	private ?bool $has_icl_table = null;
 
 	/**
+	 * Fault injection flag to simulate interruption right before transaction commit.
+	 *
+	 * @var bool
+	 */
+	private bool $simulate_interrupt_before_commit = false;
+
+	/**
+	 * Fault injection flag to simulate manifest persistence failure.
+	 *
+	 * @var bool
+	 */
+	private bool $simulate_manifest_failure = false;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param wpdb|null                          $db                    Database instance.
@@ -129,11 +143,11 @@ class WpmlMigrationExecutor {
 		$this->db                    = null !== $db ? $db : $wpdb;
 		$this->language_registry     = null !== $language_registry ? $language_registry : new LanguageRegistry();
 		$this->group_repository      = null !== $group_repository ? $group_repository : new TranslationGroupRepository( $this->db, $this->language_registry );
-		$this->checkpoint_repository = null !== $checkpoint_repository ? $checkpoint_repository : new MigrationCheckpointRepository();
-		$this->lock                  = null !== $lock ? $lock : new MigrationExecutionLock();
+		$this->checkpoint_repository = null !== $checkpoint_repository ? $checkpoint_repository : new MigrationCheckpointRepository( $this->db );
+		$this->lock                  = null !== $lock ? $lock : new MigrationExecutionLock( $this->db );
 		$this->element_validator     = null !== $element_validator ? $element_validator : new WordPressElementValidator();
 		$this->schema_manager        = null !== $schema_manager ? $schema_manager : new SchemaManager( $this->db );
-		$this->retained_registry     = null !== $retained_registry ? $retained_registry : new RetainedTranslationRegistry();
+		$this->retained_registry     = null !== $retained_registry ? $retained_registry : new RetainedTranslationRegistry( $this->db );
 	}
 
 	/**
@@ -144,6 +158,27 @@ class WpmlMigrationExecutor {
 	public function get_retained_registry(): RetainedTranslationRegistry {
 		return $this->retained_registry;
 	}
+
+	/**
+	 * Sets simulated interruption right before transaction commit (for fault testing).
+	 *
+	 * @param bool $simulate Whether to simulate interruption.
+	 * @return void
+	 */
+	public function set_simulate_interrupt_before_commit( bool $simulate ): void {
+		$this->simulate_interrupt_before_commit = $simulate;
+	}
+
+	/**
+	 * Sets simulated manifest persistence failure (for fault testing).
+	 *
+	 * @param bool $simulate Whether to simulate manifest write failure.
+	 * @return void
+	 */
+	public function set_simulate_manifest_failure( bool $simulate ): void {
+		$this->simulate_manifest_failure = $simulate;
+	}
+
 
 	/**
 	 * Checks if WPML icl_translations table exists in current database.
@@ -590,8 +625,12 @@ class WpmlMigrationExecutor {
 				}
 			}
 
-			// Advance checkpoint inside transaction.
+			// Advance and persist checkpoint inside transaction before COMMIT.
 			$new_checkpoint = $checkpoint->advance( count( $slice ), $current_trid );
+			$this->checkpoint_repository->save( $new_checkpoint );
+
+			// Persist/update execution manifest inside transaction before COMMIT.
+			$this->persist_batch_manifest( $token, $plan->get_fingerprint(), $batch_results );
 
 			// Fencing token verification right before COMMIT: ensure lock was not expired or stolen.
 			if ( ! $this->lock->verify_ownership( 'wpml', $token ) ) {
@@ -600,11 +639,15 @@ class WpmlMigrationExecutor {
 				);
 			}
 
-			// Commit transaction.
-			$this->group_repository->commit_transaction();
+			if ( $this->simulate_interrupt_before_commit ) {
+				throw new MigrationExecutionException(
+					sprintf( 'Interrupción simulada antes de confirmar la transacción del lote (TRID %d).', $current_trid ),
+					$current_trid
+				);
+			}
 
-			// Persist checkpoint outside database transaction.
-			$this->checkpoint_repository->save( $new_checkpoint );
+			// Commit transaction atomically across TFML tables and InnoDB options records.
+			$this->group_repository->commit_transaction();
 
 			$is_finished = $new_checkpoint->is_completed();
 			if ( $is_finished ) {
@@ -617,11 +660,16 @@ class WpmlMigrationExecutor {
 				'finished'      => $is_finished,
 			);
 		} catch ( Throwable $e ) {
-			// Rollback transaction.
+			// Rollback transaction and invalidate option caches.
 			$this->group_repository->rollback_transaction();
+			$this->retained_registry->invalidate_option_cache();
 
-			$failed_checkpoint = $checkpoint->record_error( $current_trid, $e->getMessage() );
-			$this->checkpoint_repository->save( $failed_checkpoint );
+			try {
+				$failed_checkpoint = $checkpoint->record_error( $current_trid, $e->getMessage() );
+				$this->checkpoint_repository->save( $failed_checkpoint );
+			} catch ( Throwable $checkpoint_error ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement.DetectedCatch
+				// Do not mask the primary transactional rollback exception if checkpoint saving also fails.
+			}
 
 			$this->lock->release( 'wpml', $token );
 
@@ -635,6 +683,82 @@ class WpmlMigrationExecutor {
 				$e
 			);
 		}
+	}
+
+	/**
+	 * Persists or updates the execution manifest inside the active batch transaction.
+	 *
+	 * @param string                            $token            Execution token.
+	 * @param string                            $plan_fingerprint Plan fingerprint.
+	 * @param array<int, array<string, mixed>>  $batch_results    Batch results.
+	 * @param string|null                       $started_at       Optional start timestamp.
+	 * @param string|null                       $finished_at      Optional finish timestamp.
+	 * @return void
+	 * @throws MigrationExecutionException If manifest write or verification fails.
+	 */
+	private function persist_batch_manifest(
+		string $token,
+		string $plan_fingerprint,
+		array $batch_results,
+		?string $started_at = null,
+		?string $finished_at = null
+	): void {
+		$rollback_service = new WpmlMigrationRollbackService(
+			$this->db,
+			$this->group_repository,
+			$this->checkpoint_repository,
+			$this->lock,
+			$this->retained_registry
+		);
+		$rollback_service->set_simulate_manifest_write_failure( $this->simulate_manifest_failure );
+
+		$existing = $rollback_service->get_execution_manifest( $token );
+
+		$imported_group_ids        = is_array( $existing ) && isset( $existing['imported_group_ids'] )
+			? array_map( 'intval', (array) $existing['imported_group_ids'] )
+			: array();
+		$retained_manifest_records = is_array( $existing ) && isset( $existing['retained_translations'] )
+			? (array) $existing['retained_translations']
+			: array();
+
+		$retained_by_trid = array();
+		foreach ( $retained_manifest_records as $item ) {
+			if ( is_array( $item ) && isset( $item['trid'] ) ) {
+				$retained_by_trid[ (int) $item['trid'] ] = $item;
+			}
+		}
+
+		foreach ( $batch_results as $res ) {
+			$st = (string) ( $res['status'] ?? '' );
+			if ( ( 'imported' === $st || 'imported_partial_retained' === $st ) && ! empty( $res['group_id'] ) ) {
+				$imported_group_ids[] = (int) $res['group_id'];
+			}
+			if ( ! empty( $res['retained_translations'] ) ) {
+				$trid                      = (int) ( $res['trid'] ?? 0 );
+				$retained_by_trid[ $trid ] = array(
+					'trid'                  => $trid,
+					'group_id'              => (int) ( $res['group_id'] ?? 0 ),
+					'retained_translations' => (array) $res['retained_translations'],
+				);
+			}
+		}
+
+		$imported_group_ids = array_values( array_unique( $imported_group_ids ) );
+		ksort( $retained_by_trid );
+
+		$manifest_data = array(
+			'execution_id'          => $token,
+			'source'                => 'wpml',
+			'plan_fingerprint'      => $plan_fingerprint,
+			'imported_group_ids'    => $imported_group_ids,
+			'retained_translations' => array_values( $retained_by_trid ),
+			'started_at'            => null !== $started_at
+				? $started_at
+				: ( is_array( $existing ) && isset( $existing['started_at'] ) ? (string) $existing['started_at'] : gmdate( 'Y-m-d H:i:s' ) ),
+			'finished_at'           => null !== $finished_at ? $finished_at : gmdate( 'Y-m-d H:i:s' ),
+		);
+
+		$rollback_service->save_execution_manifest( $token, $manifest_data );
 	}
 
 	/**
@@ -847,40 +971,9 @@ class WpmlMigrationExecutor {
 
 		// Count imported elements from reconciliation.
 		$imported_elements = (int) ( $reconciliation['tfml_imported_elements'] ?? 0 );
+		$finished_at       = gmdate( 'Y-m-d H:i:s' );
 
-		// Extract imported group IDs and register execution manifest for ownership tracking.
-		$imported_group_ids        = array();
-		$retained_manifest_records = array();
-		foreach ( $all_results as $res ) {
-			$st = (string) ( $res['status'] ?? '' );
-			if ( ( 'imported' === $st || 'imported_partial_retained' === $st ) && ! empty( $res['group_id'] ) ) {
-				$imported_group_ids[] = (int) $res['group_id'];
-			}
-			if ( ! empty( $res['retained_translations'] ) ) {
-				$retained_manifest_records[] = array(
-					'trid'                  => (int) ( $res['trid'] ?? 0 ),
-					'group_id'              => (int) ( $res['group_id'] ?? 0 ),
-					'retained_translations' => (array) $res['retained_translations'],
-				);
-			}
-		}
-		$imported_group_ids = array_values( array_unique( $imported_group_ids ) );
-
-		if ( function_exists( 'update_option' ) ) {
-			update_option(
-				WpmlMigrationRollbackService::OPTION_MANIFEST_PREFIX . $token,
-				array(
-					'execution_id'          => $token,
-					'source'                => 'wpml',
-					'plan_fingerprint'      => $plan->get_fingerprint(),
-					'imported_group_ids'    => $imported_group_ids,
-					'retained_translations' => $retained_manifest_records,
-					'started_at'            => $started_at,
-					'finished_at'           => gmdate( 'Y-m-d H:i:s' ),
-				),
-				false
-			);
-		}
+		$this->persist_batch_manifest( $token, $plan->get_fingerprint(), $all_results, $started_at, $finished_at );
 
 		return new MigrationExecutionReport(
 			array(
@@ -898,7 +991,7 @@ class WpmlMigrationExecutor {
 				'group_results'        => $all_results,
 				'reconciliation'       => $reconciliation,
 				'started_at'           => $started_at,
-				'finished_at'          => gmdate( 'Y-m-d H:i:s' ),
+				'finished_at'          => $finished_at,
 			)
 		);
 	}
@@ -907,7 +1000,8 @@ class WpmlMigrationExecutor {
 	 * Deeply reconciles the migration plan against actual database records in TFML tables.
 	 *
 	 * Verifies correspondence of groups, individual elements, canonical mapping, language codes,
-	 * subtype matching, and checks for zero orphan or fragmented assignments.
+	 * subtype matching, retained translation registry integrity, and checks for zero orphan or
+	 * fragmented assignments.
 	 *
 	 * @param MigrationPlan $plan Plan to reconcile against.
 	 * @return array{
@@ -927,6 +1021,7 @@ class WpmlMigrationExecutor {
 		$imported_elements_count = 0;
 		$skipped_count           = 0;
 		$discrepancies           = array();
+		$expected_retained_trids = array();
 
 		foreach ( $groups as $g ) {
 			$classification = (string) ( $g['classification'] ?? '' );
@@ -1011,9 +1106,10 @@ class WpmlMigrationExecutor {
 					}
 
 					// For partial groups with retained translations, verify that retained elements
-					// were NOT inserted as active elements in TFML, and ARE present in RetainedTranslationRegistry.
+					// were NOT inserted as active elements in TFML, and ARE present and valid in RetainedTranslationRegistry.
 					if ( MigrationPlan::CLASSIFICATION_PARTIAL_RETAINED === $classification ) {
-						$pending_translations = (array) ( $g['pending_translations'] ?? array() );
+						$expected_retained_trids[ $trid ] = (int) $group->get_id();
+						$pending_translations             = (array) ( $g['pending_translations'] ?? array() );
 						foreach ( $pending_translations as $pend_lang => $pend_eid ) {
 							$found_pend = $this->group_repository->find_by_element( $element_type, (int) $pend_eid );
 							if ( null !== $found_pend ) {
@@ -1033,6 +1129,36 @@ class WpmlMigrationExecutor {
 								'TRID %d: Grupo con clasificación PARTIAL_RETAINED no posee registro en RetainedTranslationRegistry.',
 								$trid
 							);
+						} elseif ( ! $this->retained_registry->verify_record_integrity( $retained_record ) ) {
+							$discrepancies[] = sprintf(
+								'TRID %d: El registro en RetainedTranslationRegistry presenta estructura corrupta o incompleta.',
+								$trid
+							);
+						} else {
+							if ( (int) ( $retained_record['group_id'] ?? 0 ) !== (int) $group->get_id() ) {
+								$discrepancies[] = sprintf(
+									'TRID %d: El registro retenido apunta al grupo ID %d, pero el grupo activo en TFML es ID %d.',
+									$trid,
+									(int) ( $retained_record['group_id'] ?? 0 ),
+									(int) $group->get_id()
+								);
+							}
+
+							$reg_elements = (array) ( $retained_record['retained_elements'] ?? array() );
+							foreach ( $pending_translations as $pend_lang => $pend_eid ) {
+								$reg_eid = isset( $reg_elements[ $pend_lang ] ) && is_array( $reg_elements[ $pend_lang ] )
+									? (int) ( $reg_elements[ $pend_lang ]['element_id'] ?? 0 )
+									: ( isset( $reg_elements[ $pend_lang ] ) && is_numeric( $reg_elements[ $pend_lang ] ) ? (int) $reg_elements[ $pend_lang ] : 0 );
+								if ( $reg_eid !== (int) $pend_eid ) {
+									$discrepancies[] = sprintf(
+										'TRID %d: El elemento retenido para "%s" en RetainedTranslationRegistry (%s) no coincide con el plan (%d).',
+										$trid,
+										$pend_lang,
+										$reg_eid > 0 ? (string) $reg_eid : 'ausente',
+										(int) $pend_eid
+									);
+								}
+							}
 						}
 					}
 
@@ -1051,6 +1177,34 @@ class WpmlMigrationExecutor {
 				}
 			} else {
 				++$skipped_count;
+			}
+		}
+
+		// Inspect all records in RetainedTranslationRegistry for orphan groups or corrupt entries.
+		$all_retained_records = $this->retained_registry->get_all( 'wpml' );
+		foreach ( $all_retained_records as $ret_key => $ret_record ) {
+			if ( ! is_array( $ret_record ) || ! $this->retained_registry->verify_record_integrity( $ret_record ) ) {
+				$discrepancies[] = sprintf(
+					'RetainedTranslationRegistry contiene un registro corrupto o mal formado para la clave %s.',
+					(string) $ret_key
+				);
+				continue;
+			}
+
+			$ret_trid_int = (int) ( $ret_record['trid'] ?? 0 );
+			$ret_group_id = (int) ( $ret_record['group_id'] ?? 0 );
+
+			if ( isset( $expected_retained_trids[ $ret_trid_int ] ) && $expected_retained_trids[ $ret_trid_int ] === $ret_group_id ) {
+				continue;
+			}
+
+			$active_group = $this->group_repository->find( $ret_group_id );
+			if ( null === $active_group ) {
+				$discrepancies[] = sprintf(
+					'TRID %d: Registro retenido huérfano en RetainedTranslationRegistry; el grupo TFML ID %d no existe.',
+					$ret_trid_int,
+					$ret_group_id
+				);
 			}
 		}
 
