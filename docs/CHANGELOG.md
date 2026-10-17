@@ -1667,3 +1667,32 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - **Pruebas Automatizadas y Certificación HTTP en Vivo:**
     - Nueva suite `tests/Unit/ResolvedorPortadaMultilingueTest.php` (**22 pruebas / 101 aserciones**) más ampliación de `tests/Unit/RewriteManagerTest.php` (**1 prueba / 6 aserciones**), alcanzando **603 pruebas totales en PHPUnit (602 ejecutadas + 1 omitida de integración, 2.160 aserciones, 0 fallos)**.
     - Verificador reproducible `scratch/verify_fase_3_33.php`: **23/23 controles PASS (0 FAIL)** sobre `http://lab.ecoterra.test/` e invariancia total de `cms_ect` y `cms_ect_lab`.
+- **Restauración Controlada del Renderizado Visual y Auditoría de Integraciones (Fase 3.34 / Directiva DT-TFML-064 — ADR-060):**
+  - **Diagnóstico y Corrección de Dependencias Visuales Físicas y Tablas de Soporte:**
+    - Identificación de la causa raíz de la ausencia de maquetación en el laboratorio: ausencia física de los directorios de `elementor`, `elementor-pro` y `revslider` en `wp-content/plugins/` a pesar de estar listados en la opción heredada `active_plugins`.
+    - Copia física controlada e incremental de las dependencias autorizadas desde `cms.ecoterra` hacia `lab.ecoterra`: `elementor` (v4.3.5), `elementor-pro` (v4.1.0) y `revslider` (v7.0.15), uniéndose a `ova-framework` (v1.0.0).
+    - Transferencia no destructiva de las 16 tablas `etk_t_revslider_*` desde `cms_ect` hacia `cms_ect_lab`, permitiendo a Slider Revolution 7.0 inicializar y renderizar el slider `home-es-1` (`Home Video`) sin tocar tablas WPML, Core ni TFML.
+    - Preservación estricta del aislamiento de seguridad: cuarentena de plugins prescindibles o de riesgo (`sitepress-multilingual-cms`, `duplicator`, `akismet`, etc.) y blindaje permanente en `mu-plugins/lab-isolation-guard.php` (`DISABLE_WP_CRON = true`, `WP_HTTP_BLOCK_EXTERNAL = true`, `blog_public = 0`).
+  - **Procedimiento de Respaldo Previo y Restauración Verificable:**
+    - Generación y custodia del respaldo previo de laboratorio `D:/laragon/backup/tfml_staging/cms_ect_lab_pre_fase_3_34_visual_restoration_20261017_125254.sql` (16.79 MB, SHA-256: `51b5cb3c413e4595caba684dc4ae430aa7be9851ec76b842f8876ed0556d1715`).
+    - Registro de metadatos `.meta.json` vinculando el micro-baseline oficial de entrada (`f554595110712228a73dda1a17322cbc098ae864`).
+    - Certificación de la restauración al 100% en la base de datos efímera `cms_ect_lab_restore_verify` y posterior purga limpia.
+    - Cero escrituras en la base de datos protegida original `cms_ect` (3.403 filas, MD5 `4241ca7e7ec6399a594537cb04790c10`).
+  - **Activación Determinista del Adaptador de Compatibilidad WPML en Laboratorio:**
+    - Activación de `AdaptadorCompatibilidadWpml` vía `tfml_enable_wpml_compatibility_adapter = '1'` en `etk_t_options`.
+    - Operatividad verificada de las funciones globales `icl_get_languages()` e `icl_object_id()`, exponiendo los idiomas activos (`es`, `en`, `pt`) y excluyendo estrictamente el idioma retenido (`fr:8839`).
+    - Certificación de que la constante global `ICL_LANGUAGE_CODE` se mantiene **estrictamente no definida** (`defined('ICL_LANGUAGE_CODE') === false`).
+  - **Certificación del Renderizado Visual Completo en Portadas ES (`/`) y EN (`/en/`):**
+    - Hidratación completa de la presentación visual: tamaño HTML expandido a ~120-130 KB, confirmando la ejecución de Elementor Builder, secciones y columnas.
+    - Cabecera fija (`_header_sticky`), logotipo oficial y menús de navegación bilingües (`menu-menu-principal` en español y `menu-menu-es-ingles` en inglés) completamente funcionales.
+    - Selector de idiomas (`[top-idiomas]`) renderizado con banderas e indicador contextual `class="activo"`.
+    - Slider Revolution (`<sr7-module data-alias="home-es-1">`) renderizado sin filtraciones textuales del shortcode crudo `[rev_slider]`.
+    - Purga de la caché obsoleta `_elementor_element_cache` en `etk_t_postmeta` para reactivar los widgets visuales.
+    - Encolado verificado de más de 25 hojas de estilo CSS y más de 25 scripts JS.
+    - Respuesta HTTP 200 y 0 errores PHP en ambas portadas.
+  - **Métricas de Calidad y Verificación:**
+    - Suite PHPUnit: **603 tests, 2.160 assertions, 0 errors, 0 failures** (100% PASS).
+    - PHPCS / WPCS: **180/180 archivos analizados, 0 errors, 0 warnings** (100% PASS).
+    - Verificador reproducible de Fase 3.34 (`scratch/verify_fase_3_34.php`): **22/22 controles PASS (100%)**.
+    - Invarianza total: 121 grupos TFML, 135 elementos activos, 1 retenido (`fr:8839`), 12 manifiestos históricos y centinela intacto en `cms_ect` y `cms_ect_lab`.
+

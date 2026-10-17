@@ -1428,7 +1428,45 @@
 - **ESTADO:** **ACEPTADA**
 - **CONTEXTO:** Fase 3.33 / Directiva DT-TFML-063 — Resolución nativa de portada multilingüe, enrutamiento y SEO canónico.
 - **JUSTIFICACIÓN:** Resolver la brecha funcional `BLOCKED BY ROUTING` de `/en/` de forma genérica, limpia y alineada con el núcleo de WordPress, sin tocar la base de datos ni introducir lógica ad-hoc dependiente del sitio.
-- **CONSECUENCIAS:** La portada bilingüe de `http://lab.ecoterra.test/` queda 100% operativa en `/` (`HTTP 200`, `es-ES`, Post `197`) y `/en/` (`HTTP 200`, `en-US`, Post `8356`), con redirección canónica `301` desde `/inicio/` y `/en/home/`, SEO canónico y `hreflang` simétricos, y preservación estricta de `121` grupos, `135` elementos activos y `1` traducción retenida (`fr:8839`).
+---
+
+### ADR-060: Restauración Controlada del Renderizado Visual, Integración de Dependencias Críticas y Certificación de Compatibilidad en Laboratorio Aislado (Fase 3.34)
+- **FECHA:** 2026-10-17
+- **DECISIÓN:**
+  1. **Diagnóstico de la Brecha de Renderizado Visual en Laboratorio Aislado (`lab.ecoterra.test`):**
+     - En fases previas, la portada en el laboratorio presentaba una estructura básica con marcado textual crudo del shortcode `[rev_slider alias="home-es-1"]` y ausencia de cabecera y pie avanzados.
+     - Se identificó que, aunque `active_plugins` en `cms_ect_lab` listaba los plugins heredados, los directorios físicos de `elementor`, `elementor-pro` y `revslider` nunca habían sido copiados a `D:\laragon\www\lab.ecoterra\wp-content\plugins\`. WordPress ignoraba silenciosamente estas dependencias en `wp-settings.php`.
+     - Adicionalmente, Slider Revolution 7.0 requería 16 tablas de soporte `etk_t_revslider_*` que no formaban parte del volcado inicial de base de datos del laboratorio.
+     - El selector de idiomas de la cabecera del tema `ecoCMS` (`[top-idiomas]`) y las rutinas de traducción de cabeceras/pies (`qomfort_render_header()`) invocaban llamadas condicionales a `icl_get_languages()` e `icl_object_id()`, las cuales dependían de la activación explícita del adaptador limitado de compatibilidad WPML implementado en Fase 3.28/3.29 (`AdaptadorCompatibilidadWpml`).
+  2. **Procedimiento de Respaldo Previo y Restauración Verificable:**
+     - Siguiendo los estándares de gobernanza y recuperación ante desastres, se generó el respaldo previo de la base de datos de laboratorio en `D:/laragon/backup/tfml_staging/cms_ect_lab_pre_fase_3_34_visual_restoration_20261017_125254.sql` (16.79 MB, SHA-256: `51b5cb3c413e4595caba684dc4ae430aa7be9851ec76b842f8876ed0556d1715`).
+     - Se generó el archivo de metadatos `cms_ect_lab_pre_fase_3_34_visual_restoration_20261017_125254.meta.json` vinculando el micro-baseline oficial de entrada (`f554595110712228a73dda1a17322cbc098ae864`).
+     - Se certificó la restauración verificable en la base de datos efímera `cms_ect_lab_restore_verify` (46 tablas, 121 grupos TFML, 135 elementos, 1 retenida, centinela WPML intacto), procediendo a su eliminación limpia inmediata.
+     - Se certificó cero escrituras en la base de datos protegida original `cms_ect` (`3,403` filas, MD5 `4241ca7e7ec6399a594537cb04790c10`).
+  3. **Transferencia Controlada de Dependencias Físicas y Tablas de Soporte:**
+     - Se realizó la copia física controlada desde `cms.ecoterra` hacia `lab.ecoterra` de las dependencias estrictamente imprescindibles: `elementor` (v4.3.5), `elementor-pro` (v4.1.0) y `revslider` (v7.0.15), uniéndose al previamente auditado `ova-framework` (v1.0.0).
+     - Se transfirieron las 16 tablas `etk_t_revslider_*` mediante lectura no destructiva desde `cms_ect` hacia `cms_ect_lab`, garantizando cero impacto en las tablas Core, WPML o TFML.
+     - Se mantuvo en cuarentena estricta cualquier plugin prescindible o peligroso (`sitepress-multilingual-cms`, `duplicator`, `akismet`, etc.) y se mantuvo activo el blindaje `mu-plugins/lab-isolation-guard.php` (`DISABLE_WP_CRON = true`, `WP_HTTP_BLOCK_EXTERNAL = true`, `blog_public = 0`).
+  4. **Activación Determinista del Adaptador de Compatibilidad WPML en Laboratorio:**
+     - Se configuró la opción `tfml_enable_wpml_compatibility_adapter = '1'` en `etk_t_options` de `cms_ect_lab`.
+     - `AdaptadorCompatibilidadWpml` inicializa de forma segura los envoltorios globales `icl_get_languages()` e `icl_object_id()`.
+     - `icl_get_languages()` expone exclusivamente los idiomas activos (`es`, `en`, `pt`), omitiendo con rigor la traducción francesa retenida (`fr:8839`).
+     - Se certifica que la constante global `ICL_LANGUAGE_CODE` permanece **estrictamente no definida** (`defined('ICL_LANGUAGE_CODE') === false`), preservando la pureza contextual de la arquitectura TFML.
+  5. **Certificación del Renderizado Visual Completo en Portadas ES (`/`) y EN (`/en/`):**
+     - El tamaño HTML de respuesta creció de ~20 KB a ~120-130 KB, certificando la ejecución completa de Elementor Builder, secciones y columnas.
+     - Se renderizó la cabecera fija (`_header_sticky`), el logotipo oficial y la navegación principal bilingüe (`menu-menu-principal` en español y `menu-menu-es-ingles` en inglés).
+     - El selector de idiomas (`[top-idiomas]`) renderiza los enlaces con banderas e indicador `activo` exacto según la ruta solicitada.
+     - Slider Revolution (`<sr7-module data-alias="home-es-1">`) renderiza la estructura HTML/JS completa, eliminando cualquier fuga textual del shortcode crudo.
+     - Se eliminó la caché transitoria obsoleta `_elementor_element_cache` en `etk_t_postmeta` (generada previamente a la carga de Slider Revolution) para garantizar la hidratación visual inmediata.
+     - Se encolaron más de 25 hojas de estilo CSS y más de 25 scripts JS propios de Elementor y Slider Revolution.
+     - La respuesta HTTP en vivo sobre `http://lab.ecoterra.test/` y `http://lab.ecoterra.test/en/` emitió código `200` y `0` errores PHP.
+  6. **Preservación Estricta de la Invarianza de Datos y Calidad de Código:**
+     - La base de datos de laboratorio conserva intactos sus 121 grupos TFML, 135 elementos activos, el grupo 587 (197:es, 8356:en), la traducción retenida `fr:8839` y los 12 manifiestos históricos.
+     - Las pruebas automáticas de la suite PHPUnit (603 tests, 2.160 aserciones, 0 fallos), PHPCS (180/180 archivos PASS) y el verificador específico de Fase 3.34 (`scratch/verify_fase_3_34.php`: 22/22 controles PASS) ratifican la estabilidad integral del sistema.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.34 / Directiva DT-TFML-064 — Restauración controlada del renderizado visual y auditoría de integraciones.
+- **JUSTIFICACIÓN:** Certificar la convivencia armónica entre TF Multilingual y el stack de maquetación y diseño visual real del tema `ecoCMS` (Elementor, Elementor Pro, Slider Revolution y OvaFramework), demostrando fidelidad visual e integridad multilingüe sin degradaciones.
+- **CONSECUENCIAS:** El laboratorio `lab.ecoterra.test` presenta ahora la apariencia visual rica y completa de Ecoterra Lodge tanto en español como en inglés, con menús traducidos, cabecera estilizada, slider dinámico y selector de idiomas operativo, manteniendo el aislamiento de seguridad y la invariancia total de la base original.
 
 
 
