@@ -1057,7 +1057,8 @@ class Plugin {
 			$this->core_sitemaps_filter = new CoreSitemapsFilter(
 				$this->get_language_registry(),
 				$translation_resolver,
-				$url_generator
+				$url_generator,
+				new RetainedTranslationRegistry()
 			);
 		}
 

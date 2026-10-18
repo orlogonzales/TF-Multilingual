@@ -235,6 +235,16 @@ foreach ( $master_plan->get_planned_groups() as $g ) {
 $posts_provider = new WP_Sitemaps_Posts();
 $tax_provider   = new WP_Sitemaps_Taxonomies();
 
+$sitemap_filter_337 = $plugin->get_core_sitemaps_filter();
+$prev_policy_337    = method_exists( $sitemap_filter_337, 'get_eligibility_policy' )
+	? $sitemap_filter_337->get_eligibility_policy()
+	: '';
+if ( method_exists( $sitemap_filter_337, 'set_eligibility_policy' ) ) {
+	$sitemap_filter_337->set_eligibility_policy( 'monolingual_default' );
+}
+$allow_tech_337 = static fn(): array => array();
+add_filter( 'tfml_sitemaps_excluded_post_types', $allow_tech_337, 99 );
+
 $page_args  = apply_filters(
 	'wp_sitemaps_posts_query_args',
 	array(
@@ -278,6 +288,9 @@ foreach ( $pages as $post ) {
 	$tfml_lang = $tfml ? (string) $tfml['language_code'] : 'NONE';
 	$plan_cls  = ( $trid > 0 && isset( $plan_by_trid[ $trid ] ) ) ? (string) $plan_by_trid[ $trid ]['classification'] : 'NONE';
 
+	if ( method_exists( $sitemap_filter_337, 'reset_url_deduplication_state' ) ) {
+		$sitemap_filter_337->reset_url_deduplication_state();
+	}
 	$entry = apply_filters(
 		'wp_sitemaps_posts_entry',
 		array( 'loc' => get_permalink( $post ) ),
@@ -327,6 +340,11 @@ $rooms_urls     = $posts_provider->get_url_list( 1, 'rooms' );
 $hf_urls        = $posts_provider->get_url_list( 1, 'ova_framework_hf_el' );
 $cat_urls       = $tax_provider->get_url_list( 1, 'category' );
 $tag_urls       = $tax_provider->get_url_list( 1, 'post_tag' );
+
+remove_filter( 'tfml_sitemaps_excluded_post_types', $allow_tech_337, 99 );
+if ( '' !== $prev_policy_337 && method_exists( $sitemap_filter_337, 'set_eligibility_policy' ) ) {
+	$sitemap_filter_337->set_eligibility_policy( $prev_policy_337 );
+}
 
 record_gate(
 	'Detección exacta de 3 URLs duplicadas en sitemap de páginas (/services/, /services/restaurant/, /blog/) e inventario completo de otros proveedores (post=27, rooms=33, ova_framework_hf_el=6, category=2, post_tag=19)',

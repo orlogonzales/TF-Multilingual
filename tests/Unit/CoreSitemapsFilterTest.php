@@ -294,4 +294,240 @@ class CoreSitemapsFilterTest extends TestCase {
 		);
 		$this->assertEmpty( $entry_retained );
 	}
+
+	/**
+	 * Tests unmigrated English translation and unclassified synthetic posts (Categories C & D)
+	 * are conservatively excluded under default policy without assuming TFML=NULL is Spanish (DT-TFML-068).
+	 */
+	public function test_unmigrated_english_and_unclassified_posts_are_excluded_by_default(): void {
+		// Unmigrated English page (e.g. 8327 contact-us, no row in tfml_group_elements).
+		$unmigrated_en = $this->create_post( 8327, 'publish', 'page' );
+		$eval_en       = $this->filter->evaluate_post_eligibility( $unmigrated_en, 'page' );
+
+		$this->assertFalse( $eval_en['eligible'] );
+		$this->assertSame( CoreSitemapsFilter::CATEGORY_UNCLASSIFIED, $eval_en['category'] );
+		$this->assertNull( $eval_en['language_code'] );
+
+		$entry_en = $this->filter->filter_posts_entry(
+			array( 'loc' => 'http://example.com/contact-us/' ),
+			$unmigrated_en,
+			'page'
+		);
+		$this->assertEmpty( $entry_en );
+
+		// Synthetic lab post (e.g. 15576, no row in tfml_group_elements).
+		$synthetic_post = $this->create_post( 15576, 'publish', 'post' );
+		$eval_synth     = $this->filter->evaluate_post_eligibility( $synthetic_post, 'post' );
+
+		$this->assertFalse( $eval_synth['eligible'] );
+		$this->assertSame( CoreSitemapsFilter::CATEGORY_UNCLASSIFIED, $eval_synth['category'] );
+
+		$entry_synth = $this->filter->filter_posts_entry(
+			array( 'loc' => 'http://example.com/synthetic-test-post/' ),
+			$synthetic_post,
+			'post'
+		);
+		$this->assertEmpty( $entry_synth );
+	}
+
+	/**
+	 * Tests accredited monolingual content (Category B) is included under default language
+	 * both via explicit per-element accreditation and via monolingual default policy (DT-TFML-068).
+	 */
+	public function test_accredited_monolingual_content_is_included_in_default_language(): void {
+		$monolingual_post = $this->create_post( 5001, 'publish', 'page' );
+
+		// Initially unclassified under conservative policy.
+		$this->assertEmpty(
+			$this->filter->filter_posts_entry( array( 'loc' => 'http://example.com/aviso-legal/' ), $monolingual_post, 'page' )
+		);
+
+		// Explicitly accredit post 5001 as monolingual (Category B).
+		$this->filter->accredit_monolingual_element( 'post', 5001 );
+		$eval = $this->filter->evaluate_post_eligibility( $monolingual_post, 'page' );
+
+		$this->assertTrue( $eval['eligible'] );
+		$this->assertSame( CoreSitemapsFilter::CATEGORY_ACCREDITED_MONOLINGUAL, $eval['category'] );
+		$this->assertSame( 'es', $eval['language_code'] );
+
+		$entry = $this->filter->filter_posts_entry( array( 'loc' => 'http://example.com/aviso-legal/' ), $monolingual_post, 'page' );
+		$this->assertSame( 'http://example.com/aviso-legal/', $entry['loc'] );
+
+		// Clear per-element accreditation and test POLICY_MONOLINGUAL_DEFAULT.
+		$this->filter->clear_accredited_monolingual_elements();
+		$this->filter->reset_url_deduplication_state();
+		$this->filter->set_eligibility_policy( CoreSitemapsFilter::POLICY_MONOLINGUAL_DEFAULT );
+
+		$eval_policy = $this->filter->evaluate_post_eligibility( $monolingual_post, 'page' );
+		$this->assertTrue( $eval_policy['eligible'] );
+		$this->assertSame( CoreSitemapsFilter::CATEGORY_ACCREDITED_MONOLINGUAL, $eval_policy['category'] );
+
+		$this->filter->set_eligibility_policy( CoreSitemapsFilter::POLICY_CONSERVATIVE_ACCREDITED_ONLY );
+	}
+
+	/**
+	 * Tests private and non-published posts are strictly excluded (Category non_public_status).
+	 */
+	public function test_private_and_trash_posts_are_excluded(): void {
+		$private_post = $this->create_post( 601, 'private', 'page' );
+		$trash_post   = $this->create_post( 602, 'trash', 'page' );
+
+		$this->group_repo->create_group( 'post', 'page', 601, 'es' );
+		$this->group_repo->create_group( 'post', 'page', 602, 'es' );
+
+		$eval_priv = $this->filter->evaluate_post_eligibility( $private_post, 'page' );
+		$this->assertFalse( $eval_priv['eligible'] );
+		$this->assertSame( CoreSitemapsFilter::CATEGORY_NON_PUBLIC_STATUS, $eval_priv['category'] );
+
+		$this->assertEmpty( $this->filter->filter_posts_entry( array( 'loc' => 'http://example.com/priv/' ), $private_post, 'page' ) );
+		$this->assertEmpty( $this->filter->filter_posts_entry( array( 'loc' => 'http://example.com/trash/' ), $trash_post, 'page' ) );
+	}
+
+	/**
+	 * Tests technical CPTs (ova_framework_hf_el, elementor_library) are excluded while commercial CPTs (rooms, tours) are preserved.
+	 */
+	public function test_technical_cpts_excluded_and_commercial_cpts_preserved(): void {
+		$subtypes = array(
+			'page'                => (object) array( 'name' => 'page' ),
+			'post'                => (object) array( 'name' => 'post' ),
+			'rooms'               => (object) array( 'name' => 'rooms' ),
+			'tours'               => (object) array( 'name' => 'tours' ),
+			'ova_framework_hf_el' => (object) array( 'name' => 'ova_framework_hf_el' ),
+			'elementor_library'   => (object) array( 'name' => 'elementor_library' ),
+		);
+
+		$filtered = $this->filter->filter_sitemaps_post_types( $subtypes );
+		$this->assertArrayHasKey( 'page', $filtered );
+		$this->assertArrayHasKey( 'post', $filtered );
+		$this->assertArrayHasKey( 'rooms', $filtered );
+		$this->assertArrayHasKey( 'tours', $filtered );
+		$this->assertArrayNotHasKey( 'ova_framework_hf_el', $filtered );
+		$this->assertArrayNotHasKey( 'elementor_library', $filtered );
+
+		// Pre max num pages and pre url list short-circuit for technical CPTs.
+		$this->assertSame( 0, $this->filter->filter_posts_pre_max_num_pages( null, 'ova_framework_hf_el' ) );
+		$this->assertSame( 0, $this->filter->filter_posts_pre_max_num_pages( null, 'elementor_library' ) );
+		$this->assertNull( $this->filter->filter_posts_pre_max_num_pages( null, 'rooms' ) );
+
+		$this->assertSame( array(), $this->filter->filter_posts_pre_url_list( null, 'ova_framework_hf_el', 1 ) );
+		$this->assertNull( $this->filter->filter_posts_pre_url_list( null, 'rooms', 1 ) );
+
+		// Even if a technical post has a TFML group, evaluate_post_eligibility and filter_posts_entry reject it as technical_content.
+		$hf_post = $this->create_post( 4804, 'publish', 'ova_framework_hf_el' );
+		$this->group_repo->create_group( 'post', 'ova_framework_hf_el', 4804, 'es' );
+
+		$eval_hf = $this->filter->evaluate_post_eligibility( $hf_post, 'ova_framework_hf_el' );
+		$this->assertFalse( $eval_hf['eligible'] );
+		$this->assertSame( CoreSitemapsFilter::CATEGORY_TECHNICAL_CONTENT, $eval_hf['category'] );
+		$this->assertEmpty( $this->filter->filter_posts_entry( array( 'loc' => 'http://example.com/hf/' ), $hf_post, 'ova_framework_hf_el' ) );
+
+		// Published commercial rooms CPT with TFML accreditation in ES and EN are properly localized.
+		$room_es = $this->create_post( 7784, 'publish', 'rooms' );
+		$room_en = $this->create_post( 8594, 'publish', 'rooms' );
+		$room_fr = $this->create_post( 8994, 'publish', 'rooms' );
+
+		$room_group = $this->group_repo->create_group( 'post', 'rooms', 7784, 'es' );
+		$this->group_repo->add_translation( (int) $room_group->get_id(), 8594, 'en' );
+		$this->group_repo->add_translation( (int) $room_group->get_id(), 8994, 'fr' );
+		$this->lang_registry->deactivate( 'fr' );
+
+		$entry_room_es = $this->filter->filter_posts_entry(
+			array( 'loc' => 'http://example.com/rooms/suite-bungalow/' ),
+			$room_es,
+			'rooms'
+		);
+		$entry_room_en = $this->filter->filter_posts_entry(
+			array( 'loc' => 'http://example.com/rooms/suite-bungalow/' ),
+			$room_en,
+			'rooms'
+		);
+		$entry_room_fr = $this->filter->filter_posts_entry(
+			array( 'loc' => 'http://example.com/rooms/suite-bungalow/' ),
+			$room_fr,
+			'rooms'
+		);
+
+		$this->assertSame( 'http://example.com/rooms/suite-bungalow/', $entry_room_es['loc'] );
+		$this->assertSame( 'http://example.com/en/rooms/suite-bungalow/', $entry_room_en['loc'] );
+		$this->assertEmpty( $entry_room_fr );
+	}
+
+	/**
+	 * Tests identical slugs across languages do not collide when properly localized,
+	 * and true duplicate URLs are deterministically deduplicated (DT-TFML-068 Section 9).
+	 */
+	public function test_identical_slugs_across_languages_and_duplicate_url_deduplication(): void {
+		$blog_es = $this->create_post( 9870, 'publish', 'page' );
+		$blog_en = $this->create_post( 9900, 'publish', 'page' );
+
+		$group = $this->group_repo->create_group( 'post', 'page', 9870, 'es' );
+		$this->group_repo->add_translation( (int) $group->get_id(), 9900, 'en' );
+
+		$entry_es = $this->filter->filter_posts_entry( array( 'loc' => 'http://example.com/blog/' ), $blog_es, 'page' );
+		$entry_en = $this->filter->filter_posts_entry( array( 'loc' => 'http://example.com/blog/' ), $blog_en, 'page' );
+
+		$this->assertSame( 'http://example.com/blog/', $entry_es['loc'] );
+		$this->assertSame( 'http://example.com/en/blog/', $entry_en['loc'] );
+
+		// If another distinct post ID attempts to emit the exact same canonical URL in the same pass, it is dropped.
+		$dup_post = $this->create_post( 9999, 'publish', 'page' );
+		$this->group_repo->create_group( 'post', 'page', 9999, 'es' );
+
+		$entry_dup = $this->filter->filter_posts_entry( array( 'loc' => 'http://example.com/blog/' ), $dup_post, 'page' );
+		$this->assertEmpty( $entry_dup );
+	}
+
+	/**
+	 * Tests SQL clauses for posts and terms sitemaps enforce eligibility at the database query level
+	 * (preserving pagination and index counts) without querying icl_* tables (DT-TFML-068 Sections 4, 5, 11).
+	 */
+	public function test_sitemap_sql_clauses_enforce_eligibility_and_never_query_wpml_tables(): void {
+		$this->lang_registry->deactivate( 'fr' );
+		$this->retained_registry->register( 'wpml', 197, 587, 'post', 'page', array( 'fr' => 8839 ) );
+
+		// 1. Post sitemap query clauses.
+		$post_args  = $this->filter->filter_posts_query_args( array( 'post_type' => 'page' ), 'page' );
+		$post_query = new WP_Query( $post_args );
+		$clauses    = $this->filter->filter_sitemap_posts_clauses(
+			array(
+				'join'  => '',
+				'where' => " AND wp_posts.post_type = 'page'",
+			),
+			$post_query
+		);
+
+		$this->assertStringContainsString( 'LEFT JOIN wp_tfml_group_elements AS tfml_sge', $clauses['join'] );
+		$this->assertStringContainsString( "tfml_sge.language_code IN ('es', 'en')", $clauses['where'] );
+		$this->assertStringNotContainsString( "'fr'", $clauses['where'] );
+		$this->assertStringContainsString( 'wp_posts.ID NOT IN (8839)', $clauses['where'] );
+		$this->assertStringNotContainsString( 'icl_', $clauses['join'] . ' ' . $clauses['where'] );
+
+		// Idempotency: second call does not duplicate JOIN or WHERE.
+		$clauses_second = $this->filter->filter_sitemap_posts_clauses( $clauses, $post_query );
+		$this->assertSame( $clauses, $clauses_second );
+
+		// 2. Term sitemap query clauses.
+		$tax_args     = $this->filter->filter_taxonomies_query_args( array( 'taxonomy' => 'category' ), 'category' );
+		$term_clauses = $this->filter->filter_sitemap_terms_clauses(
+			array(
+				'join'  => '',
+				'where' => "tt.taxonomy IN ('category')",
+			),
+			array( 'category' ),
+			$tax_args
+		);
+
+		$this->assertStringContainsString( 'LEFT JOIN wp_tfml_group_elements AS tfml_ste', $term_clauses['join'] );
+		$this->assertStringContainsString( 'LEFT JOIN wp_tfml_groups AS tfml_stg', $term_clauses['join'] );
+		$this->assertStringContainsString( "tfml_ste.language_code IN ('es', 'en') AND tfml_stg.subtype = 'category'", $term_clauses['where'] );
+		$this->assertStringNotContainsString( 'icl_', $term_clauses['join'] . ' ' . $term_clauses['where'] );
+
+		// 3. Normal public query without _tfml_sitemap_eligibility is NOT touched by CoreSitemapsFilter.
+		$normal_query   = new WP_Query( array( 'post_type' => 'page' ) );
+		$normal_clauses = array(
+			'join'  => '',
+			'where' => " AND wp_posts.post_type = 'page'",
+		);
+		$this->assertSame( $normal_clauses, $this->filter->filter_sitemap_posts_clauses( $normal_clauses, $normal_query ) );
+	}
 }
