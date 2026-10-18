@@ -200,8 +200,41 @@ class AdaptadorCompatibilidadWpml {
 		// Cargar funciones envolventes globales únicamente tras superar todas las salvaguardas.
 		require_once __DIR__ . '/funciones_wpml.php';
 
+		if ( function_exists( 'add_filter' ) ) {
+			add_filter( 'do_shortcode_tag', array( $this, 'filtrar_salida_shortcode_selector_heredado' ), 10, 2 );
+		}
+
 		$this->envoltorios_registrados = true;
 		return true;
+	}
+
+	/**
+	 * Saneamiento no intrusivo de la salida de shortcodes heredados de selector de idiomas
+	 * (top-idiomas / top-header) cuando el adaptador está habilitado:
+	 * Convierte enlaces vacíos (<a href="">) correspondientes a idiomas activos sin traducción
+	 * disponible (missing=1, url='') en elementos HTML5 placeholder no navegables sin atributo href
+	 * (<a aria-disabled="true" data-tfml-missing="1">), evitando enlaces engañosos sin modificar el tema.
+	 *
+	 * @param mixed  $salida Salida generada por el shortcode.
+	 * @param string $tag    Nombre del shortcode ejecutado.
+	 * @return mixed Salida saneada.
+	 */
+	public function filtrar_salida_shortcode_selector_heredado( mixed $salida, string $tag ): mixed {
+		if ( ! $this->habilitado || ! is_string( $salida ) || '' === $salida ) {
+			return $salida;
+		}
+
+		if ( ! in_array( $tag, array( 'top-idiomas', 'top-header' ), true ) ) {
+			return $salida;
+		}
+
+		$saneada = preg_replace(
+			'/<a(\s+[^>]*)?\s+href=""([^>]*)>/i',
+			'<a$1 aria-disabled="true" data-tfml-missing="1"$2>',
+			$salida
+		);
+
+		return is_string( $saneada ) ? $saneada : $salida;
 	}
 
 	/**
@@ -286,11 +319,18 @@ class AdaptadorCompatibilidadWpml {
 	/**
 	 * Ejecuta la lógica del contrato compatible de icl_get_languages().
 	 *
+	 * Distingue entre idioma activo en LanguageRegistry y traducción realmente
+	 * disponible y publicada para el objeto/contexto actual (DT-TFML-066):
+	 * - Si skip_missing=1, omite los idiomas donde missing=1.
+	 * - Si skip_missing=0, incluye los idiomas activos pero marca missing=1 y url=''
+	 *   cuando no existe traducción publicada real (evitando enlaces engañosos a 404).
+	 *
 	 * @param string|array<string, mixed> $args Argumentos en formato query string o array.
-	 * @return array<string, array<string, mixed>> Lista de idiomas activos disponibles.
+	 * @return array<string, array<string, mixed>> Lista de idiomas activos.
 	 */
 	public function ejecutar_icl_get_languages( mixed $args = '' ): array {
-		$parsed_args = $this->parsear_argumentos( $args );
+		$parsed_args  = $this->parsear_argumentos( $args );
+		$skip_missing = $this->debe_omitir_traducciones_faltantes( $parsed_args );
 
 		$idiomas_info  = $this->servicio_api->obtener_informacion_idiomas();
 		$idioma_actual = $this->servicio_api->obtener_idioma_actual() ?? $this->servicio_api->obtener_idioma_por_defecto() ?? 'es';
@@ -304,8 +344,21 @@ class AdaptadorCompatibilidadWpml {
 				continue;
 			}
 
-			$es_activo = ( $codigo === $idioma_actual ) ? 1 : 0;
-			$flag_url  = $this->obtener_url_bandera( $codigo );
+			$disponible = isset( $info['disponible'] ) ? (bool) $info['disponible'] : ( 0 === (int) ( $info['missing'] ?? 0 ) );
+			$missing    = $disponible ? 0 : 1;
+
+			if ( $skip_missing && 1 === $missing ) {
+				continue;
+			}
+
+			$es_activo  = ( $codigo === $idioma_actual ) ? 1 : 0;
+			$flag_url   = $this->obtener_url_bandera( $codigo );
+			$url_idioma = $disponible ? (string) ( $info['url'] ?? '' ) : '';
+			$accesible  = $this->obtener_representacion_accesible_idioma(
+				$codigo,
+				(string) ( $info['nombre_nativo'] ?? '' ),
+				(string) ( $info['nombre_traducido'] ?? '' )
+			);
 
 			$resultado[ $codigo ] = array(
 				'id'               => $indice,
@@ -315,8 +368,12 @@ class AdaptadorCompatibilidadWpml {
 				'language_code'    => $codigo,
 				'default_locale'   => $info['locale'],
 				'country_flag_url' => $flag_url,
-				'url'              => $info['url'],
-				'missing'          => 0,
+				'has_country_flag' => ( '' !== $flag_url ) ? 1 : 0,
+				'language_badge'   => $accesible['sigla'],
+				'accessible_label' => $accesible['etiqueta'],
+				'accessible_html'  => $accesible['html'],
+				'url'              => $url_idioma,
+				'missing'          => $missing,
 			);
 
 			++$indice;
@@ -326,27 +383,179 @@ class AdaptadorCompatibilidadWpml {
 	}
 
 	/**
-	 * Resuelve una URL válida y segura para la bandera del idioma.
+	 * Resuelve una URL válida, local y verificada en disco para el icono lingüístico del idioma.
 	 *
-	 * @param string $codigo Código de idioma (ej. 'es', 'en').
-	 * @return string URL del recurso de la bandera.
+	 * Reglas de endurecimiento (DT-TFML-066):
+	 * - Usa activos propios versionados del plugin en assets/images/flags/{codigo}.svg (o .png).
+	 * - Verifica existencia física en disco antes de emitir una URL; si no existe archivo local,
+	 *   retorna cadena vacía ('') para no provocar solicitudes HTTP 404.
+	 * - Permite personalización mediante el filtro 'tfml_wpml_compat_country_flag_url' únicamente
+	 *   hacia recursos locales o data URIs seguras, rechazando dominios externos.
+	 *
+	 * @param string $codigo Código de idioma (ej. 'es', 'en', 'pt').
+	 * @return string URL local verificada o '' si no existe icono gráfico.
 	 */
 	public function obtener_url_bandera( string $codigo ): string {
-		$flag_base = function_exists( 'plugins_url' )
-			? plugins_url( 'assets/images/flags/', dirname( __DIR__, 2 ) . '/tf-multilingual.php' )
+		$codigo_limpio = strtolower( (string) preg_replace( '/[^a-zA-Z0-9_-]/', '', trim( $codigo ) ) );
+		if ( '' === $codigo_limpio ) {
+			return '';
+		}
+
+		$plugin_root = dirname( __DIR__, 2 );
+		$flags_dir   = $plugin_root . '/assets/images/flags';
+		$flag_base   = function_exists( 'plugins_url' )
+			? plugins_url( 'assets/images/flags/', $plugin_root . '/tf-multilingual.php' )
 			: '/wp-content/plugins/tf-multilingual/assets/images/flags/';
 
-		$url_defecto = rtrim( $flag_base, '/' ) . '/' . $codigo . '.png';
+		$url_defecto = '';
+		foreach ( array( 'svg', 'png' ) as $extension ) {
+			$ruta_candidata = $flags_dir . '/' . $codigo_limpio . '.' . $extension;
+			if ( is_file( $ruta_candidata ) && is_readable( $ruta_candidata ) ) {
+				$url_defecto = rtrim( $flag_base, '/' ) . '/' . $codigo_limpio . '.' . $extension;
+				break;
+			}
+		}
 
 		/**
-		 * Permite filtrar la URL de la bandera para compatibilidad con temas específicos.
+		 * Permite personalizar la URL del icono lingüístico para compatibilidad con temas específicos.
 		 *
-		 * @param string $url_defecto URL construida por defecto.
-		 * @param string $codigo      Código de idioma.
+		 * @param string $url_defecto   URL local verificada o '' si no existe archivo.
+		 * @param string $codigo_limpio Código de idioma normalizado.
 		 */
-		return (string) ( function_exists( 'apply_filters' )
-			? apply_filters( 'tfml_wpml_compat_country_flag_url', $url_defecto, $codigo )
+		$url_filtrada = (string) ( function_exists( 'apply_filters' )
+			? apply_filters( 'tfml_wpml_compat_country_flag_url', $url_defecto, $codigo_limpio )
 			: $url_defecto );
+
+		$url_filtrada = trim( $url_filtrada );
+		if ( '' === $url_filtrada ) {
+			return '';
+		}
+
+		if ( ! $this->es_url_icono_local_permitida( $url_filtrada, $flag_base ) ) {
+			return $url_defecto;
+		}
+
+		return $url_filtrada;
+	}
+
+	/**
+	 * Obtiene la representación textual accesible de un idioma (sigla, etiqueta y HTML accesible)
+	 * para selectores sin icono gráfico o como alternativa semántica.
+	 *
+	 * @param string $codigo           Código de idioma (ej. 'es', 'en', 'pt').
+	 * @param string $nombre_nativo    Nombre nativo del idioma.
+	 * @param string $nombre_traducido Nombre traducido del idioma.
+	 * @return array{sigla: string, nombre_nativo: string, etiqueta: string, html: string}
+	 */
+	public function obtener_representacion_accesible_idioma(
+		string $codigo,
+		string $nombre_nativo = '',
+		string $nombre_traducido = ''
+	): array {
+		$codigo_limpio = strtolower( (string) preg_replace( '/[^a-zA-Z0-9_-]/', '', trim( $codigo ) ) );
+		$sigla         = strtoupper( $codigo_limpio );
+		$nombre        = '' !== trim( $nombre_nativo )
+			? trim( $nombre_nativo )
+			: ( '' !== trim( $nombre_traducido ) ? trim( $nombre_traducido ) : $sigla );
+		$etiqueta      = ( '' !== $nombre && $nombre !== $sigla )
+			? sprintf( '%s (%s)', $nombre, $sigla )
+			: $sigla;
+
+		return array(
+			'sigla'         => $sigla,
+			'nombre_nativo' => $nombre,
+			'etiqueta'      => $etiqueta,
+			'html'          => $this->renderizar_etiqueta_idioma_accesible( $codigo_limpio, $nombre ),
+		);
+	}
+
+	/**
+	 * Renderiza una insignia HTML textual accesible y autónoma para representar un idioma sin imagen.
+	 *
+	 * @param string $codigo        Código de idioma.
+	 * @param string $nombre_nativo Nombre nativo o descriptivo del idioma.
+	 * @return string Fragmento HTML seguro y accesible.
+	 */
+	public function renderizar_etiqueta_idioma_accesible( string $codigo, string $nombre_nativo = '' ): string {
+		$codigo_limpio = strtolower( (string) preg_replace( '/[^a-zA-Z0-9_-]/', '', trim( $codigo ) ) );
+		$sigla         = strtoupper( $codigo_limpio );
+		$titulo        = '' !== trim( $nombre_nativo ) ? trim( $nombre_nativo ) : $sigla;
+
+		$attr_lang  = function_exists( 'esc_attr' ) ? esc_attr( $codigo_limpio ) : htmlspecialchars( $codigo_limpio, ENT_QUOTES, 'UTF-8' );
+		$attr_title = function_exists( 'esc_attr' ) ? esc_attr( $titulo ) : htmlspecialchars( $titulo, ENT_QUOTES, 'UTF-8' );
+		$html_sigla = function_exists( 'esc_html' ) ? esc_html( $sigla ) : htmlspecialchars( $sigla, ENT_QUOTES, 'UTF-8' );
+
+		return sprintf(
+			'<span class="tfml-lang-badge" lang="%1$s" aria-label="%2$s"><abbr title="%2$s">%3$s</abbr></span>',
+			$attr_lang,
+			$attr_title,
+			$html_sigla
+		);
+	}
+
+	/**
+	 * Determina si el argumento skip_missing solicita omitir idiomas sin traducción disponible.
+	 *
+	 * @param array<string, mixed> $parsed_args Argumentos parseados.
+	 * @return bool True si skip_missing está activo (1, '1', true, 'true').
+	 */
+	private function debe_omitir_traducciones_faltantes( array $parsed_args ): bool {
+		if ( ! array_key_exists( 'skip_missing', $parsed_args ) ) {
+			return false;
+		}
+
+		$valor = $parsed_args['skip_missing'];
+		if ( is_bool( $valor ) ) {
+			return $valor;
+		}
+		if ( is_numeric( $valor ) ) {
+			return 1 === (int) $valor;
+		}
+		if ( is_string( $valor ) ) {
+			$limpio = strtolower( trim( $valor ) );
+			return in_array( $limpio, array( '1', 'true', 'yes' ), true );
+		}
+
+		return false;
+	}
+
+	/**
+	 * Verifica que una URL de icono personalizada sea local o data URI segura, rechazando hosts externos.
+	 *
+	 * @param string $url       URL candidata.
+	 * @param string $flag_base URL base local del plugin.
+	 * @return bool True si es segura y local.
+	 */
+	private function es_url_icono_local_permitida( string $url, string $flag_base ): bool {
+		if ( str_starts_with( $url, 'data:image/svg+xml' ) || str_starts_with( $url, 'data:image/png' ) ) {
+			return true;
+		}
+
+		if ( str_starts_with( $url, '/' ) && ! str_starts_with( $url, '//' ) ) {
+			return true;
+		}
+
+		$parsed = parse_url( $url );
+		if ( false === $parsed || empty( $parsed['host'] ) ) {
+			return false;
+		}
+
+		$host_candidato = strtolower( (string) $parsed['host'] );
+		$hosts_locales  = array( 'localhost', '127.0.0.1' );
+
+		if ( function_exists( 'home_url' ) ) {
+			$home_host = parse_url( (string) home_url(), PHP_URL_HOST );
+			if ( is_string( $home_host ) && '' !== $home_host ) {
+				$hosts_locales[] = strtolower( $home_host );
+			}
+		}
+
+		$base_host = parse_url( $flag_base, PHP_URL_HOST );
+		if ( is_string( $base_host ) && '' !== $base_host ) {
+			$hosts_locales[] = strtolower( $base_host );
+		}
+
+		return in_array( $host_candidato, array_unique( $hosts_locales ), true );
 	}
 
 	/**

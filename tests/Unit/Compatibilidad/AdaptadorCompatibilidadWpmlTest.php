@@ -319,13 +319,16 @@ class AdaptadorCompatibilidadWpmlTest extends TestCase {
 		$this->assertSame( 'Español', $es['native_name'] );
 		$this->assertSame( 'es', $es['language_code'] );
 		$this->assertSame( 'es_ES', $es['default_locale'] );
-		$this->assertStringContainsString( 'es.png', $es['country_flag_url'] );
+		$this->assertStringContainsString( 'es.svg', $es['country_flag_url'] );
+		$this->assertSame( 1, $es['has_country_flag'] );
+		$this->assertSame( 'ES', $es['language_badge'] );
 
 		$en = $languages['en'];
 		$this->assertSame( 0, $en['active'] );
 		$this->assertSame( 'English', $en['native_name'] );
 		$this->assertSame( 'en', $en['language_code'] );
 		$this->assertSame( 'en_US', $en['default_locale'] );
+		$this->assertStringContainsString( 'en.svg', $en['country_flag_url'] );
 	}
 
 	/**
@@ -355,5 +358,194 @@ class AdaptadorCompatibilidadWpmlTest extends TestCase {
 		$this->assertNull( icl_object_id( 300, 'post', false, 'en' ) );
 		$this->assertSame( 300, icl_object_id( 300, 'post', true, 'en' ) );
 		$this->assertSame( array(), icl_get_languages() );
+	}
+
+	/**
+	 * Test: Banderas locales existentes (es, en, pt) devuelven URL verificable y un idioma sin archivo devuelve ''.
+	 *
+	 * @return void
+	 */
+	public function test_banderas_locales_existentes_e_inexistentes(): void {
+		$adaptador = new AdaptadorCompatibilidadWpml( $this->servicio_api, true );
+
+		foreach ( array( 'es', 'en', 'pt' ) as $codigo ) {
+			$url = $adaptador->obtener_url_bandera( $codigo );
+			$this->assertNotEmpty( $url );
+			$this->assertStringEndsWith( '/' . $codigo . '.svg', $url );
+		}
+
+		// Un idioma sin archivo físico en assets/images/flags/ nunca debe devolver una URL rota 404.
+		$url_inexistente = $adaptador->obtener_url_bandera( 'de' );
+		$this->assertSame( '', $url_inexistente );
+	}
+
+	/**
+	 * Test: Representación textual accesible funciona cuando no hay bandera gráfica.
+	 *
+	 * @return void
+	 */
+	public function test_representacion_textual_accesible_sin_bandera(): void {
+		$de = new Language( 'de', 'de_DE', 'German', 'Deutsch', true, 4 );
+		$this->registry->add_language( $de, false );
+
+		$adaptador = new AdaptadorCompatibilidadWpml( $this->servicio_api, true );
+		$languages = $adaptador->ejecutar_icl_get_languages( 'skip_missing=0' );
+
+		$this->assertArrayHasKey( 'de', $languages );
+		$this->assertSame( '', $languages['de']['country_flag_url'] );
+		$this->assertSame( 0, $languages['de']['has_country_flag'] );
+		$this->assertSame( 'DE', $languages['de']['language_badge'] );
+		$this->assertSame( 'Deutsch (DE)', $languages['de']['accessible_label'] );
+		$this->assertStringContainsString( 'lang="de"', $languages['de']['accessible_html'] );
+		$this->assertStringContainsString( '>DE</abbr>', $languages['de']['accessible_html'] );
+	}
+
+	/**
+	 * Test: Filtro tfml_wpml_compat_country_flag_url permite ruta local o data URI y rechaza dominios externos.
+	 *
+	 * @return void
+	 */
+	public function test_filtro_bandera_permite_local_y_rechaza_dominio_externo(): void {
+		$adaptador = new AdaptadorCompatibilidadWpml( $this->servicio_api, true );
+
+		$cb_local = static function ( string $url, string $codigo ): string {
+			return '/wp-content/uploads/custom-flags/' . $codigo . '.svg';
+		};
+		add_filter( 'tfml_wpml_compat_country_flag_url', $cb_local, 10, 2 );
+		$this->assertSame( '/wp-content/uploads/custom-flags/es.svg', $adaptador->obtener_url_bandera( 'es' ) );
+		remove_filter( 'tfml_wpml_compat_country_flag_url', $cb_local, 10 );
+
+		$cb_externo = static function (): string {
+			return 'https://cdn.external-flags.invalid/es.png';
+		};
+		add_filter( 'tfml_wpml_compat_country_flag_url', $cb_externo, 10, 2 );
+		$url_protegida = $adaptador->obtener_url_bandera( 'es' );
+		$this->assertStringNotContainsString( 'external-flags.invalid', $url_protegida );
+		$this->assertStringEndsWith( '/es.svg', $url_protegida );
+		remove_filter( 'tfml_wpml_compat_country_flag_url', $cb_externo, 10 );
+	}
+
+	/**
+	 * Test: Disponibilidad real en portada estática (197 ES, 8356 EN, PT activo sin traducción, FR retenido 8839).
+	 *
+	 * @return void
+	 */
+	public function test_disponibilidad_real_en_portada_bilingue_y_portugues_sin_traduccion(): void {
+		$pt = new Language( 'pt', 'pt_PT', 'Portuguese', 'Português', true, 4 );
+		$this->registry->add_language( $pt, false );
+
+		$GLOBALS['wp_test_options']['show_on_front'] = 'page';
+		$GLOBALS['wp_test_options']['page_on_front'] = 197;
+
+		$post_es              = new \WP_Post();
+		$post_es->ID          = 197;
+		$post_es->post_type   = 'page';
+		$post_es->post_status = 'publish';
+
+		$post_en              = new \WP_Post();
+		$post_en->ID          = 8356;
+		$post_en->post_type   = 'page';
+		$post_en->post_status = 'publish';
+
+		$post_fr              = new \WP_Post();
+		$post_fr->ID          = 8839;
+		$post_fr->post_type   = 'page';
+		$post_fr->post_status = 'publish';
+
+		$GLOBALS['wp_test_posts'][197]  = $post_es;
+		$GLOBALS['wp_test_posts'][8356] = $post_en;
+		$GLOBALS['wp_test_posts'][8839] = $post_fr;
+
+		$group = $this->group_repo->create_group( 'post', 'page', 197, 'es', true );
+		$this->group_repo->add_translation( (int) $group->get_id(), 8356, 'en' );
+
+		$retained_registry = new \TF\Multilingual\Migration\RetainedTranslationRegistry( $this->db );
+		$retained_registry->register( 'wpml', 197, (int) $group->get_id(), 'post', 'page', array( 'fr' => 8839 ) );
+
+		$url_resolver  = new \TF\Multilingual\Routing\UrlLanguageResolver( $this->registry, 'http://lab.ecoterra.test' );
+		$url_generator = new \TF\Multilingual\Routing\LocalizedUrlGenerator(
+			$this->registry,
+			$url_resolver,
+			$this->content_resolver,
+			'http://lab.ecoterra.test'
+		);
+
+		$servicio = new ServicioTraduccionPublico(
+			$this->registry,
+			$this->current_lang_resolver,
+			$this->content_resolver,
+			null,
+			$url_generator,
+			null,
+			$retained_registry
+		);
+
+		$adaptador = new AdaptadorCompatibilidadWpml( $servicio, true );
+
+		// 1. Con skip_missing=0: incluye es, en y pt, pero pt tiene missing=1 y url='' (nunca http://lab.ecoterra.test/pt/).
+		$langs_all = $adaptador->ejecutar_icl_get_languages( 'skip_missing=0&orderby=custom' );
+		$this->assertArrayHasKey( 'es', $langs_all );
+		$this->assertArrayHasKey( 'en', $langs_all );
+		$this->assertArrayHasKey( 'pt', $langs_all );
+		$this->assertArrayNotHasKey( 'fr', $langs_all );
+
+		$this->assertSame( 0, $langs_all['es']['missing'] );
+		$this->assertSame( 'http://lab.ecoterra.test/', $langs_all['es']['url'] );
+
+		$this->assertSame( 0, $langs_all['en']['missing'] );
+		$this->assertSame( 'http://lab.ecoterra.test/en/', $langs_all['en']['url'] );
+
+		$this->assertSame( 1, $langs_all['pt']['missing'] );
+		$this->assertSame( '', $langs_all['pt']['url'] );
+
+		// 2. Con skip_missing=1: omite pt porque no tiene traducción publicada en la portada.
+		$langs_available = $adaptador->ejecutar_icl_get_languages( 'skip_missing=1&orderby=custom' );
+		$this->assertArrayHasKey( 'es', $langs_available );
+		$this->assertArrayHasKey( 'en', $langs_available );
+		$this->assertArrayNotHasKey( 'pt', $langs_available );
+		$this->assertArrayNotHasKey( 'fr', $langs_available );
+
+		// 3. El post francés retenido 8839 no se resuelve como traducción ni tiene idioma activo.
+		$this->assertNull( $servicio->resolver_traduccion_elemento( 'page', 197, 'fr' ) );
+		$this->assertNull( $servicio->obtener_idioma_de_elemento( 'page', 8839 ) );
+
+		unset( $GLOBALS['wp_test_options']['show_on_front'], $GLOBALS['wp_test_options']['page_on_front'] );
+	}
+
+	/**
+	 * Test: Una traducción en borrador (draft) se marca como missing=1 y url='' y se omite con skip_missing=1.
+	 *
+	 * @return void
+	 */
+	public function test_traduccion_en_borrador_no_se_expone_como_disponible(): void {
+		$post_es              = new \WP_Post();
+		$post_es->ID          = 500;
+		$post_es->post_type   = 'page';
+		$post_es->post_status = 'publish';
+
+		$post_en_draft              = new \WP_Post();
+		$post_en_draft->ID          = 501;
+		$post_en_draft->post_type   = 'page';
+		$post_en_draft->post_status = 'draft';
+
+		$GLOBALS['wp_test_posts'][500] = $post_es;
+		$GLOBALS['wp_test_posts'][501] = $post_en_draft;
+
+		$group = $this->group_repo->create_group( 'post', 'page', 500, 'es', true );
+		$this->group_repo->add_translation( (int) $group->get_id(), 501, 'en' );
+
+		$this->servicio_api->establecer_contexto_evaluacion( 'page', 500 );
+		$adaptador = new AdaptadorCompatibilidadWpml( $this->servicio_api, true );
+
+		$langs_all = $adaptador->ejecutar_icl_get_languages( 'skip_missing=0' );
+		$this->assertSame( 0, $langs_all['es']['missing'] );
+		$this->assertSame( 1, $langs_all['en']['missing'] );
+		$this->assertSame( '', $langs_all['en']['url'] );
+
+		$langs_skip = $adaptador->ejecutar_icl_get_languages( 'skip_missing=1' );
+		$this->assertArrayHasKey( 'es', $langs_skip );
+		$this->assertArrayNotHasKey( 'en', $langs_skip );
+
+		$this->servicio_api->establecer_contexto_evaluacion( null, null );
 	}
 }

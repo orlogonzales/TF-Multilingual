@@ -42,6 +42,7 @@ use TF\Multilingual\Editorial\TranslationEditorialService;
 use TF\Multilingual\Integration\IntegrationManager;
 use TF\Multilingual\Localizacion\LocalizadorPublicoNativo;
 use TF\Multilingual\Migration\MigrationManager;
+use TF\Multilingual\Migration\RetainedTranslationRegistry;
 use TF\Multilingual\Query\QueryLanguageFilter;
 use TF\Multilingual\Query\TermQueryLanguageFilter;
 use TF\Multilingual\Rest\RestApiRegistrar;
@@ -509,10 +510,12 @@ class Plugin {
 			$url_generator,
 			$url_resolver
 		);
+		$retained_registry                      = new RetainedTranslationRegistry();
 		$this->core_sitemaps_filter             = new CoreSitemapsFilter(
 			$this->language_registry,
 			$translation_resolver,
-			$url_generator
+			$url_generator,
+			$retained_registry
 		);
 		$this->seo_frontend_filter              = new SeoFrontendFilter(
 			$this->hreflang_generator,
@@ -542,7 +545,10 @@ class Plugin {
 			$this->language_registry,
 			$this->current_language_resolver,
 			$translation_resolver,
-			$this->rewrite_manager
+			$this->rewrite_manager,
+			$url_generator,
+			$this->resolvedor_portada_multilingue,
+			$retained_registry
 		);
 
 		// DT-TFML-059: Configuración determinista de compatibilidad WPML.
