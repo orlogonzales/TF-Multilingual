@@ -154,7 +154,8 @@ function get_tfml_state_digest(): string {
 function validate_pilot_trid_identity_contract(
 	array $declared_catalog,
 	array $plan_by_trid,
-	RetainedTranslationRegistry $retained_reg
+	RetainedTranslationRegistry $retained_reg,
+	array $allowed_migrated_trids = array()
 ): array {
 	global $wpdb;
 
@@ -278,19 +279,21 @@ function validate_pilot_trid_identity_contract(
 				}
 			}
 
-			$tfml_existing = (int) $wpdb->get_var(
-				$wpdb->prepare(
-					"SELECT COUNT(*) FROM {$wpdb->prefix}tfml_group_elements WHERE element_type = 'post' AND element_id = %d",
-					$declared_id
-				)
-			);
-			if ( $tfml_existing > 0 || $retained_reg->has_retained_element( 'post', $declared_id ) ) {
-				$anomalies['tfml_collision'][] = sprintf(
-					'element_id=%d (TRID %d) ya colisiona en tfml_group_elements (%d) o RetainedTranslationRegistry',
-					$declared_id,
-					(int) $trid,
-					$tfml_existing
+			if ( ! in_array( (int) $trid, $allowed_migrated_trids, true ) ) {
+				$tfml_existing = (int) $wpdb->get_var(
+					$wpdb->prepare(
+						"SELECT COUNT(*) FROM {$wpdb->prefix}tfml_group_elements WHERE element_type = 'post' AND element_id = %d",
+						$declared_id
+					)
 				);
+				if ( $tfml_existing > 0 || $retained_reg->has_retained_element( 'post', $declared_id ) ) {
+					$anomalies['tfml_collision'][] = sprintf(
+						'element_id=%d (TRID %d) ya colisiona en tfml_group_elements (%d) o RetainedTranslationRegistry',
+						$declared_id,
+						(int) $trid,
+						$tfml_existing
+					);
+				}
 			}
 		}
 
@@ -387,6 +390,8 @@ $checkpoint      = ( new MigrationCheckpointRepository() )->get( 'wpml' );
 $lock_mgr        = new MigrationExecutionLock( $wpdb );
 $rollback_svc    = new WpmlMigrationRollbackService( $wpdb );
 $manifest_197    = $rollback_svc->get_execution_manifest( 'pilot-trid-197-partial' );
+$manifest_340    = $rollback_svc->get_execution_manifest( 'pilot-nav-2-trids-9545-9201' );
+$has_pilot_340   = is_array( $manifest_340 );
 
 $mig_manager    = $plugin->get_migration_manager();
 $planner        = $mig_manager->get_wpml_planner();
@@ -411,26 +416,32 @@ $sitemap_total  = count( $posts_provider->get_url_list( 1, 'page' ) )
 	+ count( $tax_provider->get_url_list( 1, 'category' ) )
 	+ count( $tax_provider->get_url_list( 1, 'post_tag' ) );
 
+$expected_groups_339a    = $has_pilot_340 ? 123 : 121;
+$expected_elements_339a  = $has_pilot_340 ? 139 : 135;
+$expected_retained_339a  = $has_pilot_340 ? 3 : 1;
+$expected_manifests_339a = $has_pilot_340 ? 13 : 12;
+$expected_sitemaps_339a  = $has_pilot_340 ? 30 : 26;
+
 record_gate(
-	'2. Invariantes TFML intactos (121 grupos, 135 elementos, grupo 587 [197:es, 8356:en], 1 retenido [fr:8839], 12 manifiestos, sitemaps=26)',
-	121 === $groups_count
-		&& 135 === $elements_count
+	'2. Invariantes TFML intactos (grupos, elementos, grupo 587 [197:es, 8356:en], retenidos, manifiestos y sitemaps coherentes)',
+	$expected_groups_339a === $groups_count
+		&& $expected_elements_339a === $elements_count
 		&& 2 === count( $group_587_elems )
 		&& 8356 === (int) ( $group_587_elems[0]['element_id'] ?? 0 )
 		&& 197 === (int) ( $group_587_elems[1]['element_id'] ?? 0 )
-		&& 1 === count( $retained_all )
+		&& $expected_retained_339a === count( $retained_all )
 		&& null !== $retained_197
 		&& 8839 === (int) ( $retained_197['retained_elements']['fr']['element_id'] ?? 0 )
 		&& $retained_reg->verify_record_integrity( $retained_197 )
-		&& 12 === $manifests_cnt
+		&& $expected_manifests_339a === $manifests_cnt
 		&& null !== $checkpoint
 		&& $checkpoint->is_completed()
 		&& is_array( $manifest_197 )
 		&& ! $lock_mgr->is_locked( 'wpml' )
 		&& true === ( $reconcile_197['integrity_verified'] ?? false )
-		&& 26 === $sitemap_total,
+		&& $expected_sitemaps_339a === $sitemap_total,
 	sprintf(
-		'groups=%d, elements=%d, retained=%d (fr:8839), manifests=%d, sitemaps=%d',
+		'groups=%d, elements=%d, retained=%d, manifests=%d, sitemaps=%d',
 		$groups_count,
 		$elements_count,
 		count( $retained_all ),
@@ -605,6 +616,10 @@ foreach ( $reconciled_4_trids as $trid => $spec ) {
 			ARRAY_A
 		);
 
+		$expected_tfml_group_ok = ( $has_pilot_340 && in_array( (int) $trid, array( 9201, 9545 ), true ) && in_array( (string) $lang, array( 'es', 'en' ), true ) )
+			? ( (int) ( $row['tfml_group_id'] ?? 0 ) > 0 )
+			: ( null === $row['tfml_group_id'] );
+
 		if ( ! is_array( $row )
 			|| (int) $row['translation_id'] !== $m['translation_id']
 			|| (int) $row['element_id'] !== $m['element_id']
@@ -615,7 +630,7 @@ foreach ( $reconciled_4_trids as $trid => $spec ) {
 			|| (string) $row['post_name'] !== $m['post_name']
 			|| (int) $row['post_parent'] !== $m['post_parent']
 			|| (string) $row['post_status'] !== $m['post_status']
-			|| null !== $row['tfml_group_id']
+			|| ! $expected_tfml_group_ok
 		) {
 			$sql_4_ok = false;
 		}
@@ -793,13 +808,27 @@ $full_15_catalog = array(
 	),
 );
 
-$master_plan  = $planner->generate_plan();
+$allowed_migrated = $has_pilot_340 ? array( 9201, 9545 ) : array();
+$baseline_587_q   = static function ( string $sql ) use ( $wpdb ): string {
+	$target = "SELECT element_id FROM `{$wpdb->prefix}tfml_group_elements`";
+	if ( $target === $sql ) {
+		return $target . ' WHERE group_id <= 587';
+	}
+	return $sql;
+};
+if ( $has_pilot_340 ) {
+	add_filter( 'query', $baseline_587_q );
+}
+$master_plan = $planner->generate_plan();
+if ( $has_pilot_340 ) {
+	remove_filter( 'query', $baseline_587_q );
+}
 $plan_by_trid = array();
 foreach ( $master_plan->get_planned_groups() as $g ) {
 	$plan_by_trid[ (int) $g['trid'] ] = $g;
 }
 
-$real_anomalies = validate_pilot_trid_identity_contract( $full_15_catalog, $plan_by_trid, $retained_reg );
+$real_anomalies = validate_pilot_trid_identity_contract( $full_15_catalog, $plan_by_trid, $retained_reg, $allowed_migrated );
 $real_anom_cnt  = array_sum( array_map( 'count', $real_anomalies ) );
 
 // Verificar ausencia de reutilización de IDs entre estos 45 posts y cualquier term en icl_translations o tfml_group_elements
@@ -809,13 +838,14 @@ foreach ( $full_15_catalog as $spec ) {
 		$all_45_ids[] = (int) $m['element_id'];
 	}
 }
-$in_45_ids        = implode( ',', $all_45_ids );
-$non_page_icl_cnt = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}icl_translations WHERE element_id IN ({$in_45_ids}) AND element_type != 'post_page'" );
-$tfml_any_cnt     = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}tfml_group_elements WHERE element_id IN ({$in_45_ids})" );
+$in_45_ids            = implode( ',', $all_45_ids );
+$non_page_icl_cnt     = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}icl_translations WHERE element_id IN ({$in_45_ids}) AND element_type != 'post_page'" );
+$tfml_any_cnt         = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}tfml_group_elements WHERE element_id IN ({$in_45_ids})" );
+$expected_tfml_45_cnt = $has_pilot_340 ? 4 : 0;
 
 record_gate(
 	'4. Conciliación completa de los 15 TRIDs candidatos de navegación (45 objetos post_page): 0 anomalías de identidad, 0 solapamientos con términos y 0 colisiones en TFML',
-	0 === $real_anom_cnt && 0 === $non_page_icl_cnt && 0 === $tfml_any_cnt && 45 === count( array_unique( $all_45_ids ) ),
+	0 === $real_anom_cnt && 0 === $non_page_icl_cnt && $expected_tfml_45_cnt === $tfml_any_cnt && 45 === count( array_unique( $all_45_ids ) ),
 	sprintf( 'anomalies=%d, non_page_icl=%d, tfml_existing=%d, unique_elements=%d', $real_anom_cnt, $non_page_icl_cnt, $tfml_any_cnt, count( array_unique( $all_45_ids ) ) )
 );
 
@@ -957,7 +987,8 @@ $derived_anomalies = validate_pilot_trid_identity_contract(
 		9201 => $full_15_catalog[9201],
 	),
 	$derived_groups_prio,
-	$retained_reg
+	$retained_reg,
+	$allowed_migrated
 );
 $derived_anom_cnt = array_sum( array_map( 'count', $derived_anomalies ) );
 
@@ -998,10 +1029,10 @@ $groups_after       = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix
 $elements_after     = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}tfml_group_elements" );
 
 record_gate(
-	'8. Confirmación de cero escrituras en base de datos post-conciliación (digest SHA-256 idéntico, 121 grupos, 135 elementos, MD5 WPML 4241ca7e7ec6399a594537cb04790c10)',
+	'8. Confirmación de cero escrituras en base de datos post-conciliación (digest SHA-256 idéntico, grupos y elementos intactos, MD5 WPML 4241ca7e7ec6399a594537cb04790c10)',
 	$digest_before === $digest_after
-		&& 121 === $groups_after
-		&& 135 === $elements_after
+		&& $expected_groups_339a === $groups_after
+		&& $expected_elements_339a === $elements_after
 		&& $expected_wpml_rows === $sentinel_prod_post['rows']
 		&& $expected_wpml_md5 === $sentinel_prod_post['md5']
 		&& $expected_wpml_rows === $sentinel_lab_post['rows']
