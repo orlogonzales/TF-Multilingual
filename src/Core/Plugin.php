@@ -470,12 +470,14 @@ class Plugin {
 			$url_generator
 		);
 		$url_generator->set_resolvedor_portada( $this->resolvedor_portada_multilingue );
+		$retained_registry                      = new RetainedTranslationRegistry();
 		$this->nav_menu_frontend_filter         = new NavMenuFrontendFilter(
 			$this->nav_menu_location_repository,
 			$this->current_language_resolver,
 			$this->language_registry,
 			$translation_resolver,
-			$url_generator
+			$url_generator,
+			$retained_registry
 		);
 		$this->block_navigation_frontend_filter = new BlockNavigationFrontendFilter(
 			$this->current_language_resolver,
@@ -510,7 +512,6 @@ class Plugin {
 			$url_generator,
 			$url_resolver
 		);
-		$retained_registry                      = new RetainedTranslationRegistry();
 		$this->core_sitemaps_filter             = new CoreSitemapsFilter(
 			$this->language_registry,
 			$translation_resolver,
@@ -893,7 +894,8 @@ class Plugin {
 				$this->get_current_language_resolver(),
 				$this->get_language_registry(),
 				$translation_resolver,
-				$url_generator
+				$url_generator,
+				new RetainedTranslationRegistry()
 			);
 		}
 

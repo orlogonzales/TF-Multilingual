@@ -197,4 +197,20 @@ class LocalizedUrlGeneratorTest extends TestCase {
 	public function test_untranslated_term_returns_null(): void {
 		$this->assertNull( $this->generator->get_term_translation_url( 8888, 'en' ) );
 	}
+
+	/**
+	 * Tests excluded system/administrative routes, non-HTTP schemes, and pure fragment links remain unmodified.
+	 *
+	 * @return void
+	 */
+	public function test_excluded_system_routes_and_non_http_schemes_remain_unmodified(): void {
+		$this->assertSame( 'http://example.com/wp-admin/post.php?post=1&action=edit', $this->generator->localize_url( 'http://example.com/wp-admin/post.php?post=1&action=edit', 'en' ) );
+		$this->assertSame( 'http://example.com/wp-login.php', $this->generator->localize_url( 'http://example.com/wp-login.php', 'en' ) );
+		$this->assertSame( 'http://example.com/wp-json/wp/v2/posts', $this->generator->localize_url( 'http://example.com/wp-json/wp/v2/posts', 'en' ) );
+		$this->assertSame( 'http://example.com/xmlrpc.php', $this->generator->localize_url( 'http://example.com/xmlrpc.php', 'en' ) );
+		$this->assertSame( 'http://example.com/wp-cron.php', $this->generator->localize_url( 'http://example.com/wp-cron.php', 'en' ) );
+		$this->assertSame( 'mailto:info@example.com', $this->generator->localize_url( 'mailto:info@example.com', 'en' ) );
+		$this->assertSame( 'tel:+51999888777', $this->generator->localize_url( 'tel:+51999888777', 'en' ) );
+		$this->assertSame( '#contacto', $this->generator->localize_url( '#contacto', 'en' ) );
+	}
 }

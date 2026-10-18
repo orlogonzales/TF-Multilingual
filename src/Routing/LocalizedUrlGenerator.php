@@ -164,6 +164,16 @@ class LocalizedUrlGenerator {
 			return $url;
 		}
 
+		// Preserve non-HTTP(S) schemes (mailto:, tel:, javascript:, etc.) unmodified.
+		if ( isset( $parsed['scheme'] ) && ! in_array( strtolower( (string) $parsed['scheme'] ), array( 'http', 'https' ), true ) ) {
+			return $url;
+		}
+
+		// Preserve pure anchor/fragment URLs (#section) unmodified.
+		if ( ! isset( $parsed['path'] ) && ! isset( $parsed['host'] ) && isset( $parsed['fragment'] ) ) {
+			return $url;
+		}
+
 		// Determine site home base and home path.
 		$resolver_home = $this->url_resolver->get_home_url();
 		$site_home_url = ! empty( $this->home_url )
@@ -200,9 +210,18 @@ class LocalizedUrlGenerator {
 			$relative_path = trim( substr( $relative_path, strlen( $site_path ) ), '/' );
 		}
 
+		// Excluded system/administrative routes (wp-admin, wp-login.php, wp-json, xmlrpc.php, wp-cron.php) are never localized.
+		if ( '' !== $relative_path && $this->url_resolver->is_excluded( $relative_path ) ) {
+			return $url;
+		}
+
 		// Strip any recognized TFML language prefix from the relative path.
 		$clean_path = $this->url_resolver->strip_prefix( $relative_path );
 		$clean_path = trim( $clean_path, '/' );
+
+		if ( '' !== $clean_path && $this->url_resolver->is_excluded( $clean_path ) ) {
+			return $url;
+		}
 
 		$default_lang = $this->language_registry->get_default();
 		$default_code = null !== $default_lang ? $default_lang->get_code() : null;
