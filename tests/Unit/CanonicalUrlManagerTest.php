@@ -243,4 +243,46 @@ class CanonicalUrlManagerTest extends TestCase {
 		$raw = 'http://example.com/unconfigured/';
 		$this->assertSame( $raw, $manager->filter_canonical_url( $raw, 101 ) );
 	}
+
+	/**
+	 * Tests init_hooks registers WordPress Core get_canonical_url filter and dispatches without duplicates.
+	 */
+	public function test_init_hooks_registers_core_get_canonical_url_filter(): void {
+		$GLOBALS['wp_test_filters'] = array();
+
+		$this->manager->init_hooks();
+
+		$this->assertNotEmpty( $GLOBALS['wp_test_filters']['get_canonical_url'] );
+		$this->assertCount( 1, $GLOBALS['wp_test_filters']['get_canonical_url'] );
+		$this->assertSame( 10, $GLOBALS['wp_test_filters']['get_canonical_url'][0]['priority'] );
+		$this->assertSame( 2, $GLOBALS['wp_test_filters']['get_canonical_url'][0]['accepted_args'] );
+
+		// Verify end-to-end dispatch via apply_filters( 'get_canonical_url', $url, $post ) as executed by wp_get_canonical_url().
+		$nosotros_es    = $this->create_post( 6237 );
+		$about_us_en    = $this->create_post( 8354 );
+		$actividades_es = $this->create_post( 4976 );
+		$activities_en  = $this->create_post( 8339 );
+
+		$group_nosotros = $this->group_repo->create_group( 'post', 'page', 6237, 'es' );
+		$this->group_repo->add_translation( $group_nosotros->get_id(), 8354, 'en' );
+
+		$group_actividades = $this->group_repo->create_group( 'post', 'page', 4976, 'es' );
+		$this->group_repo->add_translation( $group_actividades->get_id(), 8339, 'en' );
+
+		$filtered_nosotros = apply_filters( 'get_canonical_url', 'http://example.com/nosotros/', $nosotros_es );
+		$this->assertSame( 'http://example.com/nosotros/', $filtered_nosotros );
+
+		$filtered_about_us = apply_filters( 'get_canonical_url', 'http://example.com/about-us/', $about_us_en );
+		$this->assertSame( 'http://example.com/en/about-us/', $filtered_about_us );
+
+		$filtered_actividades = apply_filters( 'get_canonical_url', 'http://example.com/actividades/', $actividades_es );
+		$this->assertSame( 'http://example.com/actividades/', $filtered_actividades );
+
+		$filtered_activities = apply_filters( 'get_canonical_url', 'http://example.com/activities/', $activities_en );
+		$this->assertSame( 'http://example.com/en/activities/', $filtered_activities );
+
+		// Idempotence: applying filter again on already localized canonical never double-prefixes.
+		$re_filtered_about_us = apply_filters( 'get_canonical_url', $filtered_about_us, $about_us_en );
+		$this->assertSame( 'http://example.com/en/about-us/', $re_filtered_about_us );
+	}
 }

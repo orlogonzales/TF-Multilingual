@@ -122,6 +122,7 @@ class SeoFrontendFilterTest extends TestCase {
 		$this->assertSame( 2, $GLOBALS['wp_test_actions']['wp_head'][0]['priority'] );
 
 		// Subordinates hooked.
+		$this->assertNotEmpty( $GLOBALS['wp_test_filters']['get_canonical_url'] );
 		$this->assertNotEmpty( $GLOBALS['wp_test_filters']['wp_get_canonical_url'] );
 		$this->assertNotEmpty( $GLOBALS['wp_test_filters']['wp_sitemaps_posts_query_args'] );
 	}

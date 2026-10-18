@@ -83,6 +83,7 @@ class CanonicalUrlManager {
 			return;
 		}
 
+		add_filter( 'get_canonical_url', array( $this, 'filter_canonical_url' ), 10, 2 );
 		add_filter( 'wp_get_canonical_url', array( $this, 'filter_canonical_url' ), 10, 2 );
 		add_filter( 'wpseo_canonical', array( $this, 'filter_third_party_canonical' ), 10, 1 );
 		add_filter( 'rank_math/canonical_url', array( $this, 'filter_third_party_canonical' ), 10, 1 );

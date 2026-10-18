@@ -1022,14 +1022,17 @@ class Plugin {
 	 */
 	public function get_canonical_url_manager(): CanonicalUrlManager {
 		if ( null === $this->canonical_url_manager ) {
-			$group_repo                  = new TranslationGroupRepository();
-			$translation_resolver        = new ContentTranslationResolver( $group_repo, $this->get_language_registry() );
-			$url_resolver                = new UrlLanguageResolver( $this->get_language_registry() );
-			$url_generator               = new LocalizedUrlGenerator(
+			$group_repo           = new TranslationGroupRepository();
+			$translation_resolver = new ContentTranslationResolver( $group_repo, $this->get_language_registry() );
+			$url_resolver         = new UrlLanguageResolver( $this->get_language_registry() );
+			$url_generator        = new LocalizedUrlGenerator(
 				$this->get_language_registry(),
 				$url_resolver,
 				$translation_resolver
 			);
+			if ( null !== $this->resolvedor_portada_multilingue ) {
+				$url_generator->set_resolvedor_portada( $this->resolvedor_portada_multilingue );
+			}
 			$this->canonical_url_manager = new CanonicalUrlManager(
 				$this->get_language_registry(),
 				$translation_resolver,
