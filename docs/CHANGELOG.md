@@ -1695,4 +1695,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - PHPCS / WPCS: **180/180 archivos analizados, 0 errors, 0 warnings** (100% PASS).
     - Verificador reproducible de Fase 3.34 (`scratch/verify_fase_3_34.php`): **22/22 controles PASS (100%)**.
     - Invarianza total: 121 grupos TFML, 135 elementos activos, 1 retenido (`fr:8839`), 12 manifiestos históricos y centinela intacto en `cms_ect` y `cms_ect_lab`.
-
+  - **Subsanación de Evidencias y Cierre Formal de Fase 3.34 (Directiva DT-TFML-064A — ADR-060):**
+    - Conciliación documental del commit real de Fase 3.34 en GitHub (`518a144cf08ec4138ca1c86e818783c939b17d40`), rectificando el hash inexistente reportado previamente (`518a1444d3ba9f032aa2f1d93540be774bc07452`).
+    - Incorporación de la excepción `!/scratch/verify_fase_3_34.php` en `.gitignore` y versionado efectivo del verificador reproducible de solo lectura `scratch/verify_fase_3_34.php` (`22/22 PASS`).
+    - Certificación de paridad tabla por tabla (`COUNT(*)` y `CHECKSUM TABLE` CRC32) de las 16 tablas `etk_t_revslider_*` entre `cms_ect` y `cms_ect_lab`, auditoría de ausencia de claves comerciales y delimitación explícita entre validación HTTP/DOM/assets (`PASS`) e hidratación JS interactiva en navegador gráfico (`NOT_TESTED`).

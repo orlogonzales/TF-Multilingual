@@ -1463,17 +1463,13 @@
   6. **Preservación Estricta de la Invarianza de Datos y Calidad de Código:**
      - La base de datos de laboratorio conserva intactos sus 121 grupos TFML, 135 elementos activos, el grupo 587 (197:es, 8356:en), la traducción retenida `fr:8839` y los 12 manifiestos históricos.
      - Las pruebas automáticas de la suite PHPUnit (603 tests, 2.160 aserciones, 0 fallos), PHPCS (180/180 archivos PASS) y el verificador específico de Fase 3.34 (`scratch/verify_fase_3_34.php`: 22/22 controles PASS) ratifican la estabilidad integral del sistema.
+  7. **Subsanación de Evidencias Documentales, Trazabilidad Git y Auditoría Criptográfica de Tablas (`DT-TFML-064A` — 2026-10-18):**
+     - **Conciliación de Commit SHA:** Se deja constancia formal de que el commit real en Git y GitHub correspondiente a la documentación inicial de la Fase 3.34 es `518a144cf08ec4138ca1c86e818783c939b17d40` (y no el hash inexistente `518a1444d3ba9f032aa2f1d93540be774bc07452` reportado inicialmente por extrapolación errónea del hash abreviado `518a144`).
+     - **Versionado del Verificador Reproducible:** Se actualizó `.gitignore` añadiendo la excepción explícita `!/scratch/verify_fase_3_34.php` (homologando el criterio de `verify_fase_3_30.php` a `verify_fase_3_33.php`), incorporando al repositorio el script de solo lectura `scratch/verify_fase_3_34.php` (`22/22 PASS`).
+     - **Auditoría Criptográfica de las 16 Tablas `etk_t_revslider_*`:** Se verificó mediante `COUNT(*)` y `CHECKSUM TABLE` (CRC32 MySQL) la paridad al 100% entre `cms_ect` (leída en modo estrictamente no destructivo) y `cms_ect_lab` en las 16 tablas transferidas (`163` filas totales combinadas, `0` discrepancias de checksum).
+     - **Frontera de Verificación Visual:** Se distingue taxativamente entre la verificación HTTP/DOM/assets en servidor (`PASS` en los 22 controles) y la renderización visual interactiva en navegador real con motor JavaScript para `<sr7-module>` y viewports responsivos (`NOT_TESTED` en entorno CLI sin navegador gráfico).
 - **ESTADO:** **ACEPTADA**
-- **CONTEXTO:** Fase 3.34 / Directiva DT-TFML-064 — Restauración controlada del renderizado visual y auditoría de integraciones.
-- **JUSTIFICACIÓN:** Certificar la convivencia armónica entre TF Multilingual y el stack de maquetación y diseño visual real del tema `ecoCMS` (Elementor, Elementor Pro, Slider Revolution y OvaFramework), demostrando fidelidad visual e integridad multilingüe sin degradaciones.
-- **CONSECUENCIAS:** El laboratorio `lab.ecoterra.test` presenta ahora la apariencia visual rica y completa de Ecoterra Lodge tanto en español como en inglés, con menús traducidos, cabecera estilizada, slider dinámico y selector de idiomas operativo, manteniendo el aislamiento de seguridad y la invariancia total de la base original.
-
-
-
-
-
-
-
-
-
+- **CONTEXTO:** Fase 3.34 / Directivas DT-TFML-064 y DT-TFML-064A — Restauración controlada del renderizado visual, auditoría de integraciones y subsanación formal de trazabilidad.
+- **JUSTIFICACIÓN:** Certificar la convivencia armónica entre TF Multilingual y el stack de maquetación y diseño visual real del tema `ecoCMS` (Elementor, Elementor Pro, Slider Revolution y OvaFramework), demostrando fidelidad estructural, aislamiento de seguridad y trazabilidad exacta en el repositorio Git.
+- **CONSECUENCIAS:** El laboratorio `lab.ecoterra.test` conserva su estado funcional restaurado (`22/22 PASS`), con el verificador `scratch/verify_fase_3_34.php` versionado en GitHub y la trazabilidad documental y criptográfica 100% conciliada.
 
