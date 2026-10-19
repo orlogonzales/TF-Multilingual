@@ -2041,6 +2041,61 @@
 - **JUSTIFICACIÓN:** Registrar con transparencia el incidente procedimental de Fase 3.46, validar empíricamente en base de datos las identidades reales del siguiente lote y derivar sus fingerprints deterministas para su posterior autorización de ejecución.
 - **CONSECUENCIAS:** Verificador reproducible `scratch/verify_fase_3_47.php` certificado con **10/10 controles PASS (0 FAIL)**, 691 pruebas PHPUnit superadas al 100% (1 omitida intencional) y PHPCS 100% limpio en todo el proyecto.
 
+---
+
+### ADR-076: Importación Transaccional de Paquetes y Servicios y Desbloqueo Jerárquico de Hijas (Fase 3.48 / Directiva DT-TFML-081)
+- **FECHA:** 2026-10-19
+- **DECISIÓN:**
+  1. **Compuertas Previas y Respaldo Físico Fuera de DocumentRoot:**
+     - Se superaron todas las compuertas obligatorias de preflight:
+       * Centinela WPML en producción `cms_ect`: 3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+       * Centinela WPML en laboratorio `cms_ect_lab`: 3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`.
+       * Baseline inicial de TFML verificado: 125 grupos, 143 elementos, 5 FR retenidas, 14 manifiestos, checkpoint `completed` y lock libre.
+       * Revalidación de los 6 posts objetivos: 100% páginas públicas con `post_parent = 0` y cero pertenencia previa a TFML.
+     - Se generó un nuevo respaldo físico completo fuera del webroot mediante `mysqldump`:
+       `D:/laragon/backup/tfml_staging/cms_ect_lab_pre_fase_3_48_pilot_trids_9537_9563_20261019_144753.sql` (17.824.215 bytes, SHA-256 `bf71aa3a267d65bbfc1e6d54254e3e011356063450b1449fb4b504bf1f8cd791`).
+  2. **Certificación y Pruebas en Base de Datos Desechable (`cms_ect_lab_restore_verify`):**
+     - Restauración completa en base efímera en 4,76s comprobando métricas idénticas al baseline (125/143/5/14).
+     - Simulación de ejecución con `WpmlMigrationExecutor`: grupos 125 -> 127, elementos 143 -> 147, retenidas 5 -> 7, manifiestos 14 -> 15.
+     - Prueba de idempotencia estricta en segunda pasada: 2 grupos saltados legítimamente (`idempotent_skipped`) con 0 duplicidades.
+     - Prueba de reversión selectiva mediante `WpmlMigrationRollbackService::rollback_groups()`: retorno exacto y limpio al estado 125/143/5.
+     - Destrucción segura de la base efímera (`DROP DATABASE`) y registro de metadatos inmutables en `.meta.json`.
+  3. **Ejecución Transaccional Atómica Única en `cms_ect_lab`:**
+     - Validación determinista de fingerprints canónicos:
+       * Plan maestro: `d3b02acff32de4c2c95b8c8561615d04e243c2d6a200c5bd30e17d93d5393b67`.
+       * Plan piloto: `7a1b8992fe352472f8ae8177e12da60a4aa825a3814d23301e222ab2543fd844`.
+     - Ejecución atómica mediante `WpmlMigrationExecutor::execute_batch()` en 0,037s:
+       * **TRID 9537** -> Asignado a **Grupo TFML #592** (Canónico Post `#6214` Paquetes [ES], Miembro Post `#8335` Tour Packages [EN], Retenida Post `#8974` Forfaits touristiques en `RetainedTranslationRegistry`).
+       * **TRID 9563** -> Asignado a **Grupo TFML #593** (Canónico Post `#6505` Servicios [ES], Miembro Post `#8347` Services [EN], Retenida Post `#8918` Services en `RetainedTranslationRegistry`).
+     - Manifiesto inmutable `tfml_migration_manifest_pilot-nav-2-trids-9537-9563` persistido, checkpoint actualizado a `completed` y lock libre.
+  4. **Consolidación de Métricas en Laboratorio:**
+     - Grupos TFML: de 125 a **127**.
+     - Elementos Activos: de 143 a **147**.
+     - Traducciones Retenidas FR: de 5 a **7**.
+     - Manifiestos de Migración: de 14 a **15**.
+     - Cero elementos en francés activos (`fr_active = 0`) y cero duplicidades relacionales.
+     - Reconciliación global con 0 discrepancias (`reconcile()`).
+  5. **Desbloqueo Jerárquico de Páginas Hijas:**
+     - Al migrar Servicios a Grupo TFML #593, sus dos páginas hijas en WPML:
+       * TRID 9326 (Salón de Eventos / Event Room): padres `#6505` (es) y `#8347` (en).
+       * TRID 9574 (Restaurante / Restaurant): padres `#6505` (es) y `#8347` (en).
+       pasan formalmente del estado "Bloqueadas por Padre Pendiente" al estado "Acreditadas y Desbloqueadas con Padre en TFML (Grupo #593)", dejándolas 100% elegibles para el siguiente lote.
+  6. **Certificación Funcional HTTP, Menús y Sitemaps:**
+     - HTTP 200 OK con lang exacto, canonical localizado y hreflang simétrico en:
+       * `/paquetes/` (ES) y `/en/tour-packages/` (EN)
+       * `/servicios/` (ES) y `/en/services/` (EN)
+       * No regresión en las 10 rutas históricas (`/`, `/en/`, `/nosotros/`, `/en/about-us/`, `/actividades/`, `/en/activities/`, `/galeria/`, `/en/gallery/`, `/contactenos/`, `/en/contact-us/`).
+       * `/fr/` y `/pt/` responden 404 limpio.
+     - Menú de escritorio `menu-menu-es-ingles`: `Tour Packages` enlaza automáticamente a `http://lab.ecoterra.test/en/tour-packages/`. Las 10 páginas no migradas se mantienen protegidas sin 404 prematuros.
+     - Sitemaps nativos: provider `page` se expande de 11 a **15** URLs. Total consolidado del sitemap pasa de 34 a **38** URLs únicas (0 francés, 0 duplicados, `blog_public = 0`).
+  7. **Invarianza Absoluta de Producción (`cms_ect`):**
+     - La base de datos de producción `cms_ect` permanece 100% inalterada: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.48 / Directiva DT-TFML-081 — Importación transaccional de Paquetes y Servicios.
+- **JUSTIFICACIÓN:** Incorporar con seguridad transaccional, trazabilidad criptográfica y certificación de reversibilidad las páginas raíz de Paquetes y Servicios, expandiendo el catálogo multilingüe y habilitando el desbloqueo jerárquico de sus páginas dependientes.
+- **CONSECUENCIAS:** Verificador reproducible `scratch/verify_fase_3_48.php` certificado con **10/10 controles PASS (0 FAIL)**, 691 pruebas PHPUnit superadas al 100% (1 omitida intencional), PHPCS 100% limpio en todo el proyecto y 2 capturas de pantalla de alta definición en `/brain/` (`fase_3_48_admin_migration_history.png` y `fase_3_48_admin_migration_retained.png`).
+
+
 
 
 

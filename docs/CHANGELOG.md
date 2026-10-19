@@ -1989,6 +1989,52 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Suite de pruebas PHPUnit: **691 pruebas unitarias / 2.558 aserciones (100% PASS, 0 fallos, 0 errores, 1 omitida intencional)**.
     - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)**.
     - Verificador reproducible `scratch/verify_fase_3_47.php` certificado con **10/10 controles PASS (0 FAIL)**.
+- **Importación Transaccional Controlada de Paquetes y Servicios y Desbloqueo Jerárquico de Hijas (Fase 3.48 / Directiva DT-TFML-081 — ADR-076):**
+  - **Compuertas Previas y Respaldo Físico Fuera de DocumentRoot:**
+    - Verificación exitosa de compuertas previas: centinela WPML en producción `cms_ect` (3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`), centinela WPML en laboratorio `cms_ect_lab` (3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`), estado base de TFML verificado (125 grupos, 143 elementos, 5 FR retenidas, 14 manifiestos, checkpoint `completed` y lock libre).
+    - Verificación previa de los 6 posts objetivos (`#6214`, `#8335`, `#8974`, `#6505`, `#8347`, `#8918`): 100% páginas públicas con `post_parent = 0` y cero pertenencia previa a TFML.
+    - Generación de respaldo físico SQL completo fuera de DocumentRoot en `D:/laragon/backup/tfml_staging/cms_ect_lab_pre_fase_3_48_pilot_trids_9537_9563_20261019_144753.sql` (17.824.215 bytes, SHA-256 `bf71aa3a267d65bbfc1e6d54254e3e011356063450b1449fb4b504bf1f8cd791`).
+  - **Certificación y Pruebas en Base de Datos Desechable (`cms_ect_lab_restore_verify`):**
+    - Restauración completa del volcado en base de datos efímera (`cms_ect_lab_restore_verify`) en 4,76s comprobando métricas idénticas al baseline (125 grupos, 143 elementos, 5 retenidas, 14 manifiestos).
+    - Ejecución de prueba del lote piloto `pilot-nav-2-trids-9537-9563`: 125 -> 127 grupos, 143 -> 147 elementos, 5 -> 7 retenidas, 14 -> 15 manifiestos.
+    - Prueba de idempotencia estricta en segundo ciclo: 2 grupos saltados (`idempotent_skipped`), 0 grupos duplicados.
+    - Prueba de reversión selectiva mediante `WpmlMigrationRollbackService::rollback_groups()`: retorno limpio al estado base previo (125 grupos, 143 elementos, 5 retenidas).
+    - Destrucción segura de la base de datos efímera y persistencia de metadatos de auditoría en `meta.json`.
+  - **Validación Criptográfica y Ejecución Transaccional Atómica en `cms_ect_lab`:**
+    - Verificación determinista de huellas: huella del plan maestro `d3b02acff32de4c2c95b8c8561615d04e243c2d6a200c5bd30e17d93d5393b67` y huella del piloto canónico `7a1b8992fe352472f8ae8177e12da60a4aa825a3814d23301e222ab2543fd844`.
+    - Ejecución atómica única vía `WpmlMigrationExecutor::execute_batch()` en 0,037s:
+      * TRID 9537 -> Asignado al Grupo TFML #592 (canónico Post `#6214` Paquetes [ES], miembro Post `#8335` Tour Packages [EN], Post `#8974` Forfaits touristiques en custodia francesa inactiva en `RetainedTranslationRegistry`).
+      * TRID 9563 -> Asignado al Grupo TFML #593 (canónico Post `#6505` Servicios [ES], miembro Post `#8347` Services [EN], Post `#8918` Services en custodia francesa inactiva en `RetainedTranslationRegistry`).
+    - Generación de manifiesto inmutable `tfml_migration_manifest_pilot-nav-2-trids-9537-9563` y actualización del checkpoint a `completed` con lock libre.
+  - **Consolidación de Métricas en Laboratorio:**
+    - Grupos TFML: de 125 a **127**.
+    - Elementos Activos: de 143 a **147**.
+    - Traducciones Retenidas FR: de 5 a **7**.
+    - Manifiestos de Migración: de 14 a **15**.
+    - Cero elementos en francés activos (`fr_active = 0`) y cero duplicidades relacionales.
+    - Reconciliación global con 0 discrepancias (`reconcile()`).
+  - **Desbloqueo Jerárquico de Páginas Hijas:**
+    - Al quedar acreditado el Grupo TFML #593 (`#6505`:es / `#8347`:en), sus dos páginas dependientes en WPML:
+      * TRID 9326 (Salón de Eventos / Event Room): `#5465` (es) y `#8343` (en).
+      * TRID 9574 (Restaurante / Restaurant): `#6649` (es) y `#8345` (en).
+      quedan 100% desbloqueadas en sus precondiciones de padre, pasando al estado "Acreditadas y Desbloqueadas con Padre en TFML" para el siguiente lote.
+  - **Certificación Funcional de Enrutamiento, Menús y Sitemaps:**
+    - Comprobación en servidor HTTP real (`http://lab.ecoterra.test`):
+      * `/paquetes/` (Post #6214): HTTP 200, `lang="es-ES"`, canonical `/paquetes/`, hreflang simétrico y alternativo.
+      * `/en/tour-packages/` (Post #8335): HTTP 200, `lang="en-US"`, canonical `/en/tour-packages/`, hreflang simétrico y alternativo.
+      * `/servicios/` (Post #6505): HTTP 200, `lang="es-ES"`, canonical `/servicios/`, hreflang simétrico y alternativo.
+      * `/en/services/` (Post #8347): HTTP 200, `lang="en-US"`, canonical `/en/services/`, hreflang simétrico y alternativo.
+      * Cero regresiones en rutas previamente migradas: 10/10 rutas históricas (`/`, `/en/`, `/nosotros/`, `/en/about-us/`, `/actividades/`, `/en/activities/`, `/galeria/`, `/en/gallery/`, `/contactenos/`, `/en/contact-us/`) responden HTTP 200; `/fr/` y `/pt/` responden 404 limpio.
+    - Menú de escritorio `menu-menu-es-ingles`: `Tour Packages` enlaza automáticamente a `http://lab.ecoterra.test/en/tour-packages/`, manteniendo protegidas las 10 páginas pendientes sin enlaces rotos 404 prematuros.
+    - Sitemaps nativos de Core: provider `page` pasa de 11 a **15** URLs; total general consolidado pasa de 34 a **38** URLs únicas (0 francés, 0 duplicados, `blog_public = 0`).
+  - **Invarianza Absoluta de Producción (`cms_ect`):**
+    - La base de datos de producción `cms_ect` permanece 100% inalterada: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+  - **Gobernanza, Calidad y Verificación Reproducible:**
+    - Suite de pruebas PHPUnit: **691 pruebas unitarias / 2.558 aserciones (100% PASS, 0 fallos, 0 errores, 1 omitida intencional)**.
+    - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)**.
+    - Verificador reproducible `scratch/verify_fase_3_48.php` certificado con **10/10 controles PASS (0 FAIL)**.
+    - Artefactos visuales de alta resolución generados en `/brain/`: `fase_3_48_admin_migration_history.png` y `fase_3_48_admin_migration_retained.png`.
+
 
 
 
