@@ -2034,6 +2034,48 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)**.
     - Verificador reproducible `scratch/verify_fase_3_48.php` certificado con **10/10 controles PASS (0 FAIL)**.
     - Artefactos visuales de alta resolución generados en `/brain/`: `fase_3_48_admin_migration_history.png` y `fase_3_48_admin_migration_retained.png`.
+- **Importación Transaccional Controlada de Páginas Hijas de Servicios y Preservación de Jerarquía (Fase 3.49 / Directiva DT-TFML-082 — ADR-077):**
+  - **Compuertas Previas y Respaldo Físico Fuera de DocumentRoot:**
+    - Verificación exitosa de compuertas previas: centinela WPML en producción `cms_ect` (3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`), centinela WPML en laboratorio `cms_ect_lab` (3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`), estado base de TFML verificado (127 grupos, 147 elementos, 7 FR retenidas, 15 manifiestos, checkpoint `completed` y lock libre).
+    - Verificación previa de los 6 posts objetivos (`#5465`, `#8343`, `#8937`, `#6649`, `#8345`, `#8921`): 100% páginas públicas con `post_status = publish`, jerarquías `post_parent` apuntando a Servicios (`#6505`, `#8347`, `#8918` en Grupo TFML #593) y cero pertenencia previa a TFML.
+    - Generación de respaldo físico SQL completo fuera de DocumentRoot en `D:/laragon/backup/tfml_staging/cms_ect_lab_pre_fase_3_49_pilot_trids_9326_9574_20261019_151012.sql` (17.884.554 bytes, SHA-256 `9189fdc4b74f914dad756c191c98bfef728376cebf277b4dbe2b4d03be036692`).
+  - **Certificación y Pruebas en Base de Datos Desechable (`cms_ect_lab_restore_verify`):**
+    - Restauración completa del volcado en base de datos efímera (`cms_ect_lab_restore_verify`) en 5,33s comprobando métricas idénticas al baseline (127 grupos, 147 elementos, 7 retenidas, 15 manifiestos).
+    - Ejecución de prueba del lote piloto `pilot-nav-2-trids-9326-9574`: 127 -> 129 grupos, 147 -> 151 elementos, 7 -> 9 retenidas, 15 -> 16 manifiestos.
+    - Prueba de idempotencia estricta en segundo ciclo: 2 grupos saltados (`idempotent_skipped`), 0 grupos duplicados.
+    - Prueba de reversión selectiva mediante `WpmlMigrationRollbackService::rollback_groups()`: retorno limpio al estado base previo (127 grupos, 147 elementos, 7 retenidas).
+    - Destrucción segura de la base de datos efímera y persistencia de metadatos de auditoría en `meta.json`.
+  - **Validación Criptográfica y Ejecución Transaccional Atómica en `cms_ect_lab`:**
+    - Verificación determinista de huellas: huella del plan maestro `16cd5cafeae23e15783662d98a4fa5474c40f9b570cf676efbedee4990aab9b4` y huella del piloto canónico `7ee6b14da94d0cc726d922bcdc751dcc755d4a188d31695299cca7b19c797967`.
+    - Ejecución atómica única vía `WpmlMigrationExecutor::execute_batch()` en 0,034s:
+      * TRID 9326 -> Asignado al Grupo TFML #594 (canónico Post `#5465` Salón de Eventos [ES], miembro Post `#8343` Event Room [EN], Post `#8937` Salon d'événements en custodia francesa inactiva en `RetainedTranslationRegistry`).
+      * TRID 9574 -> Asignado al Grupo TFML #595 (canónico Post `#6649` Restaurante [ES], miembro Post `#8345` Restaurant [EN], Post `#8921` Restaurant en custodia francesa inactiva en `RetainedTranslationRegistry`).
+    - Generación de manifiesto inmutable `tfml_migration_manifest_pilot-nav-2-trids-9326-9574` y actualización del checkpoint a `completed` con lock libre.
+  - **Preservación Jerárquica y Consolidación de Métricas en Laboratorio:**
+    - Conservación íntegra de `post_parent` en base de datos: las hijas Salón de Eventos y Restaurante preservan su relación jerárquica con sus padres respectivos en Grupo TFML #593 (Servicios) y en la traducción retenida francesa.
+    - Grupos TFML: de 127 a **129**.
+    - Elementos Activos: de 147 a **151**.
+    - Traducciones Retenidas FR: de 7 a **9**.
+    - Manifiestos de Migración: de 15 a **16**.
+    - Cero elementos en francés activos (`fr_active = 0`) y cero duplicidades relacionales.
+    - Reconciliación global con 0 discrepancias (`reconcile()`).
+  - **Certificación Funcional de Enrutamiento, Menús y Sitemaps:**
+    - Comprobación en servidor HTTP real (`http://lab.ecoterra.test`):
+      * `/servicios/salon-de-eventos/` (Post #5465): HTTP 200, `lang="es-ES"`, canonical `/servicios/salon-de-eventos/`, hreflang simétrico y alternativo.
+      * `/en/services/event-room/` (Post #8343): HTTP 200, `lang="en-US"`, canonical `/en/services/event-room/`, hreflang simétrico y alternativo.
+      * `/servicios/restaurante/` (Post #6649): HTTP 200, `lang="es-ES"`, canonical `/servicios/restaurante/`, hreflang simétrico y alternativo.
+      * `/en/services/restaurant/` (Post #8345): HTTP 200, `lang="en-US"`, canonical `/en/services/restaurant/`, hreflang simétrico y alternativo.
+      * Cero regresiones en rutas previamente migradas: 14/14 rutas históricas (`/`, `/en/`, `/nosotros/`, `/en/about-us/`, `/actividades/`, `/en/activities/`, `/galeria/`, `/en/gallery/`, `/contactenos/`, `/en/contact-us/`, `/paquetes/`, `/en/tour-packages/`, `/servicios/`, `/en/services/`) responden HTTP 200; `/fr/` y `/pt/` responden 404 limpio.
+    - Menú de escritorio `menu-menu-es-ingles`: se mantiene la protección de las 10 páginas pendientes sin enlaces rotos 404 prematuros (`premature_en_cnt = 0`).
+    - Sitemaps nativos de Core: provider `page` pasa de 15 a **19** URLs; total general consolidado pasa de 38 a **42** URLs únicas (0 francés, 0 duplicados, `blog_public = 0`).
+  - **Invarianza Absoluta de Producción (`cms_ect`):**
+    - La base de datos de producción `cms_ect` permanece 100% inalterada: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+  - **Gobernanza, Calidad y Verificación Reproducible:**
+    - Suite de pruebas PHPUnit: **691 pruebas unitarias / 2.558 aserciones (100% PASS, 0 fallos, 0 errores, 1 omitida intencional)**.
+    - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)**.
+    - Verificador reproducible `scratch/verify_fase_3_49.php` certificado con **10/10 controles PASS (0 FAIL)**.
+    - Artefactos visuales de alta resolución generados en `/brain/`: `fase_3_49_admin_migration_history.png` y `fase_3_49_admin_migration_retained.png`.
+
 
 
 

@@ -2095,6 +2095,60 @@
 - **JUSTIFICACIÓN:** Incorporar con seguridad transaccional, trazabilidad criptográfica y certificación de reversibilidad las páginas raíz de Paquetes y Servicios, expandiendo el catálogo multilingüe y habilitando el desbloqueo jerárquico de sus páginas dependientes.
 - **CONSECUENCIAS:** Verificador reproducible `scratch/verify_fase_3_48.php` certificado con **10/10 controles PASS (0 FAIL)**, 691 pruebas PHPUnit superadas al 100% (1 omitida intencional), PHPCS 100% limpio en todo el proyecto y 2 capturas de pantalla de alta definición en `/brain/` (`fase_3_48_admin_migration_history.png` y `fase_3_48_admin_migration_retained.png`).
 
+---
+
+### ADR-077: Importación Controlada de Páginas Hijas de Servicios (Salón de Eventos y Restaurante) y Preservación de la Jerarquía Post-Parent (Fase 3.49 / DT-TFML-082)
+
+- **TÍTULO:** Importación Controlada de Páginas Hijas de Servicios (Salón de Eventos y Restaurante) y Preservación de la Jerarquía Post-Parent (Fase 3.49 / DT-TFML-082)
+- **FECHA:** 2026-10-19
+- **AUTOR:** Antigravity AI
+- **DECISIÓN:**
+  1. **Aislamiento y Preflight Riguroso:**
+     - Centinela WPML en producción `cms_ect`: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+     - Centinela WPML en laboratorio `cms_ect_lab`: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10`.
+     - Baseline inicial de TFML en `cms_ect_lab`: 127 grupos, 147 elementos, 7 FR retenidas, 15 manifiestos, checkpoint `completed`, lock libre.
+     - Respaldo físico SQL completo generado fuera de webroot: `D:/laragon/backup/tfml_staging/cms_ect_lab_pre_fase_3_49_pilot_trids_9326_9574_20261019_151012.sql` (17.884.554 bytes, SHA-256 `9189fdc4b74f914dad756c191c98bfef728376cebf277b4dbe2b4d03be036692`).
+  2. **Certificación en Base de Datos Desechable (`cms_ect_lab_restore_verify`):**
+     - Restauración en BD efímera en 5,33s confirmando baseline exacto (127/147/7/15).
+     - Ejecución de prueba con `WpmlMigrationExecutor`: grupos 127 -> 129, elementos 147 -> 151, retenidas 7 -> 9, manifiestos 15 -> 16.
+     - Prueba de idempotencia estricta en segunda pasada: 2 grupos saltados legítimamente (`idempotent_skipped`) con 0 duplicidades.
+     - Prueba de reversión selectiva mediante `WpmlMigrationRollbackService::rollback_groups()`: retorno exacto y limpio al estado 127/147/7.
+     - Destrucción segura de la base efímera (`DROP DATABASE`) y metadatos inmutables en `.meta.json`.
+  3. **Ejecución Transaccional Atómica Única en `cms_ect_lab`:**
+     - Fingerprints canónicos:
+       * Plan maestro: `16cd5cafeae23e15783662d98a4fa5474c40f9b570cf676efbedee4990aab9b4`.
+       * Plan piloto: `7ee6b14da94d0cc726d922bcdc751dcc755d4a188d31695299cca7b19c797967`.
+     - Ejecución atómica mediante `WpmlMigrationExecutor::execute_batch()` en 0,034s:
+       * **TRID 9326** -> Asignado a **Grupo TFML #594** (Canónico Post `#5465` Salón de Eventos [ES], Miembro Post `#8343` Event Room [EN], Retenida Post `#8937` Salon d'événements en `RetainedTranslationRegistry`).
+       * **TRID 9574** -> Asignado a **Grupo TFML #595** (Canónico Post `#6649` Restaurante [ES], Miembro Post `#8345` Restaurant [EN], Retenida Post `#8921` Restaurant en `RetainedTranslationRegistry`).
+     - Manifiesto inmutable `tfml_migration_manifest_pilot-nav-2-trids-9326-9574` persistido, checkpoint actualizado a `completed` y lock libre.
+  4. **Preservación Jerárquica y Consolidación de Métricas:**
+     - Se mantiene la integridad estructural de relaciones jerárquicas padre-hijo (`post_parent`):
+       * Salón de Eventos `#5465` (padre `#6505` en Grupo #593), `#8343` (padre `#8347` en Grupo #593), `#8937` (padre `#8918` retenido en Grupo #593).
+       * Restaurante `#6649` (padre `#6505` en Grupo #593), `#8345` (padre `#8347` en Grupo #593), `#8921` (padre `#8918` retenido en Grupo #593).
+     - Métricas consolidadas en `cms_ect_lab`:
+       * Grupos TFML: de 127 a **129**.
+       * Elementos Activos: de 147 a **151**.
+       * Traducciones Retenidas FR: de 7 a **9**.
+       * Manifiestos de Migración: de 15 a **16**.
+       * Cero elementos en francés activos (`fr_active = 0`) y cero duplicidades relacionales.
+       * Reconciliación global con 0 discrepancias (`reconcile()`).
+  5. **Certificación Funcional HTTP, Menús y Sitemaps:**
+     - HTTP 200 OK con lang exacto, canonical localizado y hreflang simétrico en:
+       * `/servicios/salon-de-eventos/` (ES) y `/en/services/event-room/` (EN)
+       * `/servicios/restaurante/` (ES) y `/en/services/restaurant/` (EN)
+       * No regresión en las 14 rutas históricas (`/`, `/en/`, `/nosotros/`, `/en/about-us/`, `/actividades/`, `/en/activities/`, `/galeria/`, `/en/gallery/`, `/contactenos/`, `/en/contact-us/`, `/paquetes/`, `/en/tour-packages/`, `/servicios/`, `/en/services/`).
+       * `/fr/` y `/pt/` responden 404 limpio.
+     - Menú de escritorio `menu-menu-es-ingles`: las 10 páginas pendientes continúan protegidas sin 404 prematuros (`premature_en_cnt = 0`).
+     - Sitemaps nativos: provider `page` se expande de 15 a **19** URLs. Total consolidado del sitemap pasa de 38 a **42** URLs únicas (0 francés, 0 duplicados, `blog_public = 0`).
+  6. **Invarianza Absoluta de Producción (`cms_ect`):**
+     - La base de datos de producción `cms_ect` permanece 100% inalterada: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.49 / Directiva DT-TFML-082 — Importación transaccional de páginas hijas de Servicios.
+- **JUSTIFICACIÓN:** Migrar de forma atómica y segura las páginas hijas dependientes de Servicios una vez desbloqueado su padre en la fase anterior, validando el comportamiento integral de la jerarquía multinivel de WordPress, sitemaps, resolvers y custodia francesa.
+- **CONSECUENCIAS:** Verificador reproducible `scratch/verify_fase_3_49.php` certificado con **10/10 controles PASS (0 FAIL)**, 691 pruebas PHPUnit superadas al 100% (1 omitida intencional), PHPCS 100% limpio en todo el proyecto y 2 capturas de pantalla de alta definición en `/brain/` (`fase_3_49_admin_migration_history.png` y `fase_3_49_admin_migration_retained.png`).
+
+
 
 
 
