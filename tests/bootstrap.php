@@ -2246,3 +2246,61 @@ if ( ! function_exists( 'rest_validate_request_arg' ) ) {
 		return true;
 	}
 }
+
+if ( ! function_exists( 'wp_die' ) ) {
+	/**
+	 * Stub for wp_die.
+	 *
+	 * @param mixed $message Error message.
+	 * @param mixed $title   Error title or HTTP status code.
+	 * @param mixed $args    Arguments or status code.
+	 * @throws \RuntimeException Always thrown to simulate termination in test environment.
+	 */
+	function wp_die( mixed $message = '', mixed $title = '', mixed $args = array() ): never {
+		$code = is_numeric( $title ) ? (int) $title : ( is_numeric( $args ) ? (int) $args : 500 );
+		$msg  = is_string( $message ) ? $message : ( ( $message instanceof WP_Error ) ? $message->get_error_message() : 'wp_die' );
+		throw new \RuntimeException( "wp_die({$code}): {$msg}", $code );
+	}
+}
+
+if ( ! function_exists( 'wp_safe_redirect' ) ) {
+	/**
+	 * Stub for wp_safe_redirect.
+	 *
+	 * @param string $location Location URL.
+	 * @param int    $status   HTTP status code.
+	 * @return bool
+	 */
+	function wp_safe_redirect( string $location, int $status = 302 ): bool {
+		$GLOBALS['wp_test_last_redirect'] = array(
+			'location' => $location,
+			'status'   => $status,
+		);
+		return true;
+	}
+}
+
+if ( ! function_exists( 'absint' ) ) {
+	/**
+	 * Stub for absint.
+	 *
+	 * @param mixed $maybeint Value to convert.
+	 * @return int
+	 */
+	function absint( mixed $maybeint ): int {
+		return abs( (int) $maybeint );
+	}
+}
+
+if ( ! function_exists( 'get_edit_post_link' ) ) {
+	/**
+	 * Stub for get_edit_post_link.
+	 *
+	 * @param int    $id      Post ID.
+	 * @param string $context Context.
+	 * @return string|null
+	 */
+	function get_edit_post_link( int $id = 0, string $context = 'display' ): ?string {
+		return $id > 0 ? "http://example.com/wp-admin/post.php?post={$id}&action=edit" : null;
+	}
+}

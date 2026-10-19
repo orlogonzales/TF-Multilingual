@@ -1793,5 +1793,35 @@
 - **CONTEXTO:** Fase 3.43 / Directiva DT-TFML-074 — Vinculación Editorial de Traducciones Existentes.
 - **JUSTIFICACIÓN:** Dotar al equipo editorial de una herramienta visual completa para conectar contenidos ya existentes en WordPress sin obligar a recrearlos ni recurrir a llamadas REST manuales o manipulaciones de base de datos.
 - **CONSECUENCIAS:** Suite de pruebas unitarias ampliada a **655 pruebas / 2.434 aserciones (0 fallos, 0 advertencias)**, PHPCS 100% limpio en **181/181 archivos**, verificador reproducible `scratch/verify_fase_3_43.php` certificado con **10/10 controles PASS (0 FAIL)**, captura visual generada en `/brain/` (`fase_3_43_admin_post_link.png`) y 4/4 páginas frontend con HTTP 200 y canonicals correctos.
+---
+
+### ADR-070: Hardening de Seguridad Editorial: Desvinculación mediante POST Estricto, Protección Anti-Tampering y Transaccionalidad Atómica (`PostEditorialUi`, `TranslationEditorialService`, REST API) (Fase 3.43A / Directiva DT-TFML-075)
+- **FECHA:** 2026-10-18 / 2026-10-19
+- **DECISIÓN:**
+  1. **Erradicación Absoluta de Métodos Modificadores vía GET:**
+     - En conformidad con las directrices de seguridad de WordPress Core y las mejores prácticas HTTP/REST, se eliminó por completo el enlace `<a>` de desvinculación que utilizaba el método GET.
+     - Se sustituyó por un formulario inline POST `<form class="tfml-unlink-form" method="post" action="admin-post.php">` con inputs ocultos para `action` (`tfml_unlink_post_translation`), `source_post_id`, `element_id` y nonce criptográfico individualizado (`tfml_unlink_nonce`), acompañado de un diálogo de confirmación explícito al usuario en el evento `onsubmit`.
+     - En [`src/Admin/PostEditorialUi.php`](../src/Admin/PostEditorialUi.php), los controladores `handle_unlink_translation()`, `handle_create_translation()` y `handle_link_translation()` imponen una verificación incondicional de método (`$_SERVER['REQUEST_METHOD'] === 'POST'`), respondiendo de inmediato con `wp_die( ..., 405 )` (Method Not Allowed) ante cualquier invocación no autorizada mediante GET.
+  2. **Protección Anti-Tampering y Validación Contextual Cruzada:**
+     - En [`src/Editorial/TranslationEditorialService.php`](../src/Editorial/TranslationEditorialService.php), el método `unlink_translation( string $element_type, int $element_id, ?int $new_canonical_id = null, ?int $context_source_id = null )` incorpora la validación obligatoria del contexto de origen `$context_source_id`.
+     - Si se suministra un post de contexto, el servicio verifica rigurosamente que tanto el elemento a desvincular como el post de contexto pertenezcan exactamente al mismo grupo de traducción de TF Multilingual. Cualquier intento de desvincular un elemento desde el contexto de otro grupo arroja `EditorialConflictException` previniendo manipulaciones maliciosas o accidentales entre grupos cruzados.
+     - Se valida que el usuario cuente con los permisos y capacidades (`edit_post`) tanto sobre el elemento destino como sobre el post de contexto de origen (`EditorialPermissionException`).
+  3. **Integridad Relacional, Ciclo de Vida y Transaccionalidad Completa:**
+     - **Desvinculación Secundaria:** Se retira la fila relacional en `tfml_group_elements` preservando el objeto de WordPress Core en `wp_posts` al 100% sin alteración.
+     - **Desvinculación Canónica:** Se promueve automáticamente el elemento restante del grupo como nuevo canónico.
+     - **Desvinculación del Último Elemento:** Si solo queda un elemento en el grupo, su desvinculación purga limpiamente el grupo huérfano en `tfml_translation_groups`, dejando el post en `wp_posts` como entidad autónoma no gestionada.
+     - **Preservación Inmune de Traducciones Retenidas:** Se certifica que las traducciones francesas retenidas (`8839, 8955, 8873`) registradas en `RetainedTranslationRegistry` permanecen totalmente inmunes e inmutables durante las desvinculaciones de elementos activos.
+     - **Idempotencia y Manejo de Reintentos:** Intentos repetidos de desvinculación sobre elementos no gestionados arrojan limpiamente `EditorialValidationException`.
+     - **Transaccionalidad Atómica:** Toda mutación relacional se ejecuta en bloque transaccional atómico (`begin_transaction`, `commit_transaction`, `rollback_transaction`), revirtiendo por completo cualquier cambio previo si se produce un fallo o error en base de datos.
+  4. **Alineación con el Endpoint REST (`/translations/unlink`):**
+     - En [`src/Rest/TranslationsController.php`](../src/Rest/TranslationsController.php), se actualizó la ruta de desvinculación para admitir el parámetro `source_id`, validando capacidades del usuario en `unlink_permissions_check()` y verificando anti-tampering antes de delegar a `TranslationEditorialService`.
+  5. **Aislamiento Absoluto de Datos y Certificación Invariable:**
+     - Producción `cms_ect` intocada: MD5 inmutable `4241ca7e7ec6399a594537cb04790c10` (3.403 filas).
+     - Laboratorio `cms_ect_lab` invariable: 123 grupos, 139 elementos y 3 traducciones francesas retenidas preservadas.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.43A / Directiva DT-TFML-075 — Hardening de Vinculación y Desvinculación Editorial.
+- **JUSTIFICACIÓN:** Resolver las observaciones técnicas de seguridad erradicando el uso del método GET para operaciones que modifican el estado del sistema, reforzando la protección CSRF y previniendo manipulaciones maliciosas entre grupos editoriales.
+- **CONSECUENCIAS:** Suite de pruebas PHPUnit ampliada a **670 pruebas / 2.475 aserciones (100% PASS, 0 errores, 1 omitida)**, PHPCS 100% limpio en **183/183 archivos**, verificador reproducible `scratch/verify_fase_3_43a.php` certificado con **10/10 controles PASS (0 FAIL)**, captura visual de alta resolución `fase_3_43a_admin_post_link.png` y 4/4 URLs frontend verificadas con HTTP 200 y canonicals válidos.
+
 
 

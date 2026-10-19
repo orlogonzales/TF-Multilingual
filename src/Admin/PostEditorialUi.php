@@ -228,20 +228,21 @@ class PostEditorialUi {
 								</a>
 								<?php
 								$unlink_elem_id = $tinfo['element_id'] ?? 0;
-								if ( $unlink_elem_id > 0 && function_exists( 'wp_nonce_url' ) ) :
-									$unlink_url = wp_nonce_url(
-										admin_url( 'admin-post.php?action=tfml_unlink_post_translation&element_id=' . $unlink_elem_id . '&source_post_id=' . $post->ID ),
-										self::NONCE_ACTION_UNLINK . $unlink_elem_id,
-										'tfml_unlink_nonce'
-									);
+								if ( $unlink_elem_id > 0 ) :
 									?>
-									<a href="<?php echo esc_url( $unlink_url ); ?>"
-										class="button button-small tfml-unlink-btn"
-										style="color: #b32d2e; border-color: #b32d2e; padding: 0 4px;"
-										onclick="return confirm('<?php echo esc_js( __( '¿Está seguro de que desea desvincular esta traducción? El contenido original no será eliminado.', 'tf-multilingual' ) ); ?>');"
-										title="<?php esc_attr_e( 'Desvincular traducción', 'tf-multilingual' ); ?>">
-										<span class="dashicons dashicons-editor-unlink" style="font-size: 14px; line-height: 20px; width: 14px; height: 14px; vertical-align: middle;"></span>
-									</a>
+									<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="tfml-unlink-form" style="display: inline-block; margin: 0; padding: 0;">
+										<input type="hidden" name="action" value="tfml_unlink_post_translation">
+										<input type="hidden" name="source_post_id" value="<?php echo esc_attr( (string) $post->ID ); ?>">
+										<input type="hidden" name="element_id" value="<?php echo esc_attr( (string) $unlink_elem_id ); ?>">
+										<?php wp_nonce_field( self::NONCE_ACTION_UNLINK . $unlink_elem_id, 'tfml_unlink_nonce' ); ?>
+										<button type="submit"
+											class="button button-small tfml-unlink-btn"
+											style="color: #b32d2e; border-color: #b32d2e; padding: 0 4px; line-height: 1;"
+											onclick="return confirm('<?php echo esc_js( __( '¿Está seguro de que desea desvincular esta traducción? El contenido se conservará en WordPress, pero dejará de estar relacionado como traducción con este grupo.', 'tf-multilingual' ) ); ?>');"
+											title="<?php esc_attr_e( 'Desvincular traducción', 'tf-multilingual' ); ?>">
+											<span class="dashicons dashicons-editor-unlink" style="font-size: 14px; line-height: 20px; width: 14px; height: 14px; vertical-align: middle;"></span>
+										</button>
+									</form>
 								<?php endif; ?>
 							<?php endif; ?>
 						</span>
@@ -581,9 +582,16 @@ class PostEditorialUi {
 	/**
 	 * Handles POST action to create a new translation post.
 	 *
+	 * Rejects GET requests strictly (405 Method Not Allowed) to prevent CSRF.
+	 *
 	 * @return void
 	 */
 	public function handle_create_translation(): void {
+		$method = isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( (string) $_SERVER['REQUEST_METHOD'] ) : '';
+		if ( 'POST' !== $method ) {
+			wp_die( esc_html__( 'Método no permitido. Esta operación requiere una solicitud POST.', 'tf-multilingual' ), 405 );
+		}
+
 		$source_id   = isset( $_POST['source_post_id'] ) ? absint( $_POST['source_post_id'] ) : 0;
 		$target_lang = isset( $_POST['target_language'] ) ? sanitize_text_field( wp_unslash( $_POST['target_language'] ) ) : '';
 
@@ -603,29 +611,33 @@ class PostEditorialUi {
 			$redirect    = get_edit_post_link( $new_post_id, 'raw' );
 
 			if ( null !== $redirect ) {
-				wp_safe_redirect( $redirect );
-				exit;
+				$this->redirect_and_exit( $redirect );
 			}
 		} catch ( EditorialException $e ) {
 			$return_url = get_edit_post_link( $source_id, 'raw' );
 			if ( null !== $return_url ) {
 				$error_url = add_query_arg( 'tfml_error', rawurlencode( $e->getMessage() ), $return_url );
-				wp_safe_redirect( $error_url );
-				exit;
+				$this->redirect_and_exit( $error_url );
 			}
 			wp_die( esc_html( $e->getMessage() ), 400 );
 		}
 
-		wp_safe_redirect( admin_url( 'edit.php' ) );
-		exit;
+		$this->redirect_and_exit( admin_url( 'edit.php' ) );
 	}
 
 	/**
 	 * Handles POST action to link an existing post as a translation.
 	 *
+	 * Rejects GET requests strictly (405 Method Not Allowed) to prevent CSRF.
+	 *
 	 * @return void
 	 */
 	public function handle_link_translation(): void {
+		$method = isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( (string) $_SERVER['REQUEST_METHOD'] ) : '';
+		if ( 'POST' !== $method ) {
+			wp_die( esc_html__( 'Método no permitido. Esta operación requiere una solicitud POST.', 'tf-multilingual' ), 405 );
+		}
+
 		$source_id   = isset( $_POST['source_post_id'] ) ? absint( $_POST['source_post_id'] ) : 0;
 		$target_id   = isset( $_POST['target_post_id'] ) ? absint( $_POST['target_post_id'] ) : 0;
 		$target_lang = isset( $_POST['target_language'] ) ? sanitize_text_field( wp_unslash( $_POST['target_language'] ) ) : '';
@@ -658,59 +670,84 @@ class PostEditorialUi {
 				),
 				admin_url( 'post.php' )
 			);
-			wp_safe_redirect( $redirect );
-			exit;
+			$this->redirect_and_exit( $redirect );
 		} catch ( \Throwable $e ) {
 			$return_url = get_edit_post_link( $source_id, 'raw' );
 			if ( null !== $return_url ) {
 				$error_url = add_query_arg( 'tfml_error', rawurlencode( $e->getMessage() ), $return_url );
-				wp_safe_redirect( $error_url );
-				exit;
+				$this->redirect_and_exit( $error_url );
 			}
 			wp_die( esc_html( $e->getMessage() ), 400 );
 		}
 	}
 
 	/**
-	 * Handles action to unlink an element from its translation group.
+	 * Handles POST action to unlink an element from its translation group.
+	 *
+	 * Rejects GET requests strictly (405 Method Not Allowed) to prevent CSRF via link prefetching.
 	 *
 	 * @return void
 	 */
 	public function handle_unlink_translation(): void {
-		$element_id = isset( $_REQUEST['element_id'] ) ? absint( $_REQUEST['element_id'] ) : 0;
-		$source_id  = isset( $_REQUEST['source_post_id'] ) ? absint( $_REQUEST['source_post_id'] ) : $element_id;
+		$method = isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( (string) $_SERVER['REQUEST_METHOD'] ) : '';
+		if ( 'POST' !== $method ) {
+			wp_die( esc_html__( 'Método no permitido. La desvinculación requiere una solicitud POST.', 'tf-multilingual' ), 405 );
+		}
 
-		// Verify nonce.
-		$nonce = isset( $_REQUEST['tfml_unlink_nonce'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['tfml_unlink_nonce'] ) ) : '';
+		$element_id = isset( $_POST['element_id'] ) ? absint( $_POST['element_id'] ) : 0;
+		$source_id  = isset( $_POST['source_post_id'] ) ? absint( $_POST['source_post_id'] ) : $element_id;
+
+		if ( $element_id <= 0 ) {
+			wp_die( esc_html__( 'Identificador de elemento no válido.', 'tf-multilingual' ), 400 );
+		}
+
+		// Verify nonce strictly from POST.
+		$nonce = isset( $_POST['tfml_unlink_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['tfml_unlink_nonce'] ) ) : '';
 		if ( ! wp_verify_nonce( $nonce, self::NONCE_ACTION_UNLINK . $element_id ) ) {
 			wp_die( esc_html__( 'Security check failed. Please refresh and try again.', 'tf-multilingual' ), 403 );
 		}
 
-		// Verify capability.
-		if ( ! current_user_can( 'edit_post', $element_id ) ) {
+		// Verify capabilities on both element_id and source_id.
+		if ( ! current_user_can( 'edit_post', $element_id ) || ( $source_id > 0 && ! current_user_can( 'edit_post', $source_id ) ) ) {
 			wp_die( esc_html__( 'Sorry, you are not allowed to unlink this post.', 'tf-multilingual' ), 403 );
 		}
 
 		try {
-			$this->editorial_service->unlink_translation( 'post', $element_id );
+			// Pass source_id to prevent cross-group parameter tampering.
+			$this->editorial_service->unlink_translation( 'post', $element_id, null, $source_id );
 
-			$return_url = get_edit_post_link( $source_id, 'raw' ) ?? admin_url( 'edit.php' );
-			$redirect   = add_query_arg(
+			$return_url = ( $source_id > 0 ) ? get_edit_post_link( $source_id, 'raw' ) : null;
+			if ( null === $return_url ) {
+				$return_url = admin_url( 'edit.php' );
+			}
+
+			$redirect = add_query_arg(
 				array(
-					'tfml_success' => rawurlencode( __( 'Traducción desvinculada exitosamente.', 'tf-multilingual' ) ),
+					'tfml_success' => rawurlencode( __( 'Traducción desvinculada exitosamente. El contenido permanece en WordPress pero ya no está relacionado con este grupo.', 'tf-multilingual' ) ),
 				),
 				$return_url
 			);
-			wp_safe_redirect( $redirect );
-			exit;
+			$this->redirect_and_exit( $redirect );
 		} catch ( \Throwable $e ) {
-			$return_url = get_edit_post_link( $source_id, 'raw' );
+			$return_url = ( $source_id > 0 ) ? get_edit_post_link( $source_id, 'raw' ) : null;
 			if ( null !== $return_url ) {
 				$error_url = add_query_arg( 'tfml_error', rawurlencode( $e->getMessage() ), $return_url );
-				wp_safe_redirect( $error_url );
-				exit;
+				$this->redirect_and_exit( $error_url );
 			}
 			wp_die( esc_html( $e->getMessage() ), 400 );
+		}
+	}
+
+	/**
+	 * Performs a safe redirect and terminates execution unless running under unit tests.
+	 *
+	 * @param string $location Target redirect URL.
+	 * @return void
+	 */
+	private function redirect_and_exit( string $location ): void {
+		wp_safe_redirect( $location );
+		if ( ! defined( 'PHPUNIT_COMPOSER_INSTALL' ) ) {
+			exit;
 		}
 	}
 

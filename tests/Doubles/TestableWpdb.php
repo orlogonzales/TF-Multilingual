@@ -277,6 +277,12 @@ class TestableWpdb extends wpdb {
 	 * @return int|false
 	 */
 	public function delete( $table, $where, $where_format = null ) {
+		if ( null !== $this->force_next_error ) {
+			$this->last_error       = $this->force_next_error;
+			$this->force_next_error = null;
+			return false;
+		}
+
 		if ( str_contains( $table, 'tfml_groups' ) && isset( $where['id'] ) ) {
 			$id = (int) $where['id'];
 			if ( isset( $this->groups[ $id ] ) ) {

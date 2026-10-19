@@ -416,6 +416,16 @@ class TranslationsControllerTest extends TestCase {
 
 		$GLOBALS['wp_test_caps']['edit_post:101'] = true;
 		$this->assertTrue( $this->controller->unlink_permissions_check( $request ) );
+
+		// When source_id is passed, user must have edit permissions on source_id too.
+		$request->set_param( 'source_id', 102 );
+		$GLOBALS['wp_test_caps']['edit_post:102'] = false;
+		$res2                                     = $this->controller->unlink_permissions_check( $request );
+		$this->assertInstanceOf( WP_Error::class, $res2 );
+		$this->assertSame( 'rest_cannot_edit', $res2->get_error_code() );
+
+		$GLOBALS['wp_test_caps']['edit_post:102'] = true;
+		$this->assertTrue( $this->controller->unlink_permissions_check( $request ) );
 	}
 
 	/**
@@ -429,6 +439,40 @@ class TranslationsControllerTest extends TestCase {
 		$result = $this->controller->unlink_translation( $request );
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'rest_not_in_group', $result->get_error_code() );
+	}
+
+	/**
+	 * Tests unlink_translation rejects cross-group tampering when source belongs to another group.
+	 */
+	public function test_unlink_translation_rejects_cross_group_tampering(): void {
+		$post1            = new WP_Post();
+		$post1->ID        = 301;
+		$post1->post_type = 'page';
+
+		$GLOBALS['wp_test_posts'][301] = $post1;
+
+		$post2            = new WP_Post();
+		$post2->ID        = 302;
+		$post2->post_type = 'page';
+
+		$GLOBALS['wp_test_posts'][302] = $post2;
+
+		// Group 1 with post 301.
+		$group1 = $this->group_repository->create( TranslationGroup::create( 'post', 'page' ) );
+		$this->group_repository->add_translation( (int) $group1->get_id(), 301, 'es', true );
+
+		// Group 2 with post 302.
+		$group2 = $this->group_repository->create( TranslationGroup::create( 'post', 'page' ) );
+		$this->group_repository->add_translation( (int) $group2->get_id(), 302, 'es', true );
+
+		$request = new WP_REST_Request( 'POST', '/tf-multilingual/v1/translations/unlink' );
+		$request->set_param( 'element_type', 'post' );
+		$request->set_param( 'element_id', 302 );
+		$request->set_param( 'source_id', 301 ); // Different group.
+
+		$result = $this->controller->unlink_translation( $request );
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 'rest_cross_group_tampering', $result->get_error_code() );
 	}
 
 	/**

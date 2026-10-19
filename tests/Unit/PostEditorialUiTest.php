@@ -211,11 +211,13 @@ class PostEditorialUiTest extends TestCase {
 		// 2. Existing translations and Edit link.
 		$this->assertStringContainsString( 'post.php?post=8339&action=edit', $html );
 
-		// 3. Unlink button for sibling translation with nonce and dashicon.
+		// 3. Unlink button for sibling translation with POST form, nonce, and dashicon.
 		$this->assertStringContainsString( 'tfml-unlink-btn', $html );
 		$this->assertStringContainsString( 'dashicons-editor-unlink', $html );
-		$this->assertStringContainsString( 'tfml_unlink_post_translation', $html );
-		$this->assertStringContainsString( 'element_id=8339', $html );
+		$this->assertStringContainsString( 'tfml-unlink-form', $html );
+		$this->assertStringContainsString( 'value="tfml_unlink_post_translation"', $html );
+		$this->assertStringContainsString( 'value="8339"', $html );
+		$this->assertStringContainsString( 'value="4976"', $html );
 
 		// 4. Missing language: Português.
 		$this->assertStringContainsString( 'Português (PT)', $html );
@@ -240,6 +242,122 @@ class PostEditorialUiTest extends TestCase {
 		$this->assertStringContainsString( 'tfml-candidate-preview-box', $html );
 		$this->assertStringContainsString( 'tfml-link-submit-btn', $html );
 		$this->assertStringContainsString( 'Vincular como traducción en Português', $html );
+	}
+
+	/**
+	 * Tests handle_unlink_translation strictly rejects GET requests with 405.
+	 */
+	public function test_handle_unlink_rejects_get_request(): void {
+		$_SERVER['REQUEST_METHOD'] = 'GET';
+		$_POST                     = array();
+
+		$this->expectException( \RuntimeException::class );
+		$this->expectExceptionCode( 405 );
+		$this->ui->handle_unlink_translation();
+	}
+
+	/**
+	 * Tests handle_unlink_translation rejects invalid or missing nonce with 403.
+	 */
+	public function test_handle_unlink_rejects_invalid_nonce(): void {
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+		$_POST                     = array(
+			'element_id'        => 8339,
+			'source_post_id'    => 4976,
+			'tfml_unlink_nonce' => 'invalid_nonce',
+		);
+
+		$this->expectException( \RuntimeException::class );
+		$this->expectExceptionCode( 403 );
+		$this->ui->handle_unlink_translation();
+	}
+
+	/**
+	 * Tests handle_unlink_translation rejects unauthorized users with 403.
+	 */
+	public function test_handle_unlink_rejects_unauthorized_user(): void {
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+		$_POST                     = array(
+			'element_id'        => 8339,
+			'source_post_id'    => 4976,
+			'tfml_unlink_nonce' => wp_create_nonce( PostEditorialUi::NONCE_ACTION_UNLINK . 8339 ),
+		);
+
+		$GLOBALS['wp_test_caps']['edit_post:8339'] = false;
+		$GLOBALS['wp_test_caps']['edit_post:4976'] = true;
+
+		$this->expectException( \RuntimeException::class );
+		$this->expectExceptionCode( 403 );
+		$this->ui->handle_unlink_translation();
+	}
+
+	/**
+	 * Tests handle_unlink_translation rejects when user lacks permissions on source context with 403.
+	 */
+	public function test_handle_unlink_rejects_unauthorized_source_context(): void {
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+		$_POST                     = array(
+			'element_id'        => 8339,
+			'source_post_id'    => 4976,
+			'tfml_unlink_nonce' => wp_create_nonce( PostEditorialUi::NONCE_ACTION_UNLINK . 8339 ),
+		);
+
+		$GLOBALS['wp_test_caps']['edit_post:8339'] = true;
+		$GLOBALS['wp_test_caps']['edit_post:4976'] = false;
+
+		$this->expectException( \RuntimeException::class );
+		$this->expectExceptionCode( 403 );
+		$this->ui->handle_unlink_translation();
+	}
+
+	/**
+	 * Tests handle_unlink_translation successfully unlinks via POST and redirects with notice.
+	 */
+	public function test_handle_unlink_success_via_post(): void {
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+		$_POST                     = array(
+			'element_id'        => 8339,
+			'source_post_id'    => 4976,
+			'tfml_unlink_nonce' => wp_create_nonce( PostEditorialUi::NONCE_ACTION_UNLINK . 8339 ),
+		);
+
+		$GLOBALS['wp_test_caps']['edit_post:8339'] = true;
+		$GLOBALS['wp_test_caps']['edit_post:4976'] = true;
+
+		$this->editorial_service
+			->expects( $this->once() )
+			->method( 'unlink_translation' )
+			->with( 'post', 8339, null, 4976 )
+			->willReturn( true );
+
+		$this->ui->handle_unlink_translation();
+
+		$this->assertNotEmpty( $GLOBALS['wp_test_last_redirect'] );
+		$this->assertStringContainsString( 'tfml_success', $GLOBALS['wp_test_last_redirect']['location'] );
+	}
+
+	/**
+	 * Tests handle_create_translation strictly rejects GET requests with 405.
+	 */
+	public function test_handle_create_rejects_get_request(): void {
+		$_SERVER['REQUEST_METHOD'] = 'GET';
+		$_POST                     = array();
+
+		$this->expectException( \RuntimeException::class );
+		$this->expectExceptionCode( 405 );
+		$this->ui->handle_create_translation();
+	}
+
+	/**
+	 * Tests handle_link_translation strictly rejects GET requests with 405.
+	 */
+	public function test_handle_link_rejects_get_request(): void {
+		$_SERVER['REQUEST_METHOD'] = 'GET';
+		$_POST                     = array();
+
+		$this->expectException( \RuntimeException::class );
+		$this->expectExceptionCode( 405 );
+		$this->ui->handle_link_translation();
 	}
 
 	/**

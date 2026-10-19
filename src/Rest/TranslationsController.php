@@ -282,6 +282,13 @@ class TranslationsController extends WP_REST_Controller {
 							'sanitize_callback' => 'absint',
 							'validate_callback' => 'rest_validate_request_arg',
 						),
+						'source_id'        => array(
+							'description'       => 'Optional reference source element ID to prevent cross-group tampering.',
+							'type'              => 'integer',
+							'minimum'           => 1,
+							'sanitize_callback' => 'absint',
+							'validate_callback' => 'rest_validate_request_arg',
+						),
 					),
 				),
 			)
@@ -774,6 +781,7 @@ class TranslationsController extends WP_REST_Controller {
 	public function unlink_permissions_check( $request ): bool|WP_Error {
 		$element_type = (string) $request->get_param( 'element_type' );
 		$element_id   = (int) $request->get_param( 'element_id' );
+		$source_id    = $request->get_param( 'source_id' ) ? (int) $request->get_param( 'source_id' ) : 0;
 
 		if ( $element_id <= 0 ) {
 			return new WP_Error(
@@ -791,6 +799,14 @@ class TranslationsController extends WP_REST_Controller {
 			);
 		}
 
+		if ( $source_id > 0 && ! $this->can_user_edit_element( $element_type, $source_id ) ) {
+			return new WP_Error(
+				'rest_cannot_edit',
+				__( 'Sorry, you are not allowed to edit the reference element.', 'tf-multilingual' ),
+				array( 'status' => rest_authorization_required_code() )
+			);
+		}
+
 		return true;
 	}
 
@@ -804,6 +820,7 @@ class TranslationsController extends WP_REST_Controller {
 		$element_type     = (string) $request->get_param( 'element_type' );
 		$element_id       = (int) $request->get_param( 'element_id' );
 		$new_canonical_id = $request->get_param( 'new_canonical_id' ) ? (int) $request->get_param( 'new_canonical_id' ) : null;
+		$source_id        = $request->get_param( 'source_id' ) ? (int) $request->get_param( 'source_id' ) : null;
 
 		$group = $this->group_repository->find_by_element( $element_type, $element_id );
 		if ( null === $group ) {
@@ -814,32 +831,43 @@ class TranslationsController extends WP_REST_Controller {
 			);
 		}
 
-		// Locate element language in group.
-		$element_lang = null;
-		foreach ( $group->get_elements() as $elem ) {
-			if ( $elem->get_element_id() === $element_id ) {
-				$element_lang = $elem->get_language_code();
-				break;
+		// Cross-group tampering prevention: ensure source_id belongs to the exact same group.
+		if ( null !== $source_id && $source_id > 0 && $source_id !== $element_id ) {
+			$source_group = $this->group_repository->find_by_element( $element_type, $source_id );
+			if ( null === $source_group || (int) $source_group->get_id() !== (int) $group->get_id() ) {
+				return new WP_Error(
+					'rest_cross_group_tampering',
+					__( 'Source and target elements do not belong to the same translation group.', 'tf-multilingual' ),
+					array( 'status' => 400 )
+				);
 			}
 		}
 
-		if ( null === $element_lang ) {
-			return new WP_Error(
-				'rest_element_not_found_in_group',
-				__( 'Element not found in translation group.', 'tf-multilingual' ),
-				array( 'status' => 404 )
-			);
-		}
-
 		try {
-			$success = $this->group_repository->remove_translation(
-				(int) $group->get_id(),
-				$element_lang,
-				$new_canonical_id
+			$success = $this->editorial_service->unlink_translation(
+				$element_type,
+				$element_id,
+				$new_canonical_id,
+				$source_id
 			);
-
-			$this->translation_resolver->flush_cache();
-			$this->editorial_service->clear_editorial_cache();
+		} catch ( EditorialPermissionException $e ) {
+			return new WP_Error(
+				'rest_cannot_edit',
+				$e->getMessage(),
+				array( 'status' => rest_authorization_required_code() )
+			);
+		} catch ( EditorialValidationException $e ) {
+			return new WP_Error(
+				'rest_invalid_element',
+				$e->getMessage(),
+				array( 'status' => 400 )
+			);
+		} catch ( EditorialConflictException $e ) {
+			return new WP_Error(
+				'rest_conflict',
+				$e->getMessage(),
+				array( 'status' => 409 )
+			);
 		} catch ( \Throwable $e ) {
 			return new WP_Error(
 				'rest_unlink_failed',

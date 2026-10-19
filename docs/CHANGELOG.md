@@ -1832,6 +1832,28 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Ampliación de la suite PHPUnit hasta **655 pruebas unitarias / 2.434 aserciones (0 fallos, 0 errores, 1 omitida)**, incorporando `tests/Unit/PostEditorialUiTest.php` (4 pruebas, 38 aserciones) y extendiendo `TranslationEditorialServiceTest` (10 pruebas nuevas), `TranslationsControllerTest` y `CanonicalUrlManagerTest`.
     - Cumplimiento de **PHPCS 100% PASS** en 181 archivos bajo los estándares de WordPress Core (`WordPress-Extra`, `WordPress-Docs`).
     - Certificación en el verificador reproducible `scratch/verify_fase_3_43.php` con **10/10 controles PASS (0 FAIL)**, captura visual de pantalla en `/brain/` (`fase_3_43_admin_post_link.png`) e invarianza absoluta en producción `cms_ect` (MD5 `4241ca7e7ec6399a594537cb04790c10` / 3.403 filas) y laboratorio `cms_ect_lab` (123 grupos, 139 elementos, 3 franceses retenidos).
+- **Hardening de Seguridad Editorial: Desvinculación mediante POST Estricto, Protección Anti-Tampering y Transaccionalidad Atómica (Fase 3.43A / Directiva DT-TFML-075 — ADR-070):**
+  - **Erradicación Absoluta de Peticiones Modificadoras vía GET (`PostEditorialUi`):**
+    - Eliminación de todo enlace `<a>` que ejecutaba desvinculación vía solicitud GET.
+    - Implementación de un formulario inline POST `<form class="tfml-unlink-form" method="post" action="admin-post.php">` con campos ocultos para `action`, `source_post_id`, `element_id` y nonce criptográfico individualizado (`tfml_unlink_nonce`), junto con botón submit nativo de WordPress (`button-small tfml-unlink-btn`) con icono `dashicons-editor-unlink` y diálogo de confirmación explícito al usuario en el evento `onsubmit`.
+    - Blindaje incondicional en los controladores `handle_unlink_translation()`, `handle_create_translation()` y `handle_link_translation()`: cualquier solicitud entrante cuyo método sea `GET` (`$_SERVER['REQUEST_METHOD'] === 'GET'`) es interceptada y rechazada de inmediato con `wp_die( ..., 405 )` (Method Not Allowed), eliminando cualquier vector de ataque por pre-fetching o CSRF vía GET.
+  - **Protección Anti-Tampering y Validación Contextual Cruzada (`TranslationEditorialService`):**
+    - Actualización de la firma de `unlink_translation( string $element_type, int $element_id, ?int $new_canonical_id = null, ?int $context_source_id = null )` para aceptar e imponer la validación del contexto de origen `$context_source_id`.
+    - Validación rigurosa de consistencia de grupo: el servicio verifica que `$context_source_id` pertenezca exactamente al mismo grupo de traducción de TFML que `$element_id`. Si se detecta un desfase o intento de manipulación cruzada entre grupos distintos, se arroja de forma inmediata `EditorialConflictException`.
+    - Verificación estricta de capacidades editoriales (`edit_post`) tanto sobre el elemento destino `$element_id` como sobre el post de contexto `$context_source_id` (`EditorialPermissionException`).
+  - **Integridad Relacional, Ciclo de Vida y Transaccionalidad Atómica Certificada:**
+    - Verificación del ciclo de vida completo: desvinculación secundaria (remoción de `tfml_group_elements` preservando el objeto WordPress Core en `wp_posts` al 100%), desvinculación canónica (promoción automática de nuevo canónico), y desvinculación del último elemento restante con purga controlada del grupo huérfano vacío en `tfml_translation_groups` sin tocar el post de Core.
+    - Certificación de custodia de traducciones retenidas: las 3 traducciones retenidas en francés (`8839, 8955, 8873`) en `RetainedTranslationRegistry` permanecen totalmente inmunes durante cualquier operación de desvinculación.
+    - Idempotencia: los reintentos de desvinculación sobre elementos ya desvinculados arrojan limpiamente `EditorialValidationException`.
+    - Rollback atómico en base de datos: encapsulamiento de toda mutación relacional en bloques transaccionales (`begin_transaction`, `commit_transaction`, `rollback_transaction`), garantizando la reversión total ante excepciones o fallos en base de datos.
+  - **Alineación con el Endpoint REST (`TranslationsController`):**
+    - Soporte del parámetro opcional `source_id` en la ruta `/translations/unlink`, validación de permisos en `unlink_permissions_check()` y prevención de manipulación cruzada entre grupos.
+  - **Suite de Pruebas Unitarias y Calidad:**
+    - Ampliación de la suite PHPUnit a **670 pruebas unitarias / 2.475 aserciones (100% PASS, 0 fallos, 0 errores, 1 omitida)**, sumando 15 nuevas pruebas distribuidas entre `PostEditorialUiTest`, `TranslationEditorialServiceTest` y `TranslationsControllerTest`.
+    - Cumplimiento de **PHPCS 100% PASS en 183/183 archivos**.
+    - Certificación en el verificador reproducible `scratch/verify_fase_3_43a.php` con **10/10 controles PASS (0 FAIL)**, captura visual de alta resolución `fase_3_43a_admin_post_link.png` y verificación frontend de 4/4 páginas con HTTP 200 y canonicals correctos.
+    - Invarianza absoluta de datos: producción `cms_ect` intocada (MD5 `4241ca7e7ec6399a594537cb04790c10` / 3.403 filas) y laboratorio `cms_ect_lab` invariable (123 grupos, 139 elementos, 3 franceses retenidos).
+
 
 
 

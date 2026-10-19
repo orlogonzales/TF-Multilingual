@@ -1012,26 +1012,45 @@ class TranslationEditorialService {
 	}
 
 	/**
+	 * Retrieves the translation group for an element.
+	 *
+	 * @param string $element_type Element type ('post' or 'term').
+	 * @param int    $element_id   WordPress object ID.
+	 * @return TranslationGroup|null The group or null if unassigned.
+	 */
+	public function get_group_for_element( string $element_type, int $element_id ): ?TranslationGroup {
+		return $this->translation_resolver->get_group_for_element( $element_type, $element_id );
+	}
+
+	/**
 	 * Unlinks an element from its translation group without deleting the WordPress object.
 	 *
-	 * @param string   $element_type     Element type ('post' or 'term').
-	 * @param int      $element_id       Element ID to unlink.
-	 * @param int|null $new_canonical_id Optional replacement canonical ID if unlinking canonical.
+	 * @param string   $element_type      Element type ('post' or 'term').
+	 * @param int      $element_id        Element ID to unlink.
+	 * @param int|null $new_canonical_id  Optional replacement canonical ID if unlinking canonical.
+	 * @param int|null $context_source_id Optional reference element ID for cross-group tampering validation.
 	 * @return bool True on success.
 	 *
 	 * @throws EditorialPermissionException If user lacks capabilities to edit element.
 	 * @throws EditorialValidationException If element is invalid or not in a group.
-	 * @throws EditorialConflictException   If removal fails.
+	 * @throws EditorialConflictException   If removal fails or cross-group tampering is detected.
 	 */
 	public function unlink_translation(
 		string $element_type,
 		int $element_id,
-		?int $new_canonical_id = null
+		?int $new_canonical_id = null,
+		?int $context_source_id = null
 	): bool {
 		$cap = ( 'post' === $element_type ) ? 'edit_post' : 'manage_categories';
 		if ( ! $this->user_can( $cap, $element_id ) ) {
 			throw new EditorialPermissionException(
 				__( 'No tiene permisos para desvincular este elemento.', 'tf-multilingual' )
+			);
+		}
+
+		if ( null !== $context_source_id && $context_source_id > 0 && ! $this->user_can( $cap, $context_source_id ) ) {
+			throw new EditorialPermissionException(
+				__( 'No tiene permisos sobre el contenido de referencia.', 'tf-multilingual' )
 			);
 		}
 
@@ -1046,6 +1065,16 @@ class TranslationEditorialService {
 			throw new EditorialValidationException(
 				__( 'El elemento no pertenece a ningún grupo de traducción.', 'tf-multilingual' )
 			);
+		}
+
+		// Cross-group tampering prevention: ensure context_source_id belongs to the exact same group.
+		if ( null !== $context_source_id && $context_source_id > 0 && $context_source_id !== $element_id ) {
+			$context_group = $this->group_repository->find_by_element( $element_type, $context_source_id );
+			if ( null === $context_group || (int) $context_group->get_id() !== (int) $group->get_id() ) {
+				throw new EditorialConflictException(
+					__( 'El elemento a desvincular no pertenece al mismo grupo que el post de referencia.', 'tf-multilingual' )
+				);
+			}
 		}
 
 		// Find language of the element in the group.

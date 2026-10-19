@@ -24,6 +24,7 @@ use TF\Multilingual\Editorial\Exceptions\EditorialConflictException;
 use TF\Multilingual\Editorial\Exceptions\EditorialPermissionException;
 use TF\Multilingual\Editorial\Exceptions\EditorialValidationException;
 use TF\Multilingual\Editorial\TranslationEditorialService;
+use TF\Multilingual\Migration\RetainedTranslationRegistry;
 use TF\Multilingual\Tests\Doubles\TestableWpdb;
 use WP_Post;
 use WP_Term;
@@ -78,6 +79,13 @@ class TranslationEditorialServiceTest extends TestCase {
 	private CustomFieldPolicyRegistry $cf_registry;
 
 	/**
+	 * Retained translation registry.
+	 *
+	 * @var RetainedTranslationRegistry
+	 */
+	private RetainedTranslationRegistry $retained_registry;
+
+	/**
 	 * Set up test environment before each test.
 	 */
 	protected function setUp(): void {
@@ -95,9 +103,10 @@ class TranslationEditorialServiceTest extends TestCase {
 		$GLOBALS['wp_test_taxonomies'] = array( 'category', 'post_tag', 'tour_type' );
 		$GLOBALS['wp_test_caps']       = array();
 
-		$settings_repo     = new SettingsRepository();
-		$this->registry    = new LanguageRegistry( $settings_repo );
-		$this->cf_registry = new CustomFieldPolicyRegistry( $settings_repo );
+		$settings_repo           = new SettingsRepository();
+		$this->registry          = new LanguageRegistry( $settings_repo );
+		$this->cf_registry       = new CustomFieldPolicyRegistry( $settings_repo );
+		$this->retained_registry = new RetainedTranslationRegistry( $this->db );
 
 		$es = Language::create( 'es', 'es_ES', 'Spanish', 'Español', true, 10 );
 		$en = Language::create( 'en', 'en_US', 'English', 'English', true, 20 );
@@ -117,7 +126,10 @@ class TranslationEditorialServiceTest extends TestCase {
 			$this->resolver,
 			$validator,
 			$this->db,
-			$this->cf_registry
+			$this->cf_registry,
+			null,
+			null,
+			$this->retained_registry
 		);
 	}
 
@@ -803,5 +815,147 @@ class TranslationEditorialServiceTest extends TestCase {
 
 		$this->expectException( EditorialPermissionException::class );
 		$this->service->unlink_translation( 'post', 101 );
+	}
+
+	/**
+	 * Tests unlink_translation with valid context source ID succeeds.
+	 */
+	public function test_unlink_translation_with_context_source_id_success(): void {
+		$this->create_test_post( 201, 'page', 'publish', 'Nosotros ES' );
+		$this->create_test_post( 202, 'page', 'publish', 'About Us EN' );
+
+		$this->service->link_translation( 'post', 201, 202, 'en', 'es' );
+
+		$success = $this->service->unlink_translation( 'post', 202, null, 201 );
+		$this->assertTrue( $success );
+		$this->assertNull( $this->group_repo->find_element( 'post', 202 ) );
+		$this->assertNotNull( $this->group_repo->find_element( 'post', 201 ) );
+	}
+
+	/**
+	 * Tests unlink_translation rejects cross-group tampering when source belongs to another group.
+	 */
+	public function test_unlink_translation_with_context_source_id_tampering_rejected(): void {
+		$this->create_test_post( 201, 'page', 'publish', 'Group 1 ES' );
+		$this->create_test_post( 202, 'page', 'publish', 'Group 1 EN' );
+		$this->service->link_translation( 'post', 201, 202, 'en', 'es' );
+
+		$this->create_test_post( 301, 'page', 'publish', 'Group 2 ES' );
+		$this->create_test_post( 302, 'page', 'publish', 'Group 2 EN' );
+		$this->service->link_translation( 'post', 301, 302, 'en', 'es' );
+
+		// Tampering attempt: unlinking 302 (from group 2) under the context of 201 (from group 1).
+		$this->expectException( EditorialConflictException::class );
+		$this->service->unlink_translation( 'post', 302, null, 201 );
+	}
+
+	/**
+	 * Tests unlink_translation rejects when user lacks permissions on the source context post.
+	 */
+	public function test_unlink_translation_with_context_source_id_unauthorized_rejected(): void {
+		$this->create_test_post( 201, 'page', 'publish', 'Nosotros ES' );
+		$this->create_test_post( 202, 'page', 'publish', 'About Us EN' );
+		$this->service->link_translation( 'post', 201, 202, 'en', 'es' );
+
+		$GLOBALS['wp_test_caps']['edit_post:202'] = true;
+		$GLOBALS['wp_test_caps']['edit_post:201'] = false; // Denied on context source.
+
+		$this->expectException( EditorialPermissionException::class );
+		$this->service->unlink_translation( 'post', 202, null, 201 );
+	}
+
+	/**
+	 * Tests unlinking the last remaining element in a group purges the empty group row,
+	 * while the WordPress Core post remains 100% intact.
+	 */
+	public function test_unlink_last_remaining_element_purges_empty_group(): void {
+		$this->create_test_post( 401, 'page', 'publish', 'Monolingual Post' );
+		$this->service->assign_initial_language( 'post', 401, 'page', 'es' );
+
+		$group = $this->group_repo->find_by_element( 'post', 401 );
+		$this->assertNotNull( $group );
+		$group_id = (int) $group->get_id();
+
+		// Unlink the only element in the group.
+		$success = $this->service->unlink_translation( 'post', 401 );
+		$this->assertTrue( $success );
+
+		// Element is removed from group repository.
+		$this->assertNull( $this->group_repo->find_element( 'post', 401 ) );
+		// Empty group row is purged.
+		$this->assertNull( $this->group_repo->find( $group_id ) );
+		// Core post remains 100% intact.
+		$post = $GLOBALS['wp_test_posts'][401] ?? null;
+		$this->assertInstanceOf( \WP_Post::class, $post );
+		$this->assertSame( 401, $post->ID );
+	}
+
+	/**
+	 * Tests re-attempting to unlink an already unlinked element throws EditorialValidationException.
+	 */
+	public function test_unlink_retry_when_not_in_group_throws(): void {
+		$this->create_test_post( 501, 'page', 'publish', 'Test Post' );
+		$this->service->assign_initial_language( 'post', 501, 'page', 'es' );
+
+		$this->service->unlink_translation( 'post', 501 );
+
+		// Second attempt must throw validation exception because 501 is no longer managed.
+		$this->expectException( EditorialValidationException::class );
+		$this->service->unlink_translation( 'post', 501 );
+	}
+
+	/**
+	 * Tests unlinking an active translation preserves retained French translations in registry.
+	 */
+	public function test_unlink_preserves_retained_translations(): void {
+		$this->create_test_post( 601, 'page', 'publish', 'Post ES' );
+		$this->create_test_post( 602, 'page', 'publish', 'Post EN' );
+		$this->service->link_translation( 'post', 601, 602, 'en', 'es' );
+
+		$group = $this->group_repo->find_by_element( 'post', 601 );
+		$this->assertNotNull( $group );
+		$group_id = (int) $group->get_id();
+
+		// Simulate retained french post 8839 in registry for this group.
+		$this->retained_registry->register(
+			'wpml',
+			9999,
+			$group_id,
+			'post',
+			'page',
+			array( 'fr' => 8839 )
+		);
+		$this->assertTrue( $this->retained_registry->has_retained_element( 'post', 8839 ) );
+
+		// Unlink English translation 602.
+		$success = $this->service->unlink_translation( 'post', 602 );
+		$this->assertTrue( $success );
+
+		// Retained French translation 8839 remains completely intact.
+		$this->assertTrue( $this->retained_registry->has_retained_element( 'post', 8839 ) );
+	}
+
+	/**
+	 * Tests database rollback occurs cleanly if an SQL error occurs during unlinking.
+	 */
+	public function test_unlink_rolls_back_on_database_error(): void {
+		$this->create_test_post( 701, 'page', 'publish', 'Post ES' );
+		$this->create_test_post( 702, 'page', 'publish', 'Post EN' );
+		$this->service->link_translation( 'post', 701, 702, 'en', 'es' );
+
+		// Simulate DB error when attempting to delete the translation row.
+		$this->db->force_next_error = 'Simulated DB connection timeout';
+
+		try {
+			$this->service->unlink_translation( 'post', 702 );
+			$this->fail( 'Expected exception was not thrown on DB error.' );
+		} catch ( \Throwable $e ) {
+			// Expected exception from repository.
+			$this->assertStringContainsString( 'Failed to delete translation element', $e->getMessage() );
+		}
+
+		// Verify transaction rollback: both elements must still be present in group elements.
+		$this->assertNotNull( $this->group_repo->find_element( 'post', 701 ) );
+		$this->assertNotNull( $this->group_repo->find_element( 'post', 702 ) );
 	}
 }
