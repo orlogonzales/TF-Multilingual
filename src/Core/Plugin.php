@@ -19,6 +19,7 @@ use TF\Multilingual\Admin\PostEditorialUi;
 use TF\Multilingual\Admin\StringEditorialUi;
 use TF\Multilingual\Admin\TermEditorialUi;
 use TF\Multilingual\Admin\TranslationsOverviewUi;
+use TF\Multilingual\Admin\MigrationUi;
 use TF\Multilingual\Diagnostic\DiagnosticService;
 use TF\Multilingual\API\ServicioTraduccionPublico;
 use TF\Multilingual\Compatibilidad\AdaptadorCompatibilidadWpml;
@@ -322,6 +323,13 @@ class Plugin {
 	private ?DiagnosticUi $diagnostic_ui = null;
 
 	/**
+	 * Migration UI component.
+	 *
+	 * @var MigrationUi|null
+	 */
+	private ?MigrationUi $migration_ui = null;
+
+	/**
 	 * Migration manager.
 	 *
 	 * @var MigrationManager|null
@@ -573,6 +581,13 @@ class Plugin {
 		$this->diagnostic_ui                    = new DiagnosticUi(
 			$this->diagnostic_service
 		);
+		$this->migration_ui                     = new MigrationUi(
+			$this->get_migration_manager(),
+			$this->language_registry,
+			$group_repo,
+			$retained_registry,
+			isset( $GLOBALS['wpdb'] ) && $GLOBALS['wpdb'] instanceof wpdb ? $GLOBALS['wpdb'] : null
+		);
 
 		$this->servicio_traduccion_publico = new ServicioTraduccionPublico(
 			$this->language_registry,
@@ -626,6 +641,7 @@ class Plugin {
 		$this->string_editorial_ui->init_hooks();
 		$this->seo_frontend_filter->init_hooks();
 		$this->rest_api_registrar->init_hooks();
+		$this->migration_ui->init_hooks();
 		$this->diagnostic_ui->init_hooks();
 		if ( function_exists( 'add_action' ) ) {
 			add_action( 'shutdown', array( $this->string_translation_service, 'flush_observed_strings' ) );
@@ -1238,6 +1254,15 @@ class Plugin {
 		}
 
 		return $this->migration_manager;
+	}
+
+	/**
+	 * Gets the migration UI component.
+	 *
+	 * @return MigrationUi|null
+	 */
+	public function get_migration_ui(): ?MigrationUi {
+		return $this->migration_ui;
 	}
 
 	/**

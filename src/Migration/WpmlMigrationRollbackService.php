@@ -235,6 +235,59 @@ class WpmlMigrationRollbackService {
 	}
 
 	/**
+	 * Retrieves all persisted migration execution manifests.
+	 *
+	 * @return array<int, array<string, mixed>> List of manifests sorted chronologically.
+	 */
+	public function get_all_execution_manifests(): array {
+		if ( $this->has_real_db() && null !== $this->db ) {
+			$table = $this->get_options_table();
+			$like  = $this->db->esc_like( self::OPTION_MANIFEST_PREFIX ) . '%';
+			$rows  = $this->db->get_results(
+				$this->db->prepare(
+					"SELECT `option_name`, `option_value` FROM `{$table}` WHERE `option_name` LIKE %s ORDER BY `option_id` ASC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					$like
+				),
+				ARRAY_A
+			);
+
+			if ( ! is_array( $rows ) ) {
+				return array();
+			}
+
+			$manifests = array();
+			foreach ( $rows as $row ) {
+				$val = $row['option_value'] ?? null;
+				if ( null === $val || false === $val ) {
+					continue;
+				}
+				$manifest = function_exists( 'maybe_unserialize' )
+					? maybe_unserialize( $val )
+					: @unserialize( (string) $val ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize,WordPress.PHP.NoSilencedErrors.Discouraged
+
+				if ( is_array( $manifest ) ) {
+					$manifests[] = $manifest;
+				}
+			}
+
+			return $manifests;
+		}
+
+		if ( isset( $GLOBALS['wp_test_options'] ) && is_array( $GLOBALS['wp_test_options'] ) ) {
+			$manifests = array();
+			foreach ( $GLOBALS['wp_test_options'] as $key => $val ) {
+				if ( 0 === strpos( (string) $key, self::OPTION_MANIFEST_PREFIX ) && is_array( $val ) ) {
+					$manifests[] = $val;
+				}
+			}
+
+			return $manifests;
+		}
+
+		return array();
+	}
+
+	/**
 	 * Inspects potential rollback dependencies and blockers before executing deletion.
 	 *
 	 * Enforces strict execution ownership (preventing deletion of pre-existing or foreign groups)

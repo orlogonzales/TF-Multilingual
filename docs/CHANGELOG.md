@@ -1879,6 +1879,30 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Ampliación de la suite PHPUnit a **681 pruebas unitarias / 2.526 aserciones (100% PASS, 0 fallos, 0 errores, 1 omitida)**, sumando 11 nuevas pruebas entre `TranslationsOverviewUiTest` y `TranslationGroupRepositoryTest`.
     - Cumplimiento de **PHPCS 100% PASS en todo `src/` (102/102 archivos)**.
     - Certificación en el verificador reproducible `scratch/verify_fase_3_44.php` con **10/10 controles PASS (0 FAIL)**, capturas visuales de alta resolución `fase_3_44_admin_translations.png` y `fase_3_44_admin_translations_full.png`, y verificación frontend de 4/4 páginas con HTTP 200 y canonicals correctos.
+- **Panel Administrativo de Migración WPML (Fase 3.45 / Directiva DT-TFML-077 — ADR-072):**
+  - **Nueva Pantalla Administrativa de Migración WPML (`MigrationUi`):**
+    - Creación de la clase `TF\Multilingual\Admin\MigrationUi`, registrando la pantalla de inspección y planificación `TF Multilingual → Migración WPML` (`admin.php?page=tfml-migration`) con capacidad `manage_options`.
+    - Calibración y reordenamiento de prioridades en el hook `admin_menu`: Idiomas (9) -> Traducciones (10) -> Cadenas de texto (11) -> Migración WPML (12) -> Diagnóstico (13), estableciendo una secuencia lógica integral de administración del plugin.
+  - **Garantía Estricta de Solo Consulta (Read-Only Security):**
+    - Banner informativo prominente en la cabecera destacando que el panel opera exclusivamente en modo lectura y auditoría.
+    - Rechazo inmediato de solicitudes POST con código de error HTTP 403.
+    - Cero mutaciones en la base de datos de producción (`cms_ect`) ni en la de laboratorio (`cms_ect_lab`), garantizando la invarianza absoluta de los 123 grupos, 139 elementos y 3 traducciones retenidas.
+  - **Reutilización Soberana de Servicios Certificados de Migración:**
+    - Cero duplicación de motores: todos los datos del panel se obtienen directamente de `MigrationManager`, `WpmlMigrationPlanner`, `MigrationCheckpointRepository`, `RetainedTranslationRegistry`, `WpmlMigrationRollbackService` y `TranslationGroupRepository`.
+  - **Cuatro Pestañas de Navegación Funcional:**
+    - **Plan Determinista (`tab=plan`):** Despliega el resumen de 249 TRIDs WPML, la huella SHA-256 (`c82cb04b1cd6c79e6b8ed44abe556291032bb4c38b5b4c23270c11b2f00fca99`), estado `NEEDS_CONFIGURATION`, resumen del modelo de deduplicación de medios (Model B: 3.033 adjuntos), filtros por clasificación (`all`, `blocked_by_language`, `conflict`, `orphan`, `skipped`, `importable`), subtipo y búsqueda (`s`), con tabla paginada a 20 grupos por página.
+    - **Historial de Lotes (`tab=history`):** Expone el punto de control activo (`status: completed`, `last_processed_trid: 9545`, `total_items: 2`, bloqueo libre) y la tabla histórica de los 13 manifiestos inmutables en `wp_options` (`tfml_migration_manifest_*`), sumando exactamente 123 grupos importados.
+    - **Custodia Histórica (`tab=retained`):** Explica con total transparencia técnica el modelo de custodia sin polución activa para las 3 traducciones en francés (`Accueil #8839`, `Activités #8955`, `Nous #8873`) vinculadas a sus respectivos grupos TFML (`#587`, `#588`, `#589`).
+    - **Propuesta Próximo Lote (`tab=next_batch`):** Análisis analítico de las 19 páginas en `BLOCKED_BY_LANGUAGE`, clasificándolas en 7 páginas independientes (TRIDs 430, 432, 9537, 9634, 9697, 9818, 34831) y 12 páginas jerárquicas con padres ya migrados en TFML (#6237 Nosotros, #6505 Servicios, #9218 Experiencia Transformadora), detallando las precondiciones mandatorias para una futura ejecución.
+  - **Enriquecimiento del Servicio de Rollback (`WpmlMigrationRollbackService`):**
+    - Se añadió el método público `get_all_execution_manifests(): array` para recuperar cronológicamente todos los manifiestos de ejecución persistidos en `wp_options`.
+  - **Suite de Pruebas Unitarias y Calidad:**
+    - Ampliación de la suite PHPUnit a **691 pruebas unitarias / 2.558 aserciones (100% PASS, 0 fallos, 0 errores, 1 omitida)** con 10 nuevas pruebas en `tests/Unit/MigrationUiTest.php`.
+    - Cumplimiento de **PHPCS 100% PASS en todo el proyecto (0 errores, 0 avisos)**.
+    - Certificación en el verificador reproducible `scratch/verify_fase_3_45.php` con **10/10 controles PASS (0 FAIL)**.
+    - 4 capturas visuales de alta resolución generadas en el directorio de artefactos (`fase_3_45_admin_migration_plan.png`, `fase_3_45_admin_migration_history.png`, `fase_3_45_admin_migration_retained.png`, `fase_3_45_admin_migration_next_batch.png`).
+    - Cero regresiones en frontend: HTTP 200 en 4/4 URLs analizadas, canonicals correctos y 30 entradas en sitemaps sin traducciones retenidas.
+
 
 
 

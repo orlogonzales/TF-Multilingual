@@ -1863,5 +1863,40 @@
 - **JUSTIFICACIÓN:** Dotar a los administradores de un panel centralizado para visualizar, buscar y supervisar el estado de todas las traducciones del sitio, al tiempo que se resuelve de manera definitiva la reserva de Fase 3.43A protegiendo las traducciones retenidas ante desvinculaciones.
 - **CONSECUENCIAS:** Suite de pruebas PHPUnit ampliada a **681 pruebas / 2.526 aserciones (100% PASS, 0 errores, 1 omitida)**, PHPCS 100% limpio en todo `src/` (**102/102 archivos**), verificador reproducible `scratch/verify_fase_3_44.php` certificado con **10/10 controles PASS (0 FAIL)**, capturas visuales de alta definición generadas en `/brain/` (`fase_3_44_admin_translations.png`, `fase_3_44_admin_translations_full.png`) y 4/4 URLs frontend verificadas con HTTP 200 y canonicals correctos.
 
+---
+
+### ADR-072: Panel Administrativo de Migración WPML (Modo Consulta y Auditoría)
+- **DECISIÓN:** Crear una interfaz administrativa integral bajo `TF Multilingual → Migración WPML` (`admin.php?page=tfml-migration`) para la inspección, auditoría, trazabilidad y planificación de la migración WPML, reutilizando exclusivamente los servicios certificados existentes (`MigrationManager`, `WpmlMigrationPlanner`, `MigrationPlan`, `MigrationCheckpointRepository`, `RetainedTranslationRegistry`, `WpmlMigrationRollbackService`, `WpmlSourceAnalyzer`) sin implementar motores paralelos y garantizando un modo estrictamente de solo lectura (cero escrituras).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.45 / Directiva DT-TFML-077 — Panel Administrativo de Migración WPML.
+- **JUSTIFICACIÓN:** Dotar al administrador del sistema y auditores técnicos de una pantalla unificada para supervisar el avance de la migración WPML (3.403 filas en `icl_translations`, 249 TRIDs sin adjuntos), contrastar los 123 grupos ya incorporados a TFML (139 elementos), auditar el punto de control activo (`#9545 completed`) y los 13 manifiestos de lotes históricos inmutables, transparentar las 3 traducciones en custodia histórica (idioma francés inactivo) y presentar una propuesta técnica detallada para el próximo lote mínimo de páginas (diferenciando las 7 independientes de las 12 jerárquicas con padres activos).
+- **DETALLES DE IMPLEMENTACIÓN:**
+  1. **Servicio y Componente UI Dedicado (`MigrationUi`):**
+     - Se implementó la clase [`src/Admin/MigrationUi.php`](../src/Admin/MigrationUi.php), registrando la nueva pantalla `TF Multilingual → Migración WPML` (`admin.php?page=tfml-migration`) con capacidad `manage_options`.
+     - Se calibró la jerarquía de submenús mediante prioridades en la acción `admin_menu`:
+       * Prioridad 9: `Idiomas` (`page=tf-multilingual`)
+       * Prioridad 10: `Traducciones` (`page=tfml-translations`)
+       * Prioridad 11: `Cadenas de texto` (`page=tfml-strings`)
+       * Prioridad 12: `Migración WPML` (`page=tfml-migration`)
+       * Prioridad 13: `Diagnóstico` (`page=tfml-diagnostic`)
+  2. **Garantía Estricta de Solo Consulta (Read-Only Security):**
+     - Banner de seguridad prominente en la cabecera advirtiendo el modo consulta y auditoría.
+     - Bloqueo inmediato con `wp_die( ..., 403 )` ante cualquier intento de solicitud `POST` o parámetros modificadores.
+     - Cero mutaciones en la base de datos de producción (`cms_ect`) ni en la de laboratorio (`cms_ect_lab`), garantizando la invarianza absoluta de los 123 grupos, 139 elementos y 3 traducciones retenidas.
+  3. **Cuatro Pestañas de Navegación Funcional:**
+     - **Pestaña 1: Plan Determinista (`tab=plan`):** Despliega la huella criptográfica SHA-256 (`c82cb04b1cd6c79e6b8ed44abe556291032bb4c38b5b4c23270c11b2f00fca99`), estado `NEEDS_CONFIGURATION`, resumen de deduplicación de medios (Model B: 3.033 adjuntos), filtros por clasificación (`all`, `blocked_by_language`, `conflict`, `orphan`, `skipped`, `importable`), subtipo y búsqueda (`s`), con paginación a 20 grupos por página.
+     - **Pestaña 2: Historial de Lotes (`tab=history`):** Expone el punto de control activo (`status: completed`, `last_processed_trid: 9545`, `total_items: 2`, bloqueo libre) y la tabla histórica de los 13 manifiestos inmutables en `wp_options` (`tfml_migration_manifest_*`), sumando exactamente 123 grupos importados.
+     - **Pestaña 3: Custodia Histórica (`tab=retained`):** Explica con total transparencia el modelo de cero polución activa y desglosa las 3 traducciones francesas en custodia (`Accueil #8839`, `Activités #8955`, `Nous #8873`) asociadas a sus respectivos grupos TFML (`#587`, `#588`, `#589`).
+     - **Pestaña 4: Propuesta Próximo Lote (`tab=next_batch`):** Análisis analítico de las 19 páginas en `BLOCKED_BY_LANGUAGE`. Diferencia 7 páginas independientes (TRIDs 430, 432, 9537, 9634, 9697, 9818, 34831) de 12 páginas jerárquicas con padres ya migrados en TFML (#6237 Nosotros, #6505 Servicios, #9218 Experiencia Transformadora), detallando las precondiciones mandatorias para una futura ejecución.
+  4. **Enriquecimiento del Servicio de Rollback (`WpmlMigrationRollbackService`):**
+     - Se añadió el método público `get_all_execution_manifests(): array` para recuperar cronológicamente todos los manifiestos de ejecución persistidos en `wp_options`, soportando tanto la base de datos real como entornos de pruebas sintéticos.
+- **CONSECUENCIAS:**
+  - Suite de pruebas PHPUnit ampliada a **691 pruebas / 2.558 aserciones (100% PASS, 0 errores, 1 omitida)** con [`tests/Unit/MigrationUiTest.php`](../tests/Unit/MigrationUiTest.php).
+  - PHPCS 100% limpio en todo el proyecto (**0 errores, 0 avisos**).
+  - Verificador reproducible `scratch/verify_fase_3_45.php` certificado con **10/10 controles PASS (0 fallos)**.
+  - 4 capturas visuales de alta definición generadas en el directorio de artefactos (`fase_3_45_admin_migration_plan.png`, `fase_3_45_admin_migration_history.png`, `fase_3_45_admin_migration_retained.png`, `fase_3_45_admin_migration_next_batch.png`).
+  - Cero regresiones en frontend: HTTP 200, canonicals íntegros y 30 entradas en sitemaps sin traducciones retenidas.
+
+
 
 
