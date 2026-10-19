@@ -1902,6 +1902,31 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Certificación en el verificador reproducible `scratch/verify_fase_3_45.php` con **10/10 controles PASS (0 FAIL)**.
     - 4 capturas visuales de alta resolución generadas en el directorio de artefactos (`fase_3_45_admin_migration_plan.png`, `fase_3_45_admin_migration_history.png`, `fase_3_45_admin_migration_retained.png`, `fase_3_45_admin_migration_next_batch.png`).
     - Cero regresiones en frontend: HTTP 200 en 4/4 URLs analizadas, canonicals correctos y 30 entradas en sitemaps sin traducciones retenidas.
+- **Conciliación Canónica del Panel de Migración y Preparación del Siguiente Lote (Fase 3.45A / Directiva DT-TFML-078 — ADR-073):**
+  - **Resolución Integral de Discrepancias y Conciliación Forense en Solo Lectura:**
+    - Auditoría SQL exhaustiva y conciliación de identidades canónicas de los 19 TRIDs en estado `BLOCKED_BY_LANGUAGE` directamente contra las tablas maestras `etk_t_icl_translations`, `etk_t_posts` y el registro de grupos de TFML en `cms_ect_lab`.
+    - Corrección de las denominaciones espurias reportadas erróneamente en Fase 3.45 (títulos hallucinados en la narrativa de informe como "Legal", "Política Cookies", etc.), restaurando los títulos y slugs reales persistidos en base de datos.
+    - Re-acreditación canónica e inmutable de los grupos históricos de navegación: Grupo TFML `588` = Actividades (`#4976` ES / `#8339` EN / `#8955` FR retenida) derivado del TRID 9201; Grupo TFML `589` = Nosotros (`#6237` ES / `#8354` EN / `#8873` FR retenida) derivado del TRID 9545.
+    - Purga formal de los supuestos grupos TFML `593` y `594`: se acreditó matemáticamente que el ID máximo de grupo en `etk_t_tfml_groups` es `589` y que ni Servicios (`#6505` / TRID 9563) ni Experiencia Transformadora (`#9218` / TRID 34652) han sido migrados a TFML.
+  - **Rediseño Arquitectónico de la Pestaña de Próximo Lote (`MigrationUi::render_tab_next_batch`):**
+    - Despliegue de banner preventivo formal de bloqueo: indicación explícita de que el plan maestro se encuentra en estado `NEEDS_CONFIGURATION` (huella SHA-256 `c82cb04b1cd6c79e6b8ed44abe556291032bb4c38b5b4c23270c11b2f00fca99`) debido a los 48 grupos que contienen traducciones retenidas en francés, prohibiendo cualquier ejecución no autorizada.
+    - Segregación estricta de las 19 páginas candidatas en tres tablas relacionales independientes:
+      1. **9 Raíces Autónomas Candidatas (`post_parent = 0`):** TRIDs 430 (Galería de Fotos), 432 (Contáctenos), 9537 (Paquetes), 9563 (Servicios), 9634 (Naturaleza Auténtica), 9697 (Experiencia EcoTerra), 9818 (Confort y Tranquilidad), 34652 (Experiencia Transformadora) y 34831 (Blog), cada una con sus títulos reales, slugs, idiomas activos y francés en custodia.
+      2. **4 Páginas Hijas Jerárquicas Acreditadas:** TRIDs 424 (¿Quiénes Somos?), 9838 (Reviews), 34632 (Accesibilidad y Transportes) y 34823 (Terms and Conditions), cuyos padres son miembros plenamente acreditados del Grupo TFML `#589` (Nosotros / About Us).
+      3. **6 Páginas Hijas Jerárquicas Bloqueadas:** TRIDs 9326 y 9574 (hijas de Servicios `#6505`) y TRIDs 34660, 34776, 34790 y 34791 (hijas de Experiencia Transformadora `#9218`), cuyo padre aún no ha sido migrado a TFML.
+    - Incorporación de métodos auxiliares `get_post_details( int $post_id ): array` y `get_element_tfml_group_id( int $element_id ): ?int` en `MigrationUi` para consulta en tiempo de renderizado de títulos, slugs y pertenencia de grupo.
+  - **Derivación Canónica y Certificación del Piloto Mínimo:**
+    - Propuesta y derivación analítica en memoria del piloto mínimo unificado de navegación (`pilot-nav-2-trids-430-432`) utilizando `MigrationPlan::derive_partial_plan_with_retained_languages()` sobre el plan maestro.
+    - Cálculo y trazabilidad del linaje criptográfico: huella del plan maestro `c82cb04b1cd6c79e6b8ed44abe556291032bb4c38b5b4c23270c11b2f00fca99` y huella del piloto derivado `e18b00794e7ab339347c9fe101e067f2c95f339643a0957d765e1b135446c130`.
+    - Composición canónica: 2 TRIDs (430 y 432), 4 elementos activos (2 ES, 2 EN), 2 traducciones en custodia francesa (`#8989` y `#8823`), cero conflictos y estado `READY`.
+    - Prohibición explícita de ejecución en interfaz y código (`DETENIDO / NO AUTORIZADO`), manteniéndose en estricto modo de consulta.
+  - **Gobernanza, Seguridad y Verificación Reproducible:**
+    - Invarianza absoluta de datos: producción `cms_ect` intocada (MD5 `4241ca7e7ec6399a594537cb04790c10` / 3.403 filas) y laboratorio `cms_ect_lab` invariable (123 grupos, 139 elementos, 3 franceses retenidos, 13 manifiestos).
+    - Suite de pruebas PHPUnit: **691 pruebas unitarias / 2.558 aserciones (100% PASS, 0 fallos, 0 errores, 1 omitida)**.
+    - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)**.
+    - Certificación en el verificador reproducible `scratch/verify_fase_3_45a.php` con **10/10 controles PASS (0 FAIL)**.
+    - Generación de artefacto visual en alta resolución: `fase_3_45a_admin_migration_next_batch.png`.
+
 
 
 

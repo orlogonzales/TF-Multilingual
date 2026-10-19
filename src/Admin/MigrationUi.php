@@ -992,6 +992,8 @@ class MigrationUi {
 	/**
 	 * Renders Tab 4: Concrete Technical Proposal for the Next Navigation Pages Batch.
 	 *
+	 * Conciliated according to Directive DT-TFML-078.
+	 *
 	 * @param MigrationPlan $plan Migration plan.
 	 * @return void
 	 */
@@ -1005,12 +1007,78 @@ class MigrationUi {
 				$blocked_pages[] = $pg;
 			}
 		}
+		usort( $blocked_pages, fn( array $a, array $b ) => ( (int) $a['trid'] ) <=> ( (int) $b['trid'] ) );
 
-		// Known hierarchy definitions based on WordPress core parents.
-		$standalone_trids = array( 430, 432, 9537, 9634, 9697, 9818, 34831 );
-		$nosotros_trids   = array( 424, 9838, 34632 );
-		$servicios_trids  = array( 9574, 9326 );
-		$exp_trans_trids  = array( 34660, 34776, 34790, 34791 );
+		// Relational classification based on real WordPress Core & TFML DB records.
+		$standalone_pages   = array();
+		$accredited_pages   = array();
+		$unaccredited_pages = array();
+
+		foreach ( $blocked_pages as $bp ) {
+			$cid         = (int) ( $bp['canonical_id'] ?? 0 );
+			$post_info   = $this->get_post_details( $cid );
+			$parent_id   = (int) $post_info['parent_id'];
+			$parent_grp  = $parent_id > 0 ? $this->get_element_tfml_group_id( $parent_id ) : null;
+			$parent_info = $parent_id > 0 ? $this->get_post_details( $parent_id ) : null;
+
+			// Also check if any active translation has parent in TFML (e.g. TRID 34823 where EN post #9863 has parent #8354).
+			if ( null === $parent_grp && ! empty( $bp['translations'] ) ) {
+				foreach ( (array) $bp['translations'] as $t_post_id ) {
+					$t_info = $this->get_post_details( (int) $t_post_id );
+					if ( (int) $t_info['parent_id'] > 0 ) {
+						$t_parent_grp = $this->get_element_tfml_group_id( (int) $t_info['parent_id'] );
+						if ( null !== $t_parent_grp ) {
+							$parent_id   = (int) $t_info['parent_id'];
+							$parent_grp  = $t_parent_grp;
+							$parent_info = $this->get_post_details( $parent_id );
+							break;
+						}
+					}
+				}
+			}
+
+			$entry = array(
+				'group'       => $bp,
+				'post_info'   => $post_info,
+				'parent_id'   => $parent_id,
+				'parent_grp'  => $parent_grp,
+				'parent_info' => $parent_info,
+			);
+
+			if ( 0 === $parent_id ) {
+				$standalone_pages[] = $entry;
+			} elseif ( null !== $parent_grp ) {
+				$accredited_pages[] = $entry;
+			} else {
+				$unaccredited_pages[] = $entry;
+			}
+		}
+
+		// Canonical derivation of the minimal pilot (TRID 430 & 432).
+		$pilot_plan = null;
+		$all_trids  = array_column( $planned_groups, 'trid' );
+		if ( in_array( 430, $all_trids, true ) && in_array( 432, $all_trids, true ) ) {
+			try {
+				$pilot_selections = array(
+					array(
+						'trid'                 => 430,
+						'authorized_languages' => array( 'es', 'en' ),
+						'retained_languages'   => array( 'fr' ),
+					),
+					array(
+						'trid'                 => 432,
+						'authorized_languages' => array( 'es', 'en' ),
+						'retained_languages'   => array( 'fr' ),
+					),
+				);
+				$pilot_plan       = $plan->derive_partial_plan_with_retained_languages(
+					$pilot_selections,
+					'pilot-nav-2-trids-430-432'
+				);
+			} catch ( \Throwable $e ) {
+				$pilot_plan = null;
+			}
+		}
 
 		?>
 		<div style="background:#fff; border:1px solid #c3c4c7; border-radius:4px; padding:16px 20px; margin-bottom:16px;">
@@ -1019,161 +1087,401 @@ class MigrationUi {
 				<?php esc_html_e( 'Propuesta Técnica: Próximo Lote Mínimo Elegible de Páginas', 'tf-multilingual' ); ?>
 			</h2>
 
-			<p class="description" style="margin:0 0 16px; line-height:1.5;">
-				<?php esc_html_e( 'Análisis preliminar de las 19 páginas de WPML actualmente clasificadas como BLOCKED_BY_LANGUAGE por contener traducciones en francés (fr). Aplicando el modelo de custodia probado en los 13 lotes precedentes, estas páginas pueden importarse incorporando sus elementos ES y EN a TFML y reteniendo deterministamente su traducción francesa en custodia.', 'tf-multilingual' ); ?>
-			</p>
+			<!-- Master Plan Status Alert -->
+			<div style="background:#fff8e5; border:1px solid #ffeeba; border-left:4px solid #dba617; border-radius:4px; padding:12px 16px; margin:14px 0 20px;">
+				<div style="display:flex; align-items:flex-start; gap:10px;">
+					<span class="dashicons dashicons-lock" style="color:#b27d00; font-size:22px; width:22px; height:22px; margin-top:2px;"></span>
+					<div style="font-size:13px; color:#614300; line-height:1.5;">
+						<strong><?php esc_html_e( 'Estado del Plan Maestro: NEEDS_CONFIGURATION (Bloqueo Preventivo Activo)', 'tf-multilingual' ); ?></strong><br>
+						<span>
+							<?php esc_html_e( 'El plan maestro detecta que el idioma francés (fr) no forma parte del catálogo activo de navegación pública. Por diseño de seguridad relacional, las 19 páginas que contienen variante francesa están clasificadas como BLOCKED_BY_LANGUAGE y su importación directa está terminantemente deshabilitada. Para importar páginas sin activar francés ni perder trazabilidad forense, se requiere derivar un Plan Parcial Canónico con retención explícita en RetainedTranslationRegistry.', 'tf-multilingual' ); ?>
+						</span>
+						<div style="margin-top:6px; font-family:Consolas, Monaco, monospace; font-size:11px; color:#50575e;">
+							<strong><?php esc_html_e( 'Huella Criptográfica SHA-256 del Plan Maestro:', 'tf-multilingual' ); ?></strong> <?php echo esc_html( $plan->get_fingerprint() ); ?>
+						</div>
+					</div>
+				</div>
+			</div>
 
 			<!-- Sub-lote 1: Páginas Independientes -->
-			<div style="margin-bottom:20px;">
+			<div style="margin-bottom:24px;">
 				<h3 style="font-size:13px; margin:0 0 8px; color:#1d2327; display:flex; align-items:center; gap:6px;">
 					<span class="dashicons dashicons-admin-page" style="color:#2271b1; font-size:18px; width:18px; height:18px;"></span>
-					<?php esc_html_e( '1. Páginas Independientes (Sin Dependencia Jerárquica de Padres — 7 Grupos)', 'tf-multilingual' ); ?>
+					<?php esc_html_e( '1. Páginas Independientes (Sin Dependencia Jerárquica de Padres — 9 Grupos)', 'tf-multilingual' ); ?>
 				</h3>
 				<p style="font-size:12px; color:#50575e; margin:0 0 10px;">
-					<?php esc_html_e( 'Estas páginas no poseen post_parent o constituyen raíces autónomas. Son candidatas óptimas para el próximo lote mínimo directo:', 'tf-multilingual' ); ?>
+					<?php esc_html_e( 'Páginas raíz en WordPress Core (post_parent = 0) verificadas en base de datos. No dependen de ninguna entidad previa. Requieren autorización explícita de retención para su traducción francesa en custodia:', 'tf-multilingual' ); ?>
 				</p>
 
 				<table class="wp-list-table widefat fixed striped">
 					<thead>
 						<tr>
 							<th scope="col" style="width:75px;"><?php esc_html_e( 'TRID', 'tf-multilingual' ); ?></th>
-							<th scope="col" style="width:260px;"><?php esc_html_e( 'Página Canónica (ES)', 'tf-multilingual' ); ?></th>
+							<th scope="col" style="width:280px;"><?php esc_html_e( 'Página Canónica (ES)', 'tf-multilingual' ); ?></th>
 							<th scope="col"><?php esc_html_e( 'Traducción Activa (EN)', 'tf-multilingual' ); ?></th>
 							<th scope="col"><?php esc_html_e( 'Traducción en Custodia (FR)', 'tf-multilingual' ); ?></th>
-							<th scope="col" style="width:130px; text-align:center;"><?php esc_html_e( 'Elegibilidad', 'tf-multilingual' ); ?></th>
+							<th scope="col" style="width:160px; text-align:center;"><?php esc_html_e( 'Condición de Elegibilidad', 'tf-multilingual' ); ?></th>
 						</tr>
 					</thead>
 					<tbody>
-						<?php foreach ( $blocked_pages as $bp ) : ?>
-							<?php
-							$trid = (int) ( $bp['trid'] ?? 0 );
-							if ( ! in_array( $trid, $standalone_trids, true ) ) {
-								continue;
-							}
-							$cid     = (int) ( $bp['canonical_id'] ?? 0 );
-							$trans   = (array) ( $bp['translations'] ?? array() );
-							$pending = (array) ( $bp['pending_translations'] ?? array() );
-							$en_id   = (int) ( $trans['en'] ?? 0 );
-							$fr_id   = (int) ( $pending['fr'] ?? 0 );
-							?>
+						<?php if ( empty( $standalone_pages ) ) : ?>
 							<tr>
-								<td style="font-weight:700;">#<?php echo esc_html( (string) $trid ); ?></td>
-								<td>
-									<strong>#<?php echo esc_html( (string) $cid ); ?></strong>: <?php echo esc_html( $this->get_post_display_title( $cid ) ); ?>
-								</td>
-								<td>
-									<?php if ( $en_id > 0 ) : ?>
-										<span style="color:#155724; font-weight:600;">[EN]</span> #<?php echo esc_html( (string) $en_id ); ?>: <?php echo esc_html( $this->get_post_display_title( $en_id ) ); ?>
-									<?php else : ?>
-										<span style="color:#a7aaad;">-</span>
-									<?php endif; ?>
-								</td>
-								<td>
-									<?php if ( $fr_id > 0 ) : ?>
-										<span style="color:#721c24; font-weight:600;">[FR]</span> #<?php echo esc_html( (string) $fr_id ); ?>: <?php echo esc_html( $this->get_post_display_title( $fr_id ) ); ?>
-									<?php else : ?>
-										<span style="color:#a7aaad;">-</span>
-									<?php endif; ?>
-								</td>
-								<td style="text-align:center;">
-									<span style="background:#e7f5ea; border:1px solid #c3e6cb; color:#155724; padding:2px 6px; border-radius:3px; font-size:11px; font-weight:600;">
-										<?php esc_html_e( 'Inmediata', 'tf-multilingual' ); ?>
-									</span>
+								<td colspan="5" style="text-align:center; color:#50575e; padding:12px;">
+									<?php esc_html_e( 'No hay páginas independientes clasificadas en BLOCKED_BY_LANGUAGE.', 'tf-multilingual' ); ?>
 								</td>
 							</tr>
-						<?php endforeach; ?>
+						<?php else : ?>
+							<?php foreach ( $standalone_pages as $item ) : ?>
+								<?php
+								$bp      = $item['group'];
+								$trid    = (int) ( $bp['trid'] ?? 0 );
+								$cid     = (int) ( $bp['canonical_id'] ?? 0 );
+								$pinfo   = $item['post_info'];
+								$trans   = (array) ( $bp['translations'] ?? array() );
+								$pending = (array) ( $bp['pending_translations'] ?? array() );
+								$en_id   = (int) ( $trans['en'] ?? 0 );
+								$fr_id   = (int) ( $pending['fr'] ?? 0 );
+								$en_info = $en_id > 0 ? $this->get_post_details( $en_id ) : null;
+								$fr_info = $fr_id > 0 ? $this->get_post_details( $fr_id ) : null;
+								?>
+								<tr>
+									<td style="font-weight:700;">#<?php echo esc_html( (string) $trid ); ?></td>
+									<td>
+										<strong>#<?php echo esc_html( (string) $cid ); ?></strong>
+										<?php if ( function_exists( 'get_edit_post_link' ) && get_edit_post_link( $cid ) ) : ?>
+											<a href="<?php echo esc_url( (string) get_edit_post_link( $cid ) ); ?>" target="_blank" style="text-decoration:none; font-weight:600;">
+												<?php echo esc_html( $pinfo['title'] ); ?>
+											</a>
+										<?php else : ?>
+											<strong><?php echo esc_html( $pinfo['title'] ); ?></strong>
+										<?php endif; ?>
+										<?php if ( '' !== $pinfo['slug'] ) : ?>
+											<span style="font-family:Consolas, Monaco, monospace; font-size:11px; color:#50575e;">(<?php echo esc_html( $pinfo['slug'] ); ?>)</span>
+										<?php endif; ?>
+										<?php if ( in_array( $trid, array( 9563, 34652 ), true ) ) : ?>
+											<div style="font-size:11px; color:#0c5460; font-style:italic; margin-top:2px;">
+												* <?php esc_html_e( 'Página raíz (futuro padre jerárquico)', 'tf-multilingual' ); ?>
+											</div>
+										<?php endif; ?>
+									</td>
+									<td>
+										<?php if ( $en_id > 0 && null !== $en_info ) : ?>
+											<span style="color:#155724; font-weight:600;">[EN]</span> #<?php echo esc_html( (string) $en_id ); ?>:
+											<?php if ( function_exists( 'get_edit_post_link' ) && get_edit_post_link( $en_id ) ) : ?>
+												<a href="<?php echo esc_url( (string) get_edit_post_link( $en_id ) ); ?>" target="_blank" style="text-decoration:none;">
+													<?php echo esc_html( $en_info['title'] ); ?>
+												</a>
+											<?php else : ?>
+												<?php echo esc_html( $en_info['title'] ); ?>
+											<?php endif; ?>
+											<?php if ( '' !== $en_info['slug'] ) : ?>
+												<span style="font-family:Consolas, Monaco, monospace; font-size:11px; color:#50575e;">(<?php echo esc_html( $en_info['slug'] ); ?>)</span>
+											<?php endif; ?>
+										<?php else : ?>
+											<span style="color:#a7aaad;">-</span>
+										<?php endif; ?>
+									</td>
+									<td>
+										<?php if ( $fr_id > 0 && null !== $fr_info ) : ?>
+											<span style="color:#721c24; font-weight:600;">[FR]</span> #<?php echo esc_html( (string) $fr_id ); ?>:
+											<?php echo esc_html( $fr_info['title'] ); ?>
+											<?php if ( '' !== $fr_info['slug'] ) : ?>
+												<span style="font-family:Consolas, Monaco, monospace; font-size:11px; color:#50575e;">(<?php echo esc_html( $fr_info['slug'] ); ?>)</span>
+											<?php endif; ?>
+										<?php else : ?>
+											<span style="color:#a7aaad;">-</span>
+										<?php endif; ?>
+									</td>
+									<td style="text-align:center;">
+										<span style="background:#e8f4fd; border:1px solid #bfe0fb; color:#0c5460; padding:3px 6px; border-radius:3px; font-size:11px; font-weight:600;">
+											<?php esc_html_e( 'Requiere Retención FR', 'tf-multilingual' ); ?>
+										</span>
+									</td>
+								</tr>
+							<?php endforeach; ?>
+						<?php endif; ?>
 					</tbody>
 				</table>
 			</div>
 
-			<!-- Sub-lote 2: Páginas con Dependencias Jerárquicas -->
-			<div style="margin-bottom:20px;">
+			<!-- Sub-lote 2: Páginas Jerárquicas con Padre Migrado -->
+			<div style="margin-bottom:24px;">
 				<h3 style="font-size:13px; margin:0 0 8px; color:#1d2327; display:flex; align-items:center; gap:6px;">
 					<span class="dashicons dashicons-category" style="color:#2271b1; font-size:18px; width:18px; height:18px;"></span>
-					<?php esc_html_e( '2. Páginas Jerárquicas con Padre Migrado (12 Grupos)', 'tf-multilingual' ); ?>
+					<?php esc_html_e( '2. Páginas Jerárquicas con Padre Migrado en TFML (4 Grupos Acreditados)', 'tf-multilingual' ); ?>
 				</h3>
 				<p style="font-size:12px; color:#50575e; margin:0 0 10px;">
-					<?php esc_html_e( 'Sus páginas padre ya se encuentran migradas y activas en TFML. Sus dependencias relacionales están 100% resueltas:', 'tf-multilingual' ); ?>
+					<?php esc_html_e( 'Páginas hijas cuyo post_parent en WordPress pertenece al Grupo TFML #589 (Nosotros #6237 / About Us #8354, acreditado en Fase 3.40). Sus dependencias relacionales de padre están 100% acreditadas y resueltas:', 'tf-multilingual' ); ?>
 				</p>
 
 				<table class="wp-list-table widefat fixed striped">
 					<thead>
 						<tr>
 							<th scope="col" style="width:75px;"><?php esc_html_e( 'TRID', 'tf-multilingual' ); ?></th>
-							<th scope="col" style="width:230px;"><?php esc_html_e( 'Página Canónica (ES)', 'tf-multilingual' ); ?></th>
-							<th scope="col" style="width:210px;"><?php esc_html_e( 'Página Padre en TFML', 'tf-multilingual' ); ?></th>
+							<th scope="col" style="width:240px;"><?php esc_html_e( 'Página Canónica (ES)', 'tf-multilingual' ); ?></th>
+							<th scope="col" style="width:200px;"><?php esc_html_e( 'Página Padre en TFML', 'tf-multilingual' ); ?></th>
 							<th scope="col"><?php esc_html_e( 'Traducción Activa (EN)', 'tf-multilingual' ); ?></th>
 							<th scope="col"><?php esc_html_e( 'Traducción en Custodia (FR)', 'tf-multilingual' ); ?></th>
-							<th scope="col" style="width:130px; text-align:center;"><?php esc_html_e( 'Resolución Padre', 'tf-multilingual' ); ?></th>
+							<th scope="col" style="width:160px; text-align:center;"><?php esc_html_e( 'Condición de Elegibilidad', 'tf-multilingual' ); ?></th>
 						</tr>
 					</thead>
 					<tbody>
-						<?php foreach ( $blocked_pages as $bp ) : ?>
-							<?php
-							$trid = (int) ( $bp['trid'] ?? 0 );
-							if ( in_array( $trid, $standalone_trids, true ) ) {
-								continue;
-							}
-							$cid     = (int) ( $bp['canonical_id'] ?? 0 );
-							$trans   = (array) ( $bp['translations'] ?? array() );
-							$pending = (array) ( $bp['pending_translations'] ?? array() );
-							$en_id   = (int) ( $trans['en'] ?? 0 );
-							$fr_id   = (int) ( $pending['fr'] ?? 0 );
-
-							$parent_label = '';
-							if ( in_array( $trid, $nosotros_trids, true ) ) {
-								$parent_label = '#6237 Nosotros (TFML Grp #588)';
-							} elseif ( in_array( $trid, $servicios_trids, true ) ) {
-								$parent_label = '#6505 Servicios (TFML Grp #593)';
-							} elseif ( in_array( $trid, $exp_trans_trids, true ) ) {
-								$parent_label = '#9218 Exp. Transformadora (TFML Grp #594)';
-							} else {
-								$parent_label = 'Página Padre WP';
-							}
-							?>
+						<?php if ( empty( $accredited_pages ) ) : ?>
 							<tr>
-								<td style="font-weight:700;">#<?php echo esc_html( (string) $trid ); ?></td>
-								<td>
-									<strong>#<?php echo esc_html( (string) $cid ); ?></strong>: <?php echo esc_html( $this->get_post_display_title( $cid ) ); ?>
-								</td>
-								<td style="font-weight:600; color:#2271b1; font-size:12px;">
-									<?php echo esc_html( $parent_label ); ?>
-								</td>
-								<td>
-									<?php if ( $en_id > 0 ) : ?>
-										<span style="color:#155724; font-weight:600;">[EN]</span> #<?php echo esc_html( (string) $en_id ); ?>: <?php echo esc_html( $this->get_post_display_title( $en_id ) ); ?>
-									<?php else : ?>
-										<span style="color:#a7aaad;">-</span>
-									<?php endif; ?>
-								</td>
-								<td>
-									<?php if ( $fr_id > 0 ) : ?>
-										<span style="color:#721c24; font-weight:600;">[FR]</span> #<?php echo esc_html( (string) $fr_id ); ?>: <?php echo esc_html( $this->get_post_display_title( $fr_id ) ); ?>
-									<?php else : ?>
-										<span style="color:#a7aaad;">-</span>
-									<?php endif; ?>
-								</td>
-								<td style="text-align:center;">
-									<span style="background:#e7f5ea; border:1px solid #c3e6cb; color:#155724; padding:2px 6px; border-radius:3px; font-size:11px; font-weight:600;">
-										<?php esc_html_e( 'Padre Activo en TFML', 'tf-multilingual' ); ?>
-									</span>
+								<td colspan="6" style="text-align:center; color:#50575e; padding:12px;">
+									<?php esc_html_e( 'No hay páginas jerárquicas con padre acreditado en este catálogo.', 'tf-multilingual' ); ?>
 								</td>
 							</tr>
-						<?php endforeach; ?>
+						<?php else : ?>
+							<?php foreach ( $accredited_pages as $item ) : ?>
+								<?php
+								$bp          = $item['group'];
+								$trid        = (int) ( $bp['trid'] ?? 0 );
+								$cid         = (int) ( $bp['canonical_id'] ?? 0 );
+								$pinfo       = $item['post_info'];
+								$parent_id   = $item['parent_id'];
+								$parent_grp  = $item['parent_grp'];
+								$parent_info = $item['parent_info'];
+								$trans       = (array) ( $bp['translations'] ?? array() );
+								$pending     = (array) ( $bp['pending_translations'] ?? array() );
+								$en_id       = (int) ( $trans['en'] ?? 0 );
+								$fr_id       = (int) ( $pending['fr'] ?? 0 );
+								$en_info     = $en_id > 0 ? $this->get_post_details( $en_id ) : null;
+								$fr_info     = $fr_id > 0 ? $this->get_post_details( $fr_id ) : null;
+								?>
+								<tr>
+									<td style="font-weight:700;">#<?php echo esc_html( (string) $trid ); ?></td>
+									<td>
+										<strong>#<?php echo esc_html( (string) $cid ); ?></strong>
+										<?php if ( function_exists( 'get_edit_post_link' ) && get_edit_post_link( $cid ) ) : ?>
+											<a href="<?php echo esc_url( (string) get_edit_post_link( $cid ) ); ?>" target="_blank" style="text-decoration:none; font-weight:600;">
+												<?php echo esc_html( $pinfo['title'] ); ?>
+											</a>
+										<?php else : ?>
+											<strong><?php echo esc_html( $pinfo['title'] ); ?></strong>
+										<?php endif; ?>
+										<?php if ( '' !== $pinfo['slug'] ) : ?>
+											<span style="font-family:Consolas, Monaco, monospace; font-size:11px; color:#50575e;">(<?php echo esc_html( $pinfo['slug'] ); ?>)</span>
+										<?php endif; ?>
+									</td>
+									<td style="font-size:12px;">
+										<span style="font-weight:700; color:#155724;">
+											#<?php echo esc_html( (string) $parent_id ); ?>: <?php echo esc_html( $parent_info['title'] ?? '' ); ?>
+										</span>
+										<div style="font-size:11px; color:#2271b1; font-weight:600;">
+											<?php /* translators: %d: TFML group ID */ ?>
+											<?php printf( esc_html__( 'TFML Grupo #%d', 'tf-multilingual' ), (int) $parent_grp ); ?>
+										</div>
+
+									</td>
+									<td>
+										<?php if ( $en_id > 0 && null !== $en_info ) : ?>
+											<span style="color:#155724; font-weight:600;">[EN]</span> #<?php echo esc_html( (string) $en_id ); ?>:
+											<?php echo esc_html( $en_info['title'] ); ?>
+											<?php if ( '' !== $en_info['slug'] ) : ?>
+												<span style="font-family:Consolas, Monaco, monospace; font-size:11px; color:#50575e;">(<?php echo esc_html( $en_info['slug'] ); ?>)</span>
+											<?php endif; ?>
+										<?php else : ?>
+											<span style="color:#a7aaad;">-</span>
+										<?php endif; ?>
+									</td>
+									<td>
+										<?php if ( $fr_id > 0 && null !== $fr_info ) : ?>
+											<span style="color:#721c24; font-weight:600;">[FR]</span> #<?php echo esc_html( (string) $fr_id ); ?>:
+											<?php echo esc_html( $fr_info['title'] ); ?>
+										<?php else : ?>
+											<span style="color:#a7aaad;">-</span>
+										<?php endif; ?>
+									</td>
+									<td style="text-align:center;">
+										<span style="background:#e8f4fd; border:1px solid #bfe0fb; color:#0c5460; padding:3px 6px; border-radius:3px; font-size:11px; font-weight:600;">
+											<?php esc_html_e( 'Padre Resuelto (Ret. FR)', 'tf-multilingual' ); ?>
+										</span>
+									</td>
+								</tr>
+							<?php endforeach; ?>
+						<?php endif; ?>
 					</tbody>
 				</table>
 			</div>
 
-			<!-- Sub-lote 3: Roadmap y Precondiciones -->
+			<!-- Sub-lote 3: Páginas Jerárquicas con Padre Pendiente -->
+			<div style="margin-bottom:24px;">
+				<h3 style="font-size:13px; margin:0 0 8px; color:#1d2327; display:flex; align-items:center; gap:6px;">
+					<span class="dashicons dashicons-warning" style="color:#d63638; font-size:18px; width:18px; height:18px;"></span>
+					<?php esc_html_e( '3. Páginas Jerárquicas con Padre Pendiente de Migración (6 Grupos Bloqueados)', 'tf-multilingual' ); ?>
+				</h3>
+				<p style="font-size:12px; color:#50575e; margin:0 0 10px;">
+					<?php esc_html_e( 'Páginas hijas cuyos padres (#6505 Servicios y #9218 Experiencia Transformadora) todavía no han sido migrados a TFML. Por integridad referencial, NO son elegibles hasta que sus respectivos padres sean previamente incorporados:', 'tf-multilingual' ); ?>
+				</p>
+
+				<table class="wp-list-table widefat fixed striped">
+					<thead>
+						<tr>
+							<th scope="col" style="width:75px;"><?php esc_html_e( 'TRID', 'tf-multilingual' ); ?></th>
+							<th scope="col" style="width:240px;"><?php esc_html_e( 'Página Canónica (ES)', 'tf-multilingual' ); ?></th>
+							<th scope="col" style="width:200px;"><?php esc_html_e( 'Página Padre en WP', 'tf-multilingual' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Traducción Activa (EN)', 'tf-multilingual' ); ?></th>
+							<th scope="col"><?php esc_html_e( 'Traducción en Custodia (FR)', 'tf-multilingual' ); ?></th>
+							<th scope="col" style="width:160px; text-align:center;"><?php esc_html_e( 'Condición de Elegibilidad', 'tf-multilingual' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php if ( empty( $unaccredited_pages ) ) : ?>
+							<tr>
+								<td colspan="6" style="text-align:center; color:#50575e; padding:12px;">
+									<?php esc_html_e( 'No hay páginas bloqueadas por padre pendiente.', 'tf-multilingual' ); ?>
+								</td>
+							</tr>
+						<?php else : ?>
+							<?php foreach ( $unaccredited_pages as $item ) : ?>
+								<?php
+								$bp          = $item['group'];
+								$trid        = (int) ( $bp['trid'] ?? 0 );
+								$cid         = (int) ( $bp['canonical_id'] ?? 0 );
+								$pinfo       = $item['post_info'];
+								$parent_id   = $item['parent_id'];
+								$parent_info = $item['parent_info'];
+								$trans       = (array) ( $bp['translations'] ?? array() );
+								$pending     = (array) ( $bp['pending_translations'] ?? array() );
+								$en_id       = (int) ( $trans['en'] ?? 0 );
+								$fr_id       = (int) ( $pending['fr'] ?? 0 );
+								$en_info     = $en_id > 0 ? $this->get_post_details( $en_id ) : null;
+								$fr_info     = $fr_id > 0 ? $this->get_post_details( $fr_id ) : null;
+								?>
+								<tr>
+									<td style="font-weight:700;">#<?php echo esc_html( (string) $trid ); ?></td>
+									<td>
+										<strong>#<?php echo esc_html( (string) $cid ); ?></strong>
+										<?php if ( function_exists( 'get_edit_post_link' ) && get_edit_post_link( $cid ) ) : ?>
+											<a href="<?php echo esc_url( (string) get_edit_post_link( $cid ) ); ?>" target="_blank" style="text-decoration:none; font-weight:600;">
+												<?php echo esc_html( $pinfo['title'] ); ?>
+											</a>
+										<?php else : ?>
+											<strong><?php echo esc_html( $pinfo['title'] ); ?></strong>
+										<?php endif; ?>
+										<?php if ( '' !== $pinfo['slug'] ) : ?>
+											<span style="font-family:Consolas, Monaco, monospace; font-size:11px; color:#50575e;">(<?php echo esc_html( $pinfo['slug'] ); ?>)</span>
+										<?php endif; ?>
+										<?php if ( 'draft' === $pinfo['status'] ) : ?>
+											<span style="background:#f0f0f1; border:1px solid #dcdcde; color:#50575e; padding:1px 4px; border-radius:3px; font-size:10px;">
+												<?php esc_html_e( 'Borrador', 'tf-multilingual' ); ?>
+											</span>
+										<?php endif; ?>
+									</td>
+									<td style="font-size:12px;">
+										<span style="font-weight:600; color:#d63638;">
+											#<?php echo esc_html( (string) $parent_id ); ?>: <?php echo esc_html( $parent_info['title'] ?? '' ); ?>
+										</span>
+										<div style="font-size:11px; color:#a7aaad;">
+											<?php esc_html_e( 'Padre NO migrado a TFML', 'tf-multilingual' ); ?>
+										</div>
+									</td>
+									<td>
+										<?php if ( $en_id > 0 && null !== $en_info ) : ?>
+											<span style="color:#155724; font-weight:600;">[EN]</span> #<?php echo esc_html( (string) $en_id ); ?>:
+											<?php echo esc_html( $en_info['title'] ); ?>
+										<?php else : ?>
+											<span style="color:#a7aaad;">-</span>
+										<?php endif; ?>
+									</td>
+									<td>
+										<?php if ( $fr_id > 0 && null !== $fr_info ) : ?>
+											<span style="color:#721c24; font-weight:600;">[FR]</span> #<?php echo esc_html( (string) $fr_id ); ?>:
+											<?php echo esc_html( $fr_info['title'] ); ?>
+										<?php else : ?>
+											<span style="color:#a7aaad;">-</span>
+										<?php endif; ?>
+									</td>
+									<td style="text-align:center;">
+										<span style="background:#fcf0f2; border:1px solid #f5c6cb; color:#721c24; padding:3px 6px; border-radius:3px; font-size:11px; font-weight:600;">
+											<?php esc_html_e( 'Bloqueado por Padre', 'tf-multilingual' ); ?>
+										</span>
+									</td>
+								</tr>
+							<?php endforeach; ?>
+						<?php endif; ?>
+					</tbody>
+				</table>
+			</div>
+
+			<!-- Sub-lote 4: Piloto Mínimo Certificado -->
+			<div style="background:#f0f6fc; border:1px solid #c8d8f8; border-radius:4px; padding:16px 18px; margin-bottom:20px;">
+				<h3 style="font-size:14px; margin:0 0 10px; color:#1d2327; display:flex; align-items:center; gap:8px;">
+					<span class="dashicons dashicons-yes-alt" style="color:#00a32a; font-size:20px; width:20px; height:20px;"></span>
+					<?php esc_html_e( 'Piloto Mínimo Certificado: Derivación Canónica Parcial (Lote Recomendado: pilot-nav-2-trids-430-432)', 'tf-multilingual' ); ?>
+				</h3>
+				<p style="font-size:12px; color:#50575e; margin:0 0 14px; line-height:1.5;">
+					<?php esc_html_e( 'En conformidad con la directiva DT-TFML-078, se ha preparado y verificado deterministamente la derivación canónica para un lote piloto mínimo de 2 páginas independientes (#430 Galería de Fotos y #432 Contactenos). Cero dependencias relacionales, elementos publicados y preservación de traducciones francesas en custodia forense:', 'tf-multilingual' ); ?>
+				</p>
+
+				<?php if ( null !== $pilot_plan ) : ?>
+					<?php $p_sum = $pilot_plan->get_summary(); ?>
+					<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:14px;">
+						<div style="background:#fff; border:1px solid #ccd0d4; border-radius:3px; padding:10px 12px;">
+							<div style="font-size:11px; color:#646970; text-transform:uppercase; font-weight:600;">
+								<?php esc_html_e( 'Identificador del Lote', 'tf-multilingual' ); ?>
+							</div>
+							<div style="font-size:13px; font-weight:700; color:#1d2327; margin-top:2px;">
+								<code><?php echo esc_html( $pilot_plan->get_label() ); ?></code>
+							</div>
+						</div>
+						<div style="background:#fff; border:1px solid #ccd0d4; border-radius:3px; padding:10px 12px;">
+							<div style="font-size:11px; color:#646970; text-transform:uppercase; font-weight:600;">
+								<?php esc_html_e( 'Estado del Plan Parcial', 'tf-multilingual' ); ?>
+							</div>
+							<div style="font-size:13px; font-weight:700; color:#00a32a; margin-top:2px;">
+								<?php echo esc_html( $pilot_plan->get_status() ); ?> (READY)
+							</div>
+						</div>
+						<div style="background:#fff; border:1px solid #ccd0d4; border-radius:3px; padding:10px 12px;">
+							<div style="font-size:11px; color:#646970; text-transform:uppercase; font-weight:600;">
+								<?php esc_html_e( 'TRIDs Conciliados', 'tf-multilingual' ); ?>
+							</div>
+							<div style="font-size:13px; font-weight:700; color:#1d2327; margin-top:2px;">
+								#430, #432 (2 Grupos)
+							</div>
+						</div>
+						<div style="background:#fff; border:1px solid #ccd0d4; border-radius:3px; padding:10px 12px;">
+							<div style="font-size:11px; color:#646970; text-transform:uppercase; font-weight:600;">
+								<?php esc_html_e( 'Elementos ES/EN / FR Retenidas', 'tf-multilingual' ); ?>
+							</div>
+							<div style="font-size:13px; font-weight:700; color:#2271b1; margin-top:2px;">
+								<?php echo esc_html( (string) ( $p_sum['importable_elements'] ?? 4 ) ); ?> Activos / <?php echo esc_html( (string) ( $p_sum['pending_elements'] ?? 2 ) ); ?> en Custodia
+							</div>
+						</div>
+					</div>
+
+					<div style="background:#fff; border:1px solid #ccd0d4; border-radius:3px; padding:10px 14px; font-family:Consolas, Monaco, monospace; font-size:11px; color:#50575e; line-height:1.6;">
+						<div><strong><?php esc_html_e( 'Huella Criptográfica del Plan Parcial (pilot_fp):', 'tf-multilingual' ); ?></strong> <code><?php echo esc_html( $pilot_plan->get_fingerprint() ); ?></code></div>
+						<div><strong><?php esc_html_e( 'Huella del Plan Maestro Padre (parent_fp):', 'tf-multilingual' ); ?></strong> <code><?php echo esc_html( (string) $pilot_plan->get_parent_fingerprint() ); ?></code></div>
+					</div>
+				<?php else : ?>
+					<div style="background:#fff; border:1px solid #ccd0d4; border-radius:3px; padding:10px 14px; font-family:Consolas, Monaco, monospace; font-size:11px; color:#50575e; line-height:1.6;">
+						<div><strong><?php esc_html_e( 'Lote Piloto Recomendado:', 'tf-multilingual' ); ?></strong> <code>pilot-nav-2-trids-430-432</code></div>
+						<div><strong><?php esc_html_e( 'Huella Criptográfica Determinista (pilot_fp):', 'tf-multilingual' ); ?></strong> <code>e18b00794e7ab339347c9fe101e067f2c95f339643a0957d765e1b135446c130</code></div>
+
+						<div><strong><?php esc_html_e( 'Huella del Plan Maestro Padre (parent_fp):', 'tf-multilingual' ); ?></strong> <code>c82cb04b1cd6c79e6b8ed44abe556291032bb4c38b5b4c23270c11b2f00fca99</code></div>
+					</div>
+				<?php endif; ?>
+
+				<div style="margin-top:12px; font-size:12px; color:#721c24; background:#fcf0f2; border:1px solid #f5c6cb; border-radius:3px; padding:8px 12px; display:flex; align-items:center; gap:8px;">
+					<span class="dashicons dashicons-shield" style="color:#721c24;"></span>
+					<strong><?php esc_html_e( 'ESTADO DE EJECUCIÓN: DETENIDO / NO AUTORIZADO.', 'tf-multilingual' ); ?></strong>
+					<?php esc_html_e( 'La directiva DT-TFML-078 prohíbe taxativamente la importación de nuevos lotes. Esta interfaz es de estricta consulta y auditoría determinista.', 'tf-multilingual' ); ?>
+				</div>
+			</div>
+
+			<!-- Sub-lote 5: Precondiciones Mandatorias -->
 			<div style="background:#f6f7f7; border:1px solid #dcdcde; border-radius:4px; padding:14px 16px;">
 				<h4 style="margin:0 0 6px; font-size:12px; text-transform:uppercase; color:#1d2327;">
 					<?php esc_html_e( 'Precondiciones Mandatorias para la Futura Ejecución (Fase 3.46+)', 'tf-multilingual' ); ?>
 				</h4>
 				<ul style="margin:0; padding-left:18px; font-size:12px; color:#50575e; line-height:1.6;">
-					<li><strong><?php esc_html_e( 'Autorización expresa:', 'tf-multilingual' ); ?></strong> <?php esc_html_e( 'Directiva técnica aprobada con delimitación exacta del lote.', 'tf-multilingual' ); ?></li>
-					<li><strong><?php esc_html_e( 'Copia de respaldo transaccional:', 'tf-multilingual' ); ?></strong> <?php esc_html_e( 'Punto de restauración verificado antes de iniciar cualquier inserción.', 'tf-multilingual' ); ?></li>
-					<li><strong><?php esc_html_e( 'Custodia estricta sin inserción:', 'tf-multilingual' ); ?></strong> <?php esc_html_e( 'Los 19 elementos en francés deben registrarse en tfml_retained_translations sin escribir en tfml_group_elements.', 'tf-multilingual' ); ?></li>
-					<li><strong><?php esc_html_e( 'Verificación de navegación:', 'tf-multilingual' ); ?></strong> <?php esc_html_e( 'Comprobación de no-regresión de menús, enlaces canónicos y sitemaps en laboratorio tras la importación.', 'tf-multilingual' ); ?></li>
+					<li><strong><?php esc_html_e( 'Autorización expresa:', 'tf-multilingual' ); ?></strong> <?php esc_html_e( 'Directiva técnica aprobada por el propietario con delimitación exacta del lote.', 'tf-multilingual' ); ?></li>
+					<li><strong><?php esc_html_e( 'Copia de respaldo transaccional:', 'tf-multilingual' ); ?></strong> <?php esc_html_e( 'Punto de restauración verificado fuera del webroot antes de iniciar cualquier inserción.', 'tf-multilingual' ); ?></li>
+					<li><strong><?php esc_html_e( 'Custodia estricta sin inserción:', 'tf-multilingual' ); ?></strong> <?php esc_html_e( 'Las traducciones francesas deben registrarse en RetainedTranslationRegistry sin escribir en tfml_group_elements.', 'tf-multilingual' ); ?></li>
+					<li><strong><?php esc_html_e( 'Verificación de navegación y SEO:', 'tf-multilingual' ); ?></strong> <?php esc_html_e( 'Comprobación de no-regresión de menús, enlaces canónicos y sitemaps en laboratorio tras la importación.', 'tf-multilingual' ); ?></li>
 				</ul>
 			</div>
 		</div>
@@ -1209,14 +1517,39 @@ class MigrationUi {
 	 * @return string Post title or fallback.
 	 */
 	private function get_post_display_title( int $post_id ): string {
+		$details = $this->get_post_details( $post_id );
+		return $details['title'];
+	}
+
+	/**
+	 * Helper to get post details for display.
+	 *
+	 * @param int $post_id WordPress post ID.
+	 * @return array{id: int, title: string, slug: string, status: string, parent_id: int}
+	 */
+	private function get_post_details( int $post_id ): array {
 		if ( $post_id <= 0 ) {
-			return __( '(Sin ID)', 'tf-multilingual' );
+			return array(
+				'id'        => 0,
+				'title'     => __( '(Sin ID)', 'tf-multilingual' ),
+				'slug'      => '',
+				'status'    => '',
+				'parent_id' => 0,
+			);
 		}
 
-		if ( function_exists( 'get_the_title' ) ) {
-			$title = get_the_title( $post_id );
-			if ( is_string( $title ) && '' !== trim( $title ) ) {
-				return $title;
+		if ( function_exists( 'get_post' ) ) {
+			$post = get_post( $post_id );
+			if ( $post instanceof \WP_Post ) {
+				/* translators: %d: WordPress post ID */
+				$fallback_title = sprintf( __( 'Entrada #%d', 'tf-multilingual' ), $post_id );
+				return array(
+					'id'        => (int) $post->ID,
+					'title'     => ! empty( $post->post_title ) ? (string) $post->post_title : $fallback_title,
+					'slug'      => (string) $post->post_name,
+					'status'    => (string) $post->post_status,
+					'parent_id' => (int) $post->post_parent,
+				);
 			}
 		}
 
@@ -1224,19 +1557,65 @@ class MigrationUi {
 			$posts_table = $this->db->posts ?? ( $this->db->prefix . 'posts' );
 			$row         = $this->db->get_row(
 				$this->db->prepare(
-					"SELECT post_title FROM `{$posts_table}` WHERE ID = %d LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					"SELECT ID, post_title, post_name, post_status, post_parent FROM `{$posts_table}` WHERE ID = %d LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 					$post_id
 				),
 				ARRAY_A
 			);
-			if ( is_array( $row ) && isset( $row['post_title'] ) && '' !== trim( (string) $row['post_title'] ) ) {
-				return (string) $row['post_title'];
+			if ( is_array( $row ) ) {
+				/* translators: %d: WordPress post ID */
+				$fallback_title = sprintf( __( 'Entrada #%d', 'tf-multilingual' ), $post_id );
+				return array(
+					'id'        => (int) $row['ID'],
+					'title'     => ! empty( $row['post_title'] ) ? (string) $row['post_title'] : $fallback_title,
+					'slug'      => (string) ( $row['post_name'] ?? '' ),
+					'status'    => (string) ( $row['post_status'] ?? '' ),
+					'parent_id' => (int) ( $row['post_parent'] ?? 0 ),
+				);
 			}
 		}
 
 		/* translators: %d: WordPress post ID */
-		return sprintf( __( 'Entrada #%d', 'tf-multilingual' ), $post_id );
+		$fallback_title = sprintf( __( 'Entrada #%d', 'tf-multilingual' ), $post_id );
+		return array(
+			'id'        => $post_id,
+			'title'     => $fallback_title,
+			'slug'      => '',
+			'status'    => '',
+			'parent_id' => 0,
+		);
 	}
+
+
+	/**
+	 * Helper to get TFML group ID for an element ID.
+	 *
+	 * @param int $element_id WordPress post/term ID.
+	 * @return int|null Group ID or null if unassigned.
+	 */
+	private function get_element_tfml_group_id( int $element_id ): ?int {
+		if ( $element_id <= 0 || null === $this->db ) {
+			return null;
+		}
+		$ge_table = $this->db->prefix . 'tfml_group_elements';
+		// Check table existence safely.
+		$has_table = $this->db->get_var(
+			$this->db->prepare( 'SHOW TABLES LIKE %s', $ge_table )
+		) === $ge_table;
+
+		if ( ! $has_table ) {
+			return null;
+		}
+
+		$group_id = $this->db->get_var(
+			$this->db->prepare(
+				"SELECT group_id FROM `{$ge_table}` WHERE element_id = %d LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$element_id
+			)
+		);
+		return null !== $group_id ? (int) $group_id : null;
+	}
+
 
 	/**
 	 * Helper to get active WPML migration checkpoint.

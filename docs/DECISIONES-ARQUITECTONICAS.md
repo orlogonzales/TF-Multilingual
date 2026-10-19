@@ -1897,6 +1897,53 @@
   - 4 capturas visuales de alta definición generadas en el directorio de artefactos (`fase_3_45_admin_migration_plan.png`, `fase_3_45_admin_migration_history.png`, `fase_3_45_admin_migration_retained.png`, `fase_3_45_admin_migration_next_batch.png`).
   - Cero regresiones en frontend: HTTP 200, canonicals íntegros y 30 entradas en sitemaps sin traducciones retenidas.
 
+---
+
+### ADR-073: Conciliación Canónica de Identidades WPML, Arquitectura Jerárquica y Preparación del Piloto Mínimo (Fase 3.45A / Directiva DT-TFML-078)
+- **FECHA:** 2026-10-19
+- **DECISIÓN:**
+  1. **Conciliación Forense en Solo Lectura de las 19 Páginas en `BLOCKED_BY_LANGUAGE`:**
+     - Se realizó una auditoría directa contra `cms_ect_lab.etk_t_icl_translations` y `etk_t_posts` para verificar las identidades exactas (ID, slug, título, estado de publicación y jerarquía) de todas las páginas catalogadas con variantes en francés.
+     - Se purgaron las denominaciones erróneas y conjeturas del informe anterior, conciliando con precisión matemática:
+       * TRID 430: "Galería de Fotos" (`galeria`) / "Photo Gallery" (`gallery`) / "Galerie" (`galerie`).
+       * TRID 432: "Contactenos" (`contactenos`) / "Contact Us" (`contact-us`) / "Contactez-nous" (`contactez-nous`).
+       * TRID 9537: "Paquetes" (`paquetes`) / "Tour Packages" (`tour-packages`) / "Forfaits touristiques" (`forfaits-touristiques`).
+       * TRID 9563: "Servicios" (`servicios`) / "Services" (`services`) / "Services" (`services`) *(Página raíz autónoma, futuro padre jerárquico)*.
+       * TRID 9634: "Naturaleza Autentica" (`naturaleza-autentica`) / "Authentic Nature" (`authentic-nature`) / "Nature" (`nature`).
+       * TRID 9697: "Experiencia EcoTerra" (`experiencia-ecoterra`) / "Ecoterra Experience" (`ecoterra-experience`) / "Expérience Ecoterra" (`experience-ecoterra`).
+       * TRID 9818: "Confort y Tranquilidad" (`confort-y-tranquilidad`) / "Comfort and Tranquility" (`comfort-and-tranquility`) / "Chambres" (`chambres`).
+       * TRID 34652: "Experiencia Transformadora" (`experiencia-transformadora`) / "Transformative Experience" (`transformative-experience`) / "Qui somme nous?" *(Página raíz autónoma, futuro padre jerárquico)*.
+       * TRID 34831: "Blog" (`blog`) / "Blog" (`blog`) / "Blog" (`blog`).
+  2. **Rectificación de Grupos Acreditados y Purga de Conjeturas sobre Grupos Inexistentes:**
+     - Se confirmaron los grupos acreditados del piloto histórico:
+       * Grupo TFML #587: Inicio (Post #197 ES / Post #8356 EN), TRID 197.
+       * Grupo TFML #588: Actividades (Post #4976 ES / Post #8339 EN), TRID 9201.
+       * Grupo TFML #589: Nosotros (Post #6237 ES / Post #8354 EN), TRID 9545.
+     - Se demostró empíricamente la inexistencia de grupos #593 y #594 en la base de datos (el ID máximo en `etk_t_tfml_groups` es 589). Los posts #6505 (Servicios) y #9218 (Experiencia Transformadora) no habían sido migrados a TFML.
+  3. **Segregación Estricta de Dependencias Jerárquicas (3 Categorías Nítidas):**
+     - **Categoría A (9 Páginas Raíz Autónomas, `post_parent = 0`):** TRIDs 430, 432, 9537, 9563, 9634, 9697, 9818, 34652, 34831. Cero dependencias previas; requieren exclusivamente autorización de retención para su variante francesa.
+     - **Categoría B (4 Páginas Jerárquicas con Padre Acreditado en TFML):** Hijas de Nosotros / About Us (Grupo TFML #589): TRID 424 (¿Quienes Somos?), TRID 9838 (Reviews), TRID 34632 (Accesibilidad y Transportes) y TRID 34823 (Terms and Conditions). Dependencia de padre 100% resuelta en TFML.
+     - **Categoría C (6 Páginas Jerárquicas Bloqueadas por Padre Pendiente):** Hijas de Servicios (#6505: TRIDs 9326 y 9574) e Hijas de Experiencia Transformadora (#9218: TRIDs 34660, 34776, 34790, 34791). Bloqueadas incondicionalmente por integridad referencial hasta que sus respectivos padres sean migrados previamente.
+  4. **Rediseño del Panel `MigrationUi` (Tab `next_batch`):**
+     - Advertencia de Bloqueo Preventivo: Plan Maestro en `NEEDS_CONFIGURATION` con huella `c82cb04b1cd6c79e6b8ed44abe556291032bb4c38b5b4c23270c11b2f00fca99`.
+     - Tres tablas independientes renderizando títulos y slugs dinámicamente desde la base de datos real.
+     - Tarjeta destacada del Piloto Mínimo Certificado (`pilot-nav-2-trids-430-432`) con derivación canónica mediante `MigrationPlan::derive_partial_plan_with_retained_languages()`:
+       * Estado del Plan Parcial: `READY`.
+       * Huella del Plan Parcial (pilot_fp): `e18b00794e7ab339347c9fe101e067f2c95f339643a0957d765e1b135446c130`.
+       * Huella del Plan Maestro Padre (parent_fp): `c82cb04b1cd6c79e6b8ed44abe556291032bb4c38b5b4c23270c11b2f00fca99`.
+       * TRIDs ordenados canónicamente: `#430` y `#432`.
+       * Elementos ES/EN activos esperados: `4`.
+       * Traducciones francesas en custodia retenida: `2` (#8989 y #8823).
+       * Estado de Ejecución: `DETENIDO / NO AUTORIZADO` (cero mutaciones, modo estricto de auditoría).
+  5. **Invarianza Absoluta de Datos:**
+     - Producción `cms_ect` intocada: MD5 inmutable `4241ca7e7ec6399a594537cb04790c10` (3.403 filas).
+     - Laboratorio `cms_ect_lab` invariable: 123 grupos, 139 elementos y 3 traducciones retenidas preservadas.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.45A / Directiva DT-TFML-078 — Conciliación Canónica del Panel de Migración y Preparación del Siguiente Lote.
+- **JUSTIFICACIÓN:** Resolver las observaciones técnicas de la auditoría de Fase 3.45, corrigiendo la identificación errónea de los TRIDs, clarificando las dependencias jerárquicas y certificando un lote piloto mínimo determinista sin mutaciones en base de datos.
+- **CONSECUENCIAS:** Verificador reproducible `scratch/verify_fase_3_45a.php` certificado con **10/10 controles PASS (0 fallos)**, 691 pruebas PHPUnit superadas al 100%, PHPCS 100% limpio en todo el proyecto (187/187 archivos) y captura de alta resolución generada (`fase_3_45a_admin_migration_next_batch.png`).
+
+
 
 
 
