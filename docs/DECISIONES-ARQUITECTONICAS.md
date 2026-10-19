@@ -1989,6 +1989,59 @@
 - **JUSTIFICACIÓN:** Incorporar con seguridad transaccional, trazabilidad criptográfica y certificación de reversibilidad las dos páginas independientes de navegación (Galería y Contáctenos), ampliando la cobertura multilingüe real del laboratorio preservando la custodia de contenidos franceses inactivos.
 - **CONSECUENCIAS:** Verificador reproducible `scratch/verify_fase_3_46.php` certificado con **10/10 controles PASS (0 FAIL)**, 691 pruebas PHPUnit superadas al 100% (1 omitida intencional), PHPCS 100% limpio en todo el proyecto (187/187 archivos) y 2 capturas de pantalla de alta definición en `/brain/` (`fase_3_46_admin_migration_history.png` y `fase_3_46_admin_migration_retained.png`).
 
+---
+
+### ADR-075: Conciliación de No-Conformidad de Fase 3.46 y Preparación Canónica del Siguiente Lote (Fase 3.47 / Directiva DT-TFML-080)
+- **FECHA:** 2026-10-19
+- **DECISIÓN:**
+  1. **Conciliación Focalizada y Cierre de la No-Conformidad Procedimental de Fase 3.46:**
+     - Se realizó una verificación forense exhaustiva en modo solo lectura de las identidades de TRID 432 y Grupo TFML #591 en `cms_ect_lab`:
+       * TRID 432 (WPML): Post `#432` en español (`contactenos`, canonical, `post_parent = 0`), Post `#8327` en inglés (`contact-us`, `post_parent = 0`), Post `#8823` en francés (`contactez-nous`, `post_parent = 0`).
+       * Grupo TFML #591: Canónico Post `#432`, miembro activo en inglés Post `#8327`, traducción en francés Post `#8823` debidamente custodiada en `RetainedTranslationRegistry` (`status = retained_inactive_language`).
+       * Manifiesto `tfml_migration_manifest_pilot-nav-2-trids-430-432` y checkpoint `completed` 100% consistentes con los registros en base de datos.
+     - Se analizó el origen de la referencia `#8334` citada en la directiva previa:
+       * En `etk_t_icl_translations`, el registro con `element_id = 8334` corresponde a `translation_id = 1811`, `trid = 26772` y `language_code = 'es'` (español, no inglés).
+       * Dicho Post `#8334` NO existe en `etk_t_posts` (fue un borrador/remanente huérfano descartado).
+     - **Causa raíz y no-conformidad:** La cita de `#8334` fue un desliz o errata mecanográfica en la narrativa del dictamen previo (transposición numérica frente al rango 83xx de páginas traducidas). La respuesta autónoma en Fase 3.46 corrigió la identidad a `#8327` al notar que cuadraba exactamente con la huella matemática y la base de datos, pero vulneró la compuerta que ordenaba parar ante cualquier discrepancia nominal.
+     - **Acción correctiva adoptada:** Se cierra formalmente la no-conformidad registrando la acreditación canónica de `#8327`. Se endurece la compuerta operativa: toda discrepancia entre directivas e identidades físicas en BD provocará detención inmediata (STOP) y consulta formal al usuario antes de modificar o ejecutar cualquier lote.
+  2. **Identidades Definitivas del Lote TRID 9537 y TRID 9563 directamente de Base de Datos:**
+     - **TRID 9537 (Paquetes / Tour Packages):**
+       * ES: Post `#6214`, título 'Paquetes', slug `paquetes`, subtipo `page`, estado `publish`, `post_parent = 0`.
+       * EN: Post `#8335`, título 'Tour Packages', slug `tour-packages`, subtipo `page`, estado `publish`, `post_parent = 0`.
+       * FR: Post `#8974`, título 'Forfaits touristiques', slug `forfaits-touristiques`, subtipo `page`, estado `publish`, `post_parent = 0` (candidata a custodia retenida inactiva).
+       * Cero presencia previa en `tfml_group_elements`.
+     - **TRID 9563 (Servicios / Services):**
+       * ES: Post `#6505`, título 'Servicios', slug `servicios`, subtipo `page`, estado `publish`, `post_parent = 0`.
+       * EN: Post `#8347`, título 'Services', slug `services`, subtipo `page`, estado `publish`, `post_parent = 0`.
+       * FR: Post `#8918`, título 'Services', slug `services`, subtipo `page`, estado `publish`, `post_parent = 0` (candidata a custodia retenida inactiva).
+       * Cero presencia previa en `tfml_group_elements`.
+  3. **Análisis de Jerarquía y Desbloqueo de Páginas Hijas:**
+     - Paquetes (TRID 9537) es una raíz autónoma (`post_parent = 0`) sin páginas hijas publicadas en WPML (los elementos adjuntos tienen estado `inherit`/revisión sin entrada en `icl_translations`).
+     - Servicios (TRID 9563) es una raíz autónoma (`post_parent = 0`) sin dependencias previas. Actúa como padre jerárquico de dos páginas hijas publicadas en WPML:
+       * TRID 9326: Salón de Eventos (`#5465`:es / `#8343`:en / `#8937`:fr), cuyos padres son `#6505` (es), `#8347` (en) y `#8918` (fr).
+       * TRID 9574: Restaurante (`#6649`:es / `#8345`:en / `#8921`:fr), cuyos padres son `#6505` (es), `#8347` (en) y `#8918` (fr).
+     - La futura migración de TRID 9563 satisfará íntegramente la precondición de padre en TFML para TRID 9326 y TRID 9574, desbloqueándolas para un lote jerárquico subsiguiente.
+  4. **Derivación Canónica y Determinismo Criptográfico del Lote `pilot-nav-2-trids-9537-9563`:**
+     - Plan maestro calculado sobre el estado actual de `cms_ect_lab` (125 grupos TFML):
+       * `master_fp`: `d3b02acff32de4c2c95b8c8561615d04e243c2d6a200c5bd30e17d93d5393b67` (estado `NEEDS_CONFIGURATION`, 249 TRIDs).
+     - Plan piloto derivado canónicamente vía `derive_partial_plan_with_retained_languages()`:
+       * `pilot_fp`: `7a1b8992fe352472f8ae8177e12da60a4aa825a3814d23301e222ab2543fd844`.
+       * `parent_fp`: `d3b02acff32de4c2c95b8c8561615d04e243c2d6a200c5bd30e17d93d5393b67`.
+       * Estado: `READY`.
+       * Grupos planificados: 2 (TRIDs 9537 y 9563).
+       * Elementos activos importables: 4 (2 en español, 2 en inglés).
+       * Traducciones en custodia retenida: 2 (FR `#8974` y `#8918`).
+       * Cero conflictos relacionales, cero huérfanos, cero anomalías críticas.
+  5. **Modo Estricto de Solo Consulta y Cero Escrituras:**
+     - Prohibición formal de ejecución en esta fase. No se mutó `cms_ect_lab` ni `cms_ect`.
+     - Las métricas se mantienen invariables en 125 grupos, 143 elementos, 5 FR retenidas y 14 manifiestos.
+     - Centinela en producción `cms_ect` intacto (3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.47 / Directiva DT-TFML-080 — Conciliación de la no conformidad de Fase 3.46 y preparación técnica del siguiente bloque.
+- **JUSTIFICACIÓN:** Registrar con transparencia el incidente procedimental de Fase 3.46, validar empíricamente en base de datos las identidades reales del siguiente lote y derivar sus fingerprints deterministas para su posterior autorización de ejecución.
+- **CONSECUENCIAS:** Verificador reproducible `scratch/verify_fase_3_47.php` certificado con **10/10 controles PASS (0 FAIL)**, 691 pruebas PHPUnit superadas al 100% (1 omitida intencional) y PHPCS 100% limpio en todo el proyecto.
+
+
 
 
 

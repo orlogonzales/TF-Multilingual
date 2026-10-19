@@ -1965,6 +1965,30 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)**.
     - Verificador reproducible `scratch/verify_fase_3_46.php` certificado con **10/10 controles PASS (0 FAIL)**.
     - Artefactos visuales de alta resolución generados en `/brain/`: `fase_3_46_admin_migration_history.png` y `fase_3_46_admin_migration_retained.png`.
+- **Conciliación del Piloto Anterior y Preparación Canónica del Siguiente Bloque (Fase 3.47 / Directiva DT-TFML-080 — ADR-075):**
+  - **Conciliación Focalizada y Cierre de la No-Conformidad de Fase 3.46:**
+    - Verificación forense en solo lectura de TRID 432 y Grupo TFML #591 en `cms_ect_lab`: confirmación plena de que el elemento en español es el Post `#432` ("Contactenos", slug `contactenos`), el elemento en inglés es el Post `#8327` ("Contact Us", slug `contact-us`) y la traducción retenida en francés es el Post `#8823` ("Contactez-nous", slug `contactez-nous`).
+    - Descarte formal de la referencia `#8334`: se acreditó en base de datos que en WPML pertenece al TRID 26772 con idioma `es` y no existe registro físico en la tabla `wp_posts`.
+    - Registro de la no-conformidad procedimental por haber auto-corregido la identidad sin detener la ejecución y endurecimiento preventivo de compuertas (parada obligatoria ante discrepancias nominales entre directiva y base de datos).
+  - **Identidades Definitivas del Lote TRID 9537 y TRID 9563 directamente de Base de Datos:**
+    - **TRID 9537 (Paquetes / Tour Packages):** ES Post `#6214` (`paquetes`, status `publish`, `post_parent = 0`), EN Post `#8335` (`tour-packages`, status `publish`, `post_parent = 0`), FR Post `#8974` (`forfaits-touristiques`, status `publish`, `post_parent = 0`, retenible); 0 registros previos en TFML.
+    - **TRID 9563 (Servicios / Services):** ES Post `#6505` (`servicios`, status `publish`, `post_parent = 0`), EN Post `#8347` (`services`, status `publish`, `post_parent = 0`), FR Post `#8918` (`services`, status `publish`, `post_parent = 0`, retenible); 0 registros previos en TFML.
+  - **Análisis Riguroso de Dependencias y Jerarquía (Padres e Hijos):**
+    - TRID 9537 es una página raíz autónoma (`post_parent = 0`) sin dependencias previas ni páginas hijas en WPML.
+    - TRID 9563 es una página raíz autónoma (`post_parent = 0`) sin dependencias previas, y actúa como padre de dos páginas hijas en WPML: TRID 9326 (Salón de Eventos) y TRID 9574 (Restaurante). Su futura migración satisfará íntegramente la precondición jerárquica de padre para ambas hijas en TFML.
+  - **Determinismo Criptográfico y Derivación Canónica del Piloto:**
+    - Huella del plan maestro actual en `cms_ect_lab` (125 grupos TFML): `d3b02acff32de4c2c95b8c8561615d04e243c2d6a200c5bd30e17d93d5393b67` (estado `NEEDS_CONFIGURATION`).
+    - Huella del lote parcial derivado canónicamente `pilot-nav-2-trids-9537-9563`: `7a1b8992fe352472f8ae8177e12da60a4aa825a3814d23301e222ab2543fd844` (estado `READY`).
+    - Composición: 2 grupos (TRIDs 9537 y 9563), 4 elementos activos (2 ES, 2 EN), 2 retenidos en custodia francesa (`#8974` y `#8918`), 0 conflictos, 0 omitidos, 0 huérfanos.
+  - **Modo Estricto de Solo Consulta y Cero Escrituras:**
+    - Prohibición formal de ejecución en esta fase.
+    - Reconciliación global con 0 discrepancias (`reconcile()`) sobre los 125 grupos, 143 elementos, 5 FR retenidas y 14 manifiestos existentes.
+    - Verificación HTTP en vivo de 10 rutas públicas (200 OK con lang y canonical exactos; 404 limpio en `/fr/` y `/pt/`).
+    - Producción `cms_ect` 100% intacta (3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`).
+  - **Gobernanza, Calidad y Verificación Reproducible:**
+    - Suite de pruebas PHPUnit: **691 pruebas unitarias / 2.558 aserciones (100% PASS, 0 fallos, 0 errores, 1 omitida intencional)**.
+    - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)**.
+    - Verificador reproducible `scratch/verify_fase_3_47.php` certificado con **10/10 controles PASS (0 FAIL)**.
 
 
 
