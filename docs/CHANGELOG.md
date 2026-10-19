@@ -1926,6 +1926,46 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)**.
     - Certificación en el verificador reproducible `scratch/verify_fase_3_45a.php` con **10/10 controles PASS (0 FAIL)**.
     - Generación de artefacto visual en alta resolución: `fase_3_45a_admin_migration_next_batch.png`.
+- **Importación Transaccional Controlada del Piloto de Navegación TRID 430/432 (Fase 3.46 / Directiva DT-TFML-079 — ADR-074):**
+  - **Compuertas Previas y Protocolo de Respaldo Fuera del Webroot:**
+    - Verificación exitosa de compuertas previas: centinela WPML en producción `cms_ect` (3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`), centinela WPML en laboratorio `cms_ect_lab` (3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`), estado base de TFML verificado (123 grupos, 139 elementos, 3 FR retenidas, 13 manifiestos, checkpoint `completed` y lock libre).
+    - Generación de respaldo físico SQL completo fuera de DocumentRoot en `D:/laragon/backup/tfml_staging/cms_ect_lab_pre_fase_3_46_pilot_trids_430_432_20261019_063119.sql` (17.806.013 bytes, SHA-256 `5d6fceeccc37a6c26603898e440bfaa620786d880fb05144a5c8ce7d4bfb7e23`).
+  - **Certificación y Pruebas en Base de Datos Desechable (`cms_ect_lab_restore_verify`):**
+    - Restauración completa y certificación de volcado en base de datos efímera (`cms_ect_lab_restore_verify`) confirmando métricas base (123/139/3/13).
+    - Ejecución de prueba del lote piloto `pilot-nav-2-trids-430-432`: 123 -> 125 grupos, 139 -> 143 elementos, 3 -> 5 retenidas, 13 -> 14 manifiestos.
+    - Prueba de idempotencia estricta en segundo ciclo: 2 grupos saltados (`idempotent_skipped`), 0 grupos duplicados.
+    - Prueba de reversión selectiva mediante `WpmlMigrationRollbackService::rollback_groups()`: retorno limpio al estado base previo (123 grupos, 139 elementos, 3 retenidas).
+    - Destrucción segura de la base de datos efímera y persistencia de metadatos de auditoría en `meta.json`.
+  - **Validación Criptográfica y Ejecución Transaccional Atómica en `cms_ect_lab`:**
+    - Derivación canónica del plan parcial `pilot-nav-2-trids-430-432` con trazabilidad criptográfica: huella padre `c82cb04b1cd6c79e6b8ed44abe556291032bb4c38b5b4c23270c11b2f00fca99`, huella piloto `e18b00794e7ab339347c9fe101e067f2c95f339643a0957d765e1b135446c130`, 2 grupos, 4 elementos activos (2 ES, 2 EN), 2 retenidos en francés (#8989 y #8823), 0 conflictos, estado `READY`.
+    - Ejecución atómica única vía `WpmlMigrationExecutor`:
+      * TRID 430 -> Asignado al Grupo TFML #590 (canónico `#430` Galería de Fotos [ES], miembro `#8329` Photo Gallery [EN], `#8989` Galerie en custodia francesa inactiva en `RetainedTranslationRegistry`).
+      * TRID 432 -> Asignado al Grupo TFML #591 (canónico `#432` Contáctenos [ES], miembro `#8327` Contact Us [EN], `#8823` Contactez-nous en custodia francesa inactiva en `RetainedTranslationRegistry`).
+    - Generación de manifiesto inmutable `tfml_migration_manifest_pilot-nav-2-trids-430-432` y actualización del checkpoint a `completed` con lock libre.
+  - **Consolidación de Métricas en Laboratorio:**
+    - Grupos TFML: de 123 a **125**.
+    - Elementos Activos: de 139 a **143**.
+    - Traducciones Retenidas FR: de 3 a **5**.
+    - Manifiestos de Migración: de 13 a **14**.
+    - Cero elementos en francés activos (`fr_active = 0`) y cero duplicidades relacionales.
+    - Reconciliación global con 0 discrepancias (`reconcile()`).
+  - **Certificación Funcional de Enrutamiento, Menús y Sitemaps:**
+    - Comprobación en servidor HTTP real (`http://lab.ecoterra.test`):
+      * `/galeria/` (Post #430): HTTP 200, `lang="es-ES"`, canonical `/galeria/`, hreflang simétrico y alternativo.
+      * `/en/gallery/` (Post #8329): HTTP 200, `lang="en-US"`, canonical `/en/gallery/`, hreflang simétrico y alternativo.
+      * `/contactenos/` (Post #432): HTTP 200, `lang="es-ES"`, canonical `/contactenos/`, hreflang simétrico y alternativo.
+      * `/en/contact-us/` (Post #8327): HTTP 200, `lang="en-US"`, canonical `/en/contact-us/`, hreflang simétrico y alternativo.
+      * Cero regresiones en rutas previamente migradas: `/`, `/en/`, `/nosotros/`, `/en/about-us/`, `/actividades/`, `/en/activities/` (todas 200 OK); `/fr/` y `/pt/` responden 404 limpio.
+    - Menú de escritorio `menu-menu-es-ingles` (ID 98): `Photo Gallery` enlaza automáticamente a `http://lab.ecoterra.test/en/gallery/`, mientras las 11 subpáginas pendientes se mantienen protegidas sin enlaces rotos 404 prematuros.
+    - Sitemaps de Core: el subtipo `page` pasa de 7 a 11 entradas; total general pasa de 30 a 34 entradas únicas (0 francés, 0 duplicados, `blog_public = 0`).
+  - **Invarianza Absoluta de Producción (`cms_ect`):**
+    - La base de datos de producción `cms_ect` permanece 100% inalterada: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+  - **Gobernanza, Calidad y Verificación Reproducible:**
+    - Suite de pruebas PHPUnit: **691 pruebas unitarias / 2.558 aserciones (100% PASS, 0 fallos, 0 errores, 1 omitida intencional)**.
+    - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)**.
+    - Verificador reproducible `scratch/verify_fase_3_46.php` certificado con **10/10 controles PASS (0 FAIL)**.
+    - Artefactos visuales de alta resolución generados en `/brain/`: `fase_3_46_admin_migration_history.png` y `fase_3_46_admin_migration_retained.png`.
+
 
 
 

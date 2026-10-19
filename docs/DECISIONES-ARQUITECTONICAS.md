@@ -1943,6 +1943,53 @@
 - **JUSTIFICACIÓN:** Resolver las observaciones técnicas de la auditoría de Fase 3.45, corrigiendo la identificación errónea de los TRIDs, clarificando las dependencias jerárquicas y certificando un lote piloto mínimo determinista sin mutaciones en base de datos.
 - **CONSECUENCIAS:** Verificador reproducible `scratch/verify_fase_3_45a.php` certificado con **10/10 controles PASS (0 fallos)**, 691 pruebas PHPUnit superadas al 100%, PHPCS 100% limpio en todo el proyecto (187/187 archivos) y captura de alta resolución generada (`fase_3_45a_admin_migration_next_batch.png`).
 
+---
+
+### ADR-074: Importación Transaccional Controlada del Piloto de Navegación TRID 430/432 (Fase 3.46 / Directiva DT-TFML-079)
+- **FECHA:** 2026-10-19
+- **DECISIÓN:**
+  1. **Compuertas Previas Obligatorias y Protocolo de Respaldo Fuera del Webroot:**
+     - Se superaron todas las compuertas previas: centinela WPML en producción `cms_ect` (3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`), centinela WPML en laboratorio `cms_ect_lab` (3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`), estado previo de TFML verificado (123 grupos, 139 elementos, 3 FR retenidas, 13 manifiestos, checkpoint `completed` y lock libre).
+     - Se generó un respaldo SQL físico completo fuera del webroot en `D:/laragon/backup/tfml_staging/cms_ect_lab_pre_fase_3_46_pilot_trids_430_432_20261019_063119.sql` (17.806.013 bytes, SHA-256 `5d6fceeccc37a6c26603898e440bfaa620786d880fb05144a5c8ce7d4bfb7e23`).
+  2. **Certificación en Base de Datos Desechable (`cms_ect_lab_restore_verify`):**
+     - Se restauró el volcado SQL en una base efímera independiente (`cms_ect_lab_restore_verify`), comprobando la paridad de métricas.
+     - Se ejecutó el lote piloto `pilot-nav-2-trids-430-432` en la base desechable: grupos 123 -> 125, elementos 139 -> 143, retenidas 3 -> 5, manifiestos 13 -> 14.
+     - Se ejecutó un segundo ciclo probando la idempotencia estricta: 2 grupos saltados por idempotencia (`idempotent_skipped`), 0 grupos duplicados.
+     - Se ejecutó una reversión selectiva mediante `WpmlMigrationRollbackService::rollback_groups()`: restauración limpia al estado previo (123 grupos, 139 elementos, 3 retenidas).
+     - Se eliminó la base de datos efímera y se registró el archivo inmutable `meta.json`.
+  3. **Validación Criptográfica y Ejecución Transaccional Única en `cms_ect_lab`:**
+     - Derivación canónica autorizada del plan parcial con retención de idiomas inactivos:
+       * Huella del Plan Maestro (`parent_fp`): `c82cb04b1cd6c79e6b8ed44abe556291032bb4c38b5b4c23270c11b2f00fca99`.
+       * Huella del Plan Piloto (`pilot_fp`): `e18b00794e7ab339347c9fe101e067f2c95f339643a0957d765e1b135446c130`.
+       * Composición: 2 grupos, 4 elementos activos (2 ES, 2 EN), 2 traducciones en custodia francesa (#8989 y #8823), cero conflictos.
+     - Ejecución transaccional atómica única en `cms_ect_lab` mediante `WpmlMigrationExecutor`:
+       * TRID 430 -> Asignado a Grupo TFML #590 (canónico `#430` Galería de Fotos [ES], miembro `#8329` Photo Gallery [EN], `#8989` Galerie en custodia retenida en `RetainedTranslationRegistry`).
+       * TRID 432 -> Asignado a Grupo TFML #591 (canónico `#432` Contactenos [ES], miembro `#8327` Contact Us [EN], `#8823` Contactez-nous en custodia retenida en `RetainedTranslationRegistry`).
+       * Se generó el manifiesto inmutable `tfml_migration_manifest_pilot-nav-2-trids-430-432` y el checkpoint se actualizó a `completed` con el lock libre.
+  4. **Consolidación de Métricas en Laboratorio:**
+     - Grupos TFML: de 123 a **125**.
+     - Elementos Activos: de 139 a **143**.
+     - Traducciones Retenidas FR: de 3 a **5**.
+     - Manifiestos de Migración: de 13 a **14**.
+     - Cero elementos en francés activos (`fr_active = 0`) y cero duplicidades relacionales.
+     - Reconciliación global con 0 discrepancias (`reconcile()`).
+  5. **Certificación Funcional de Enrutamiento, Menús y Sitemaps:**
+     - Comprobación empírica en servidor HTTP real (`http://lab.ecoterra.test`):
+       * `/galeria/` (Post #430): HTTP 200, `lang="es-ES"`, canonical `/galeria/`, hreflang simétrico.
+       * `/en/gallery/` (Post #8329): HTTP 200, `lang="en-US"`, canonical `/en/gallery/`, hreflang simétrico.
+       * `/contactenos/` (Post #432): HTTP 200, `lang="es-ES"`, canonical `/contactenos/`, hreflang simétrico.
+       * `/en/contact-us/` (Post #8327): HTTP 200, `lang="en-US"`, canonical `/en/contact-us/`, hreflang simétrico.
+       * Selector de idiomas con enlaces cruzados directos; portugués (`pt`) excluido por falta de traducción (`skip_missing`) y francés (`fr`) con cero exposición.
+     - Menú de escritorio `menu-menu-es-ingles` (ID 98): `Photo Gallery` enlaza automáticamente a `http://lab.ecoterra.test/en/gallery/`, mientras las 11 subpáginas pendientes se mantienen protegidas sin rutas 404 prematuras.
+     - Sitemaps de Core: el subtipo `page` pasa de 7 a 11 entradas; el total general pasa de 30 a 34 entradas únicas (0 francés, 0 duplicados, `blog_public = 0`).
+  6. **Invarianza Absoluta de Producción (`cms_ect`):**
+     - La base de datos de producción `cms_ect` permanece 100% inalterada: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.46 / Directiva DT-TFML-079 — Importación transaccional controlada del piloto TRID 430/432.
+- **JUSTIFICACIÓN:** Incorporar con seguridad transaccional, trazabilidad criptográfica y certificación de reversibilidad las dos páginas independientes de navegación (Galería y Contáctenos), ampliando la cobertura multilingüe real del laboratorio preservando la custodia de contenidos franceses inactivos.
+- **CONSECUENCIAS:** Verificador reproducible `scratch/verify_fase_3_46.php` certificado con **10/10 controles PASS (0 FAIL)**, 691 pruebas PHPUnit superadas al 100% (1 omitida intencional), PHPCS 100% limpio en todo el proyecto (187/187 archivos) y 2 capturas de pantalla de alta definición en `/brain/` (`fase_3_46_admin_migration_history.png` y `fase_3_46_admin_migration_retained.png`).
+
+
 
 
 
