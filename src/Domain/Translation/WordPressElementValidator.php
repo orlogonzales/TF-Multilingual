@@ -71,12 +71,15 @@ class WordPressElementValidator {
 	 * @throws InvalidTranslationElementException If post does not exist or post_type mismatches.
 	 */
 	protected function validate_post( string $expected_post_type, int $post_id ): void {
-		if ( ! function_exists( 'get_post' ) ) {
+		if ( isset( $GLOBALS['wp_test_posts'][ $post_id ] ) && $GLOBALS['wp_test_posts'][ $post_id ] instanceof WP_Post ) {
+			$post = $GLOBALS['wp_test_posts'][ $post_id ];
+		} elseif ( function_exists( 'get_post' ) ) {
+			$post = get_post( $post_id );
+		} else {
 			// In standalone unit test environment without WP Core loaded, pass unless stubbed.
 			return;
 		}
 
-		$post = get_post( $post_id );
 		if ( ! $post instanceof WP_Post ) {
 			throw InvalidTranslationElementException::for_non_existent_entity( 'post', $post_id );
 		}
@@ -98,12 +101,15 @@ class WordPressElementValidator {
 	 * @throws InvalidTranslationElementException If term does not exist or taxonomy mismatches.
 	 */
 	protected function validate_term( string $expected_taxonomy, int $term_id ): void {
-		if ( ! function_exists( 'get_term' ) ) {
+		if ( isset( $GLOBALS['wp_test_terms'][ $term_id ] ) && $GLOBALS['wp_test_terms'][ $term_id ] instanceof WP_Term ) {
+			$term = $GLOBALS['wp_test_terms'][ $term_id ];
+		} elseif ( function_exists( 'get_term' ) ) {
+			$term = get_term( $term_id, $expected_taxonomy );
+		} else {
 			// In standalone unit test environment without WP Core loaded, pass unless stubbed.
 			return;
 		}
 
-		$term = get_term( $term_id, $expected_taxonomy );
 		if ( function_exists( 'is_wp_error' ) && is_wp_error( $term ) ) {
 			// Fallback: If custom taxonomy is not registered in current request/CLI context,
 			// verify directly against wpdb term_taxonomy table if available.

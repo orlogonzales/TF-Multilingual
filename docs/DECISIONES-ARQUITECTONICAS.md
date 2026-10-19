@@ -1757,9 +1757,41 @@
   6. **Aislamiento Absoluto e Invarianza de Datos Certificada:**
      - Cero escrituras en la base de datos de producción `cms_ect` (MD5 inmutable `4241ca7e7ec6399a594537cb04790c10` / 3.403 filas).
      - Invarianza total en la base de datos de laboratorio `cms_ect_lab`: 123 grupos de traducción, 139 elementos activos y 3 traducciones retenidas.
+---
+
+### ADR-069: Vinculación y Desvinculación Editorial de Traducciones Existentes en el Panel Administrativo (`PostEditorialUi`, `TranslationEditorialService`, REST API) (Fase 3.43 / Directiva DT-TFML-074)
+- **FECHA:** 2026-10-18 / 2026-10-19
+- **DECISIÓN:**
+  1. **Arquitectura Centralizada en `TranslationEditorialService` sin Motores Paralelos ni Tablas Duplicadas:**
+     - En lugar de crear lógica paralela en los controladores visuales, la búsqueda de candidatos (`search_link_candidates`), la vinculación relacional (`link_translation`) y la desvinculación segura (`unlink_translation`) se centralizan soberanamente en [`src/Editorial/TranslationEditorialService.php`](../src/Editorial/TranslationEditorialService.php).
+     - Tanto el controlador REST (`TranslationsController::get_candidates`, `link_translation`, `unlink_translation`) como la UI editorial de WordPress (`PostEditorialUi::handle_link_translation`, `handle_unlink_translation`, `handle_ajax_search_candidates`) delegan exactamente en la misma capa de servicio de dominio.
+  2. **Doble Mecanismo Editorial: Creación de Borradores (`Crear nueva`) vs Vinculación de Existentes (`Vincular existente`):**
+     - En [`src/Admin/PostEditorialUi.php`](../src/Admin/PostEditorialUi.php), cada idioma faltante se presenta en una tarjeta organizada por pestañas independientes:
+       - Pestaña `[+ Crear nueva]`: invoca `create_post_translation()` para generar un nuevo borrador clonando metadatos compartidos.
+       - Pestaña `[🔗 Vincular existente]`: permite localizar un post/página preexistente y vincularlo al grupo existente sin crear contenido duplicado.
+  3. **Buscador en Vivo Debounced (250ms), Tarjeta de Previsualización y Fallback por ID Directo:**
+     - El formulario de vinculación incluye un input con autocompletado en vivo por AJAX (`admin-ajax.php?action=tfml_search_candidates`) con debounce de 250ms, filtrando estrictamente por tipo de elemento, subtipo exacto y excluyendo el post actual y elementos ya vinculados a cualquier grupo de TFML.
+     - Cada elemento de la lista desplegable muestra el título, ID numérico, slug y estado de publicación (`publish`, `draft`, etc.).
+     - Al seleccionar un candidato, se despliega una tarjeta de confirmación visual (`tfml-candidate-preview-box`) con los metadatos completos y se habilita el botón de acción principal.
+     - Se mantiene un campo directo numérico (`target_post_id`) como mecanismo de respaldo robusto para entornos sin JavaScript o selección directa por ID.
+  4. **Desvinculación Segura (`unlink_translation`) con 100% Preservación de la Entidad en Core (`wp_posts`):**
+     - La desvinculación retira la correspondencia relacional en `tfml_group_elements` y actualiza/promueve el ID canónico si el elemento desvinculado era el canónico.
+     - CERO operaciones de eliminación o alteración en `wp_posts` o `wp_terms`: el objeto de WordPress Core permanece 100% intacto como contenido huérfano no gestionado, disponible para ser editado individualmente o revinculado a otro grupo.
+     - La acción de desvinculación se ofrece mediante un botón dedicado `[Desvincular]` con icono `dashicons-editor-unlink`, confirmación nativa de JavaScript y nonce individualizado.
+  5. **Integridad Estricta de Dominio y Validaciones de Seguridad:**
+     - Bloqueo de duplicidad de idioma en el grupo (`EditorialConflictException`).
+     - Bloqueo de heterogeneidad de subtipos (ej. vincular un `post` a una `page`) (`EditorialValidationException`).
+     - Bloqueo de vinculación de posts que ya pertenecen a otro grupo activo (`EditorialConflictException`).
+     - Bloqueo de vinculación contra sí mismo (`source_id === target_id`) (`EditorialValidationException`).
+     - Bloqueo de vinculación a idiomas inactivos o elementos retenidos en francés (`EditorialValidationException`).
+     - Verificación obligatoria de nonces dedicados (`tfml_link_post_translation_*`, `tfml_unlink_post_translation_*`, `tfml_editorial_ajax`) y capacidades de edición (`edit_post` en el post origen y destino).
+  6. **Aislamiento Estricto y Cero Mutaciones sobre la Base de Datos:**
+     - Cero escrituras en producción `cms_ect` (MD5 inmutable `4241ca7e7ec6399a594537cb04790c10` / 3.403 filas).
+     - Invarianza total en la base de datos de laboratorio `cms_ect_lab`: 123 grupos, 139 elementos, 3 franceses retenidos intactos.
+     - Todas las demostraciones de vinculación y desvinculación se verificaron de forma sintética e inofensiva en fixtures descartables sin alterar las páginas reales de `cms_ect_lab`.
 - **ESTADO:** **ACEPTADA**
-- **CONTEXTO:** Fase 3.42 / Directiva DT-TFML-073 — Coherencia del Panel Administrativo & Pantalla Funcional de Idiomas.
-- **JUSTIFICACIÓN:** Transformar las capacidades del motor lingüístico en una experiencia de administración intuitiva, segura y transparente, resolviendo duplicidades en menús, dotando de interfaz gráfica a la gestión de idiomas, y aclarando con precisión diagnóstica las métricas de menús y la retención del francés.
-- **CONSECUENCIAS:** Suite de pruebas unitarias ampliada a **639 pruebas / 2.367 aserciones (0 fallos)** con 13 tests nuevos específicos para `LanguageEditorialUi`, verificación PHPCS 100% limpia, verificador automatizado `scratch/verify_fase_3_42.php` certificado con **10/10 controles PASS (0 FAIL)**, capturas visuales reales generadas en `/brain/` y cumplimiento estricto del aislamiento entre proyectos.
+- **CONTEXTO:** Fase 3.43 / Directiva DT-TFML-074 — Vinculación Editorial de Traducciones Existentes.
+- **JUSTIFICACIÓN:** Dotar al equipo editorial de una herramienta visual completa para conectar contenidos ya existentes en WordPress sin obligar a recrearlos ni recurrir a llamadas REST manuales o manipulaciones de base de datos.
+- **CONSECUENCIAS:** Suite de pruebas unitarias ampliada a **655 pruebas / 2.434 aserciones (0 fallos, 0 advertencias)**, PHPCS 100% limpio en **181/181 archivos**, verificador reproducible `scratch/verify_fase_3_43.php` certificado con **10/10 controles PASS (0 FAIL)**, captura visual generada en `/brain/` (`fase_3_43_admin_post_link.png`) y 4/4 páginas frontend con HTTP 200 y canonicals correctos.
 
 

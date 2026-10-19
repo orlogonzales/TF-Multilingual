@@ -186,6 +186,7 @@ class TranslationsControllerTest extends TestCase {
 		$this->assertArrayHasKey( '/translations/(?P<element_type>post|term)/(?P<id>[\\d]+)', $routes );
 		$this->assertArrayHasKey( '/translations/link', $routes );
 		$this->assertArrayHasKey( '/translations/unlink', $routes );
+		$this->assertArrayHasKey( '/translations/candidates', $routes );
 	}
 
 	/**
@@ -569,5 +570,50 @@ class TranslationsControllerTest extends TestCase {
 		$this->assertNull( $data['canonical_element_id'], 'Private canonical ID must be nullified for unauthorized users' );
 		$this->assertNull( $data['canonical_language'], 'Private canonical language must be nullified for unauthorized users' );
 		$this->assertFalse( $data['is_canonical'] );
+	}
+
+	/**
+	 * Tests get_candidates_permissions_check returns forbidden when user lacks edit cap.
+	 */
+	public function test_get_candidates_permissions_check_forbidden(): void {
+		$request = new WP_REST_Request( 'GET', '/tf-multilingual/v1/translations/candidates' );
+		$request->set_param( 'subtype', 'post' );
+
+		$GLOBALS['wp_test_caps']['edit_posts'] = false;
+
+		$result = $this->controller->get_candidates_permissions_check( $request );
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 'rest_cannot_view', $result->get_error_code() );
+	}
+
+	/**
+	 * Tests get_candidates successfully returns candidate list from editorial service.
+	 */
+	public function test_get_candidates_success(): void {
+		$this->db->mock_posts = array(
+			array(
+				'ID'          => 105,
+				'post_title'  => 'Nosotros Portuguese',
+				'post_name'   => 'nosotros-pt',
+				'post_status' => 'publish',
+				'post_type'   => 'page',
+			),
+		);
+
+		$request = new WP_REST_Request( 'GET', '/tf-multilingual/v1/translations/candidates' );
+		$request->set_param( 'element_type', 'post' );
+		$request->set_param( 'subtype', 'page' );
+		$request->set_param( 'target_language', 'pt' );
+		$request->set_param( 'query', 'Nosotros' );
+
+		$response = $this->controller->get_candidates( $request );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		$data = $response->get_data();
+		$this->assertIsArray( $data );
+		$this->assertCount( 1, $data );
+		$this->assertSame( 105, $data[0]['id'] );
+		$this->assertSame( 'Nosotros Portuguese', $data[0]['title'] );
 	}
 }

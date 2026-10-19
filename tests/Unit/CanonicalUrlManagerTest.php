@@ -142,9 +142,10 @@ class CanonicalUrlManagerTest extends TestCase {
 	 * @param int $id Post ID.
 	 * @return WP_Post
 	 */
-	private function create_post( int $id ): WP_Post {
+	private function create_post( int $id, string $post_type = 'post' ): WP_Post {
 		$post             = new WP_Post();
 		$post->ID         = $id;
+		$post->post_type  = $post_type;
 		$post->post_title = 'Post ' . $id;
 
 		$GLOBALS['wp_test_posts'][ $id ] = $post;
@@ -258,10 +259,10 @@ class CanonicalUrlManagerTest extends TestCase {
 		$this->assertSame( 2, $GLOBALS['wp_test_filters']['get_canonical_url'][0]['accepted_args'] );
 
 		// Verify end-to-end dispatch via apply_filters( 'get_canonical_url', $url, $post ) as executed by wp_get_canonical_url().
-		$nosotros_es    = $this->create_post( 6237 );
-		$about_us_en    = $this->create_post( 8354 );
-		$actividades_es = $this->create_post( 4976 );
-		$activities_en  = $this->create_post( 8339 );
+		$nosotros_es    = $this->create_post( 6237, 'page' );
+		$about_us_en    = $this->create_post( 8354, 'page' );
+		$actividades_es = $this->create_post( 4976, 'page' );
+		$activities_en  = $this->create_post( 8339, 'page' );
 
 		$group_nosotros = $this->group_repo->create_group( 'post', 'page', 6237, 'es' );
 		$this->group_repo->add_translation( $group_nosotros->get_id(), 8354, 'en' );

@@ -44,21 +44,21 @@ class TestableWpdb extends wpdb {
 	 *
 	 * @var string
 	 */
-	public string $posts = 'wp_posts';
+	public $posts = 'wp_posts';
 
 	/**
 	 * Terms table name.
 	 *
 	 * @var string
 	 */
-	public string $terms = 'wp_terms';
+	public $terms = 'wp_terms';
 
 	/**
 	 * Term taxonomy table name.
 	 *
 	 * @var string
 	 */
-	public string $term_taxonomy = 'wp_term_taxonomy';
+	public $term_taxonomy = 'wp_term_taxonomy';
 
 	/**
 	 * Mock posts storage.
@@ -89,6 +89,15 @@ class TestableWpdb extends wpdb {
 	public ?string $force_next_error = null;
 
 	/**
+	 * Constructor.
+	 *
+	 * Overrides wpdb constructor to prevent connecting to a real database.
+	 */
+	public function __construct() {
+		$this->prefix = 'wp_';
+	}
+
+	/**
 	 * Resets simulated tables.
 	 *
 	 * @return void
@@ -105,6 +114,29 @@ class TestableWpdb extends wpdb {
 	}
 
 	/**
+	 * Simulates real escape without requiring live MySQL connection.
+	 *
+	 * @param string $data Data to escape.
+	 * @return string
+	 */
+	public function _real_escape( $data ) {
+		return addslashes( (string) $data );
+	}
+
+	/**
+	 * Simulates escape without requiring live MySQL connection.
+	 *
+	 * @param mixed $data Data to escape.
+	 * @return mixed
+	 */
+	public function _escape( $data ) {
+		if ( is_array( $data ) ) {
+			return array_map( array( $this, '_escape' ), $data );
+		}
+		return addslashes( (string) $data );
+	}
+
+	/**
 	 * Simulates insert.
 	 *
 	 * @param string               $table  Table name.
@@ -112,7 +144,7 @@ class TestableWpdb extends wpdb {
 	 * @param array<string>        $format Format array.
 	 * @return int|false
 	 */
-	public function insert( string $table, array $data, array $format = array() ): int|false {
+	public function insert( $table, $data, $format = null ) {
 		if ( null !== $this->force_next_error ) {
 			$this->last_error       = $this->force_next_error;
 			$this->force_next_error = null;
@@ -190,12 +222,12 @@ class TestableWpdb extends wpdb {
 	 * @return int|false
 	 */
 	public function update(
-		string $table,
-		array $data,
-		array $where,
-		array $format = array(),
-		array $where_format = array()
-	): int|false {
+		$table,
+		$data,
+		$where,
+		$format = null,
+		$where_format = null
+	) {
 		if ( str_contains( $table, 'tfml_groups' ) && isset( $where['id'] ) ) {
 			$id = (int) $where['id'];
 			if ( isset( $this->groups[ $id ] ) ) {
@@ -244,7 +276,7 @@ class TestableWpdb extends wpdb {
 	 * @param array<string>        $where_format Where format.
 	 * @return int|false
 	 */
-	public function delete( string $table, array $where, array $where_format = array() ): int|false {
+	public function delete( $table, $where, $where_format = null ) {
 		if ( str_contains( $table, 'tfml_groups' ) && isset( $where['id'] ) ) {
 			$id = (int) $where['id'];
 			if ( isset( $this->groups[ $id ] ) ) {
@@ -299,7 +331,7 @@ class TestableWpdb extends wpdb {
 	 * @param string $output Output format.
 	 * @return mixed
 	 */
-	public function get_row( string $query, string $output = 'OBJECT' ): mixed {
+	public function get_row( $query = null, $output = 'OBJECT', $y = 0 ) {
 		if ( preg_match( '/FROM `?[^` ]*tfml_groups`? WHERE `?id`? = (\d+)/i', $query, $matches ) ) {
 			$id = (int) $matches[1];
 			return $this->groups[ $id ] ?? null;
@@ -362,7 +394,7 @@ class TestableWpdb extends wpdb {
 	 * @param string $query SQL query.
 	 * @return mixed
 	 */
-	public function get_var( string $query ): mixed {
+	public function get_var( $query = null, $x = 0, $y = 0 ) {
 		if ( preg_match( '/FROM `?[^` ]*tfml_group_elements`? WHERE `?element_type`? = \'([^\']+)\' AND `?element_id`? = (\d+)/i', $query, $matches ) ) {
 			$type       = $matches[1];
 			$element_id = (int) $matches[2];
@@ -395,7 +427,7 @@ class TestableWpdb extends wpdb {
 	 * @param string $output Output format.
 	 * @return mixed
 	 */
-	public function get_results( string $query, string $output = 'OBJECT' ): mixed {
+	public function get_results( $query = null, $output = 'OBJECT' ) {
 		if ( preg_match( '/FROM `?[^` ]*tfml_group_elements`? WHERE `?element_type`? = \'([^\']+)\' AND `?element_id`? IN \(([^)]+)\)/i', $query, $matches ) ) {
 			$type    = $matches[1];
 			$ids     = array_map( 'intval', explode( ',', $matches[2] ) );
@@ -463,6 +495,14 @@ class TestableWpdb extends wpdb {
 			return $results;
 		}
 
+		if ( str_contains( $query, "FROM {$this->posts}" ) || str_contains( $query, 'FROM wp_posts' ) ) {
+			$results = array();
+			foreach ( $this->mock_posts as $p ) {
+				$results[] = ( 'OBJECT' === $output ) ? (object) $p : $p;
+			}
+			return $results;
+		}
+
 		return array();
 	}
 
@@ -472,7 +512,7 @@ class TestableWpdb extends wpdb {
 	 * @param string $query SQL query.
 	 * @return int|bool
 	 */
-	public function query( string $query ): int|bool {
+	public function query( $query ) {
 		return true;
 	}
 }

@@ -24,6 +24,7 @@ use TF\Multilingual\Domain\Versioning\TranslationStatusResolver;
 use TF\Multilingual\Editorial\Exceptions\EditorialConflictException;
 use TF\Multilingual\Editorial\Exceptions\EditorialPermissionException;
 use TF\Multilingual\Editorial\Exceptions\EditorialValidationException;
+use TF\Multilingual\Migration\RetainedTranslationRegistry;
 use WP_Post;
 use WP_Term;
 use wpdb;
@@ -137,6 +138,13 @@ class TranslationEditorialService {
 	private array $syncing_elements = array();
 
 	/**
+	 * Retained translation registry.
+	 *
+	 * @var RetainedTranslationRegistry|null
+	 */
+	private ?RetainedTranslationRegistry $retained_registry = null;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param LanguageRegistry|null           $language_registry             Language registry.
@@ -147,6 +155,7 @@ class TranslationEditorialService {
 	 * @param CustomFieldPolicyRegistry|null  $custom_field_policy_registry  Custom field policy registry.
 	 * @param TranslationStatusResolver|null  $status_resolver               Translation status resolver.
 	 * @param TranslatableFingerprint|null    $fingerprint_service           Fingerprint service.
+	 * @param RetainedTranslationRegistry|null $retained_registry            Retained translation registry.
 	 */
 	public function __construct(
 		?LanguageRegistry $language_registry = null,
@@ -156,7 +165,8 @@ class TranslationEditorialService {
 		?wpdb $db = null,
 		?CustomFieldPolicyRegistry $custom_field_policy_registry = null,
 		?TranslationStatusResolver $status_resolver = null,
-		?TranslatableFingerprint $fingerprint_service = null
+		?TranslatableFingerprint $fingerprint_service = null,
+		?RetainedTranslationRegistry $retained_registry = null
 	) {
 		global $wpdb;
 
@@ -168,6 +178,12 @@ class TranslationEditorialService {
 		$this->custom_field_policy_registry = null !== $custom_field_policy_registry ? $custom_field_policy_registry : new CustomFieldPolicyRegistry();
 		$this->status_resolver              = null !== $status_resolver ? $status_resolver : new TranslationStatusResolver( $this->group_repository, $this->language_registry );
 		$this->fingerprint_service          = null !== $fingerprint_service ? $fingerprint_service : new TranslatableFingerprint( $this->custom_field_policy_registry );
+
+		if ( null !== $retained_registry ) {
+			$this->retained_registry = $retained_registry;
+		} elseif ( class_exists( RetainedTranslationRegistry::class ) && null !== $this->db ) {
+			$this->retained_registry = new RetainedTranslationRegistry( $this->db );
+		}
 	}
 
 	/**
@@ -732,6 +748,344 @@ class TranslationEditorialService {
 	}
 
 	/**
+	 * Searches for eligible candidate elements that can be linked into a translation group.
+	 *
+	 * Only returns elements of the exact same subtype that are not currently assigned
+	 * to any translation group and not retained in inactive languages.
+	 *
+	 * @param string $element_type    Element type ('post' or 'term').
+	 * @param string $subtype         Subtype ('page', 'post', or taxonomy name).
+	 * @param string $target_language Optional target language code filter.
+	 * @param string $query           Optional search string (title, slug, or numeric ID).
+	 * @param int    $limit           Maximum results to return (default 20, max 50).
+	 * @param int    $exclude_id      Element ID to exclude from results (e.g. source ID).
+	 * @return array<int, array{id: int, title: string, slug: string, status: string, date: string, subtype: string, edit_url: string}>
+	 */
+	public function search_link_candidates(
+		string $element_type,
+		string $subtype,
+		string $target_language = '',
+		string $query = '',
+		int $limit = 20,
+		int $exclude_id = 0
+	): array {
+		$limit   = max( 1, min( 50, $limit ) );
+		$results = array();
+
+		if ( 'post' === $element_type ) {
+			$post_table = $this->db->posts ?? ( $GLOBALS['table_prefix'] ?? 'wp_' ) . 'posts';
+			$ge_table   = ( $this->db->prefix ?? ( $GLOBALS['table_prefix'] ?? 'wp_' ) ) . 'tfml_group_elements';
+
+			$where_clauses = array(
+				'p.post_type = %s',
+				"p.post_status IN ('publish', 'draft', 'pending', 'future', 'private')",
+				"p.ID NOT IN (SELECT element_id FROM {$ge_table} WHERE element_type = 'post')",
+			);
+			$params        = array( $subtype );
+
+			if ( $exclude_id > 0 ) {
+				$where_clauses[] = 'p.ID != %d';
+				$params[]        = $exclude_id;
+			}
+
+			$query_trimmed = trim( $query );
+			if ( '' !== $query_trimmed ) {
+				$esc_like = method_exists( $this->db, 'esc_like' )
+					? $this->db->esc_like( $query_trimmed )
+					: addcslashes( $query_trimmed, '_%\\' );
+				$like     = '%' . $esc_like . '%';
+
+				if ( ctype_digit( $query_trimmed ) ) {
+					$where_clauses[] = '(p.ID = %d OR p.post_title LIKE %s OR p.post_name LIKE %s)';
+					$params[]        = (int) $query_trimmed;
+					$params[]        = $like;
+					$params[]        = $like;
+				} else {
+					$where_clauses[] = '(p.post_title LIKE %s OR p.post_name LIKE %s)';
+					$params[]        = $like;
+					$params[]        = $like;
+				}
+			}
+
+			$where_sql = implode( ' AND ', $where_clauses );
+			$sql       = "SELECT p.ID, p.post_title, p.post_name, p.post_status, p.post_date, p.post_type
+					FROM {$post_table} p
+					WHERE {$where_sql}
+					ORDER BY p.post_date DESC
+					LIMIT " . (int) $limit;
+
+			$prepared = $this->db->prepare( $sql, ...$params );
+			$rows     = $this->db->get_results( $prepared );
+
+			if ( is_array( $rows ) ) {
+				foreach ( $rows as $row ) {
+					$post_id = (int) $row->ID;
+					// Exclude retained translations in inactive languages.
+					if ( null !== $this->retained_registry && $this->retained_registry->has_retained_element( 'post', $post_id ) ) {
+						continue;
+					}
+
+					$title = trim( (string) $row->post_title );
+					if ( '' === $title ) {
+						/* translators: %d: post ID */
+						$title = sprintf( __( '(Sin título #%d)', 'tf-multilingual' ), $post_id );
+					}
+
+					$results[] = array(
+						'id'       => $post_id,
+						'title'    => $title,
+						'slug'     => (string) ( $row->post_name ?? '' ),
+						'status'   => (string) ( $row->post_status ?? '' ),
+						'date'     => (string) ( $row->post_date ?? '' ),
+						'subtype'  => (string) ( $row->post_type ?? $subtype ),
+						'edit_url' => $this->get_edit_url( 'post', $post_id, (string) ( $row->post_type ?? $subtype ) ),
+					);
+				}
+			}
+		}
+
+		return $results;
+	}
+
+	/**
+	 * Links an existing WordPress element into a translation group as a translation.
+	 *
+	 * @param string $element_type    Element type ('post' or 'term').
+	 * @param int    $source_id       Source element ID.
+	 * @param int    $target_id       Target element ID to link into group.
+	 * @param string $target_language Target language code for the linked element.
+	 * @param string $source_language Optional source language code if source is unassigned.
+	 * @return TranslationGroup The updated translation group entity.
+	 *
+	 * @throws EditorialPermissionException If user lacks capabilities to edit either element.
+	 * @throws EditorialValidationException If validation fails (identical IDs, invalid language, subtype mismatch, non-existent, retained).
+	 * @throws EditorialConflictException   If target is already linked, or group already has a translation for target_language.
+	 */
+	public function link_translation(
+		string $element_type,
+		int $source_id,
+		int $target_id,
+		string $target_language,
+		string $source_language = ''
+	): TranslationGroup {
+		// 1. Permission checks.
+		$cap = ( 'post' === $element_type ) ? 'edit_post' : 'manage_categories';
+		if ( ! $this->user_can( $cap, $source_id ) || ! $this->user_can( $cap, $target_id ) ) {
+			throw new EditorialPermissionException(
+				__( 'No tiene permisos para editar y vincular estos elementos.', 'tf-multilingual' )
+			);
+		}
+
+		// 2. Identifier validation.
+		if ( $source_id <= 0 || $target_id <= 0 ) {
+			throw new EditorialValidationException(
+				__( 'Los identificadores de origen y destino deben ser enteros positivos.', 'tf-multilingual' )
+			);
+		}
+
+		if ( $source_id === $target_id ) {
+			throw new EditorialValidationException(
+				__( 'El elemento de origen y de destino no pueden ser idénticos.', 'tf-multilingual' )
+			);
+		}
+
+		// 3. Target language validation.
+		$norm_target_lang = Language::normalize_code( $target_language );
+		if ( ! $this->language_registry->is_active( $norm_target_lang ) ) {
+			throw new EditorialValidationException(
+				__( 'El idioma de destino no está registrado o no está activo en el catálogo.', 'tf-multilingual' )
+			);
+		}
+
+		// 4. Existence and Subtype check.
+		$source_subtype = '';
+		$target_subtype = '';
+
+		if ( 'post' === $element_type ) {
+			$source_post = $this->find_post( $source_id );
+			$target_post = $this->find_post( $target_id );
+
+			if ( null === $source_post || null === $target_post ) {
+				throw new EditorialValidationException(
+					__( 'Uno o ambos contenidos no existen en la base de datos.', 'tf-multilingual' )
+				);
+			}
+
+			$source_subtype = $source_post->post_type;
+			$target_subtype = $target_post->post_type;
+		} elseif ( 'term' === $element_type ) {
+			$source_term = $this->element_validator->validate_term( $source_id );
+			$target_term = $this->element_validator->validate_term( $target_id );
+
+			if ( null === $source_term || null === $target_term ) {
+				throw new EditorialValidationException(
+					__( 'Uno o ambos términos no existen en la base de datos.', 'tf-multilingual' )
+				);
+			}
+
+			$source_subtype = $source_term['taxonomy'] ?? '';
+			$target_subtype = $target_term['taxonomy'] ?? '';
+		}
+
+		if ( '' === $source_subtype || $source_subtype !== $target_subtype ) {
+			throw new EditorialValidationException(
+				__( 'El contenido de origen y de destino deben pertenecer al mismo tipo.', 'tf-multilingual' )
+			);
+		}
+
+		// 5. Retained translation check.
+		if ( null !== $this->retained_registry && $this->retained_registry->has_retained_element( $element_type, $target_id ) ) {
+			throw new EditorialValidationException(
+				__( 'El elemento de destino es una traducción retenida en un idioma inactivo y no puede vincularse directamente.', 'tf-multilingual' )
+			);
+		}
+
+		// 6. Check target is not already assigned to another translation group.
+		$target_existing_group = $this->group_repository->find_by_element( $element_type, $target_id );
+		if ( null !== $target_existing_group ) {
+			throw new EditorialConflictException(
+				__( 'El elemento de destino ya pertenece a otro grupo de traducción.', 'tf-multilingual' )
+			);
+		}
+
+		// 7. Find or assign source group.
+		$source_group = $this->group_repository->find_by_element( $element_type, $source_id );
+		if ( null === $source_group ) {
+			$initial_lang = '' !== $source_language
+				? Language::normalize_code( $source_language )
+				: ( $this->language_registry->get_default()?->get_code() ?? 'es' );
+
+			$source_group = $this->assign_initial_language(
+				$element_type,
+				$source_id,
+				$source_subtype,
+				$initial_lang
+			);
+		}
+
+		// 8. Check language uniqueness within group.
+		if ( $source_group->has_translation( $norm_target_lang ) ) {
+			throw new EditorialConflictException(
+				sprintf(
+					/* translators: %s: Language code */
+					__( 'El grupo de traducción ya contiene un elemento para el idioma %s.', 'tf-multilingual' ),
+					strtoupper( $norm_target_lang )
+				)
+			);
+		}
+
+		// 9. Calculate fingerprint and source version.
+		$canonical_element = $source_group->get_canonical_element();
+		$source_version    = null !== $canonical_element ? $canonical_element->get_current_content_version() : 1;
+
+		$fingerprint = '';
+		if ( 'post' === $element_type ) {
+			$fingerprint = $this->fingerprint_service->calculate_post_fingerprint( $target_id );
+		} else {
+			$fingerprint = $this->fingerprint_service->calculate_term_fingerprint( $target_id, $target_subtype );
+		}
+
+		// 10. Persist relation atomically.
+		$this->group_repository->add_translation(
+			(int) $source_group->get_id(),
+			$target_id,
+			$norm_target_lang,
+			false,
+			$source_version,
+			1,
+			$fingerprint
+		);
+
+		// 11. Flush caches.
+		$this->translation_resolver->flush_cache();
+		$this->clear_editorial_cache();
+
+		// 12. Return reloaded group.
+		$updated_group = $this->group_repository->find( (int) $source_group->get_id() );
+		if ( null === $updated_group ) {
+			throw new EditorialConflictException(
+				__( 'No se pudo recuperar el grupo de traducción actualizado.', 'tf-multilingual' )
+			);
+		}
+
+		return $updated_group;
+	}
+
+	/**
+	 * Unlinks an element from its translation group without deleting the WordPress object.
+	 *
+	 * @param string   $element_type     Element type ('post' or 'term').
+	 * @param int      $element_id       Element ID to unlink.
+	 * @param int|null $new_canonical_id Optional replacement canonical ID if unlinking canonical.
+	 * @return bool True on success.
+	 *
+	 * @throws EditorialPermissionException If user lacks capabilities to edit element.
+	 * @throws EditorialValidationException If element is invalid or not in a group.
+	 * @throws EditorialConflictException   If removal fails.
+	 */
+	public function unlink_translation(
+		string $element_type,
+		int $element_id,
+		?int $new_canonical_id = null
+	): bool {
+		$cap = ( 'post' === $element_type ) ? 'edit_post' : 'manage_categories';
+		if ( ! $this->user_can( $cap, $element_id ) ) {
+			throw new EditorialPermissionException(
+				__( 'No tiene permisos para desvincular este elemento.', 'tf-multilingual' )
+			);
+		}
+
+		if ( $element_id <= 0 ) {
+			throw new EditorialValidationException(
+				__( 'El identificador del elemento debe ser un entero positivo.', 'tf-multilingual' )
+			);
+		}
+
+		$group = $this->group_repository->find_by_element( $element_type, $element_id );
+		if ( null === $group ) {
+			throw new EditorialValidationException(
+				__( 'El elemento no pertenece a ningún grupo de traducción.', 'tf-multilingual' )
+			);
+		}
+
+		// Find language of the element in the group.
+		$element_lang = null;
+		foreach ( $group->get_elements() as $elem ) {
+			if ( $elem->get_element_id() === $element_id ) {
+				$element_lang = $elem->get_language_code();
+				break;
+			}
+		}
+
+		if ( null === $element_lang ) {
+			throw new EditorialValidationException(
+				__( 'El elemento no fue encontrado dentro de los miembros del grupo.', 'tf-multilingual' )
+			);
+		}
+
+		// If unlinking the canonical element and no replacement given, select another remaining element.
+		if ( $group->get_canonical_element_id() === $element_id && null === $new_canonical_id ) {
+			foreach ( $group->get_elements() as $elem ) {
+				if ( $elem->get_element_id() !== $element_id ) {
+					$new_canonical_id = $elem->get_element_id();
+					break;
+				}
+			}
+		}
+
+		$success = $this->group_repository->remove_translation(
+			(int) $group->get_id(),
+			$element_lang,
+			$new_canonical_id
+		);
+
+		$this->translation_resolver->flush_cache();
+		$this->clear_editorial_cache();
+
+		return $success;
+	}
+
+	/**
 	 * Generates the native WordPress admin edit URL for an element.
 	 *
 	 * @param string $element_type Element type ('post' or 'term').
@@ -759,6 +1113,9 @@ class TranslationEditorialService {
 	 * @return bool
 	 */
 	protected function user_can( string $capability, ...$args ): bool {
+		if ( ! empty( $args ) && isset( $GLOBALS['wp_test_caps'][ $capability . ':' . $args[0] ] ) ) {
+			return (bool) $GLOBALS['wp_test_caps'][ $capability . ':' . $args[0] ];
+		}
 		if ( isset( $GLOBALS['wp_test_caps'][ $capability ] ) ) {
 			return (bool) $GLOBALS['wp_test_caps'][ $capability ];
 		}
@@ -775,11 +1132,14 @@ class TranslationEditorialService {
 	 * @return WP_Post|null
 	 */
 	protected function find_post( int $post_id ): ?WP_Post {
+		if ( isset( $GLOBALS['wp_test_posts'][ $post_id ] ) && $GLOBALS['wp_test_posts'][ $post_id ] instanceof WP_Post ) {
+			return $GLOBALS['wp_test_posts'][ $post_id ];
+		}
 		if ( function_exists( 'get_post' ) ) {
 			$post = get_post( $post_id );
 			return $post instanceof WP_Post ? $post : null;
 		}
-		return $GLOBALS['wp_test_posts'][ $post_id ] ?? null;
+		return null;
 	}
 
 	/**

@@ -286,6 +286,121 @@ class TranslationsController extends WP_REST_Controller {
 				),
 			)
 		);
+
+		// Candidates route: GET /tf-multilingual/v1/translations/candidates.
+		register_rest_route(
+			$this->namespace,
+			'/' . $this->rest_base . '/candidates',
+			array(
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( $this, 'get_candidates' ),
+					'permission_callback' => array( $this, 'get_candidates_permissions_check' ),
+					'args'                => array(
+						'element_type'    => array(
+							'description'       => 'Element type.',
+							'type'              => 'string',
+							'enum'              => array( 'post', 'term' ),
+							'default'           => 'post',
+							'sanitize_callback' => 'sanitize_text_field',
+							'validate_callback' => 'rest_validate_request_arg',
+						),
+						'subtype'         => array(
+							'description'       => 'Subtype (post_type or taxonomy).',
+							'type'              => 'string',
+							'required'          => true,
+							'sanitize_callback' => 'sanitize_text_field',
+							'validate_callback' => 'rest_validate_request_arg',
+						),
+						'target_language' => array(
+							'description'       => 'Target language code.',
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_text_field',
+							'validate_callback' => 'rest_validate_request_arg',
+						),
+						'query'           => array(
+							'description'       => 'Search query or numeric ID.',
+							'type'              => 'string',
+							'sanitize_callback' => 'sanitize_text_field',
+							'validate_callback' => 'rest_validate_request_arg',
+						),
+						'exclude_id'      => array(
+							'description'       => 'Element ID to exclude.',
+							'type'              => 'integer',
+							'sanitize_callback' => 'absint',
+							'validate_callback' => 'rest_validate_request_arg',
+						),
+						'per_page'        => array(
+							'description'       => 'Maximum results.',
+							'type'              => 'integer',
+							'default'           => 20,
+							'minimum'           => 1,
+							'maximum'           => 50,
+							'sanitize_callback' => 'absint',
+							'validate_callback' => 'rest_validate_request_arg',
+						),
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Checks permissions for retrieving candidate elements to link.
+	 *
+	 * @param WP_REST_Request $request Request object.
+	 * @return bool|WP_Error
+	 */
+	public function get_candidates_permissions_check( $request ): bool|WP_Error {
+		$element_type = (string) ( $request->get_param( 'element_type' ) ?? 'post' );
+		$cap          = ( 'post' === $element_type ) ? 'edit_posts' : 'manage_categories';
+
+		if ( isset( $GLOBALS['wp_test_caps'][ $cap ] ) ) {
+			if ( ! $GLOBALS['wp_test_caps'][ $cap ] ) {
+				return new WP_Error(
+					'rest_cannot_view',
+					__( 'Sorry, you are not allowed to view link candidates.', 'tf-multilingual' ),
+					array( 'status' => rest_authorization_required_code() )
+				);
+			}
+			return true;
+		}
+
+		if ( function_exists( 'current_user_can' ) && ! current_user_can( $cap ) ) {
+			return new WP_Error(
+				'rest_cannot_view',
+				__( 'Sorry, you are not allowed to view link candidates.', 'tf-multilingual' ),
+				array( 'status' => rest_authorization_required_code() )
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Retrieves candidate elements eligible for translation linking.
+	 *
+	 * @param WP_REST_Request $request Request object.
+	 * @return WP_REST_Response
+	 */
+	public function get_candidates( $request ): WP_REST_Response {
+		$element_type    = (string) ( $request->get_param( 'element_type' ) ?? 'post' );
+		$subtype         = (string) $request->get_param( 'subtype' );
+		$target_language = (string) ( $request->get_param( 'target_language' ) ?? '' );
+		$query           = (string) ( $request->get_param( 'query' ) ?? '' );
+		$exclude_id      = (int) ( $request->get_param( 'exclude_id' ) ?? 0 );
+		$per_page        = (int) ( $request->get_param( 'per_page' ) ?? 20 );
+
+		$candidates = $this->editorial_service->search_link_candidates(
+			$element_type,
+			$subtype,
+			$target_language,
+			$query,
+			$per_page,
+			$exclude_id
+		);
+
+		return rest_ensure_response( $candidates );
 	}
 
 	/**

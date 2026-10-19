@@ -33,35 +33,35 @@ if ( ! class_exists( 'wpdb' ) ) {
 		 *
 		 * @var string
 		 */
-		public string $posts = 'wp_posts';
+		public $posts = 'wp_posts';
 
 		/**
 		 * Terms table name.
 		 *
 		 * @var string
 		 */
-		public string $terms = 'wp_terms';
+		public $terms = 'wp_terms';
 
 		/**
 		 * Term taxonomy table name.
 		 *
 		 * @var string
 		 */
-		public string $term_taxonomy = 'wp_term_taxonomy';
+		public $term_taxonomy = 'wp_term_taxonomy';
 
 		/**
 		 * Last insert ID.
 		 *
 		 * @var int
 		 */
-		public int $insert_id = 0;
+		public $insert_id = 0;
 
 		/**
 		 * Last error string.
 		 *
 		 * @var string
 		 */
-		public string $last_error = '';
+		public $last_error = '';
 
 		/**
 		 * Stubs charset collate retrieval.
@@ -115,7 +115,7 @@ if ( ! class_exists( 'wpdb' ) ) {
 		 * @param array<string>        $format Format array.
 		 * @return int|false
 		 */
-		public function insert( string $table, array $data, array $format = array() ): int|false {
+		public function insert( $table, $data, $format = array() ) {
 			return 1;
 		}
 
@@ -130,12 +130,12 @@ if ( ! class_exists( 'wpdb' ) ) {
 		 * @return int|false
 		 */
 		public function update(
-			string $table,
-			array $data,
-			array $where,
-			array $format = array(),
-			array $where_format = array()
-		): int|false {
+			$table,
+			$data,
+			$where,
+			$format = array(),
+			$where_format = array()
+		) {
 			return 1;
 		}
 
@@ -147,7 +147,7 @@ if ( ! class_exists( 'wpdb' ) ) {
 		 * @param array<string>        $where_format Where format array.
 		 * @return int|false
 		 */
-		public function delete( string $table, array $where, array $where_format = array() ): int|false {
+		public function delete( $table, $where, $where_format = array() ) {
 			return 1;
 		}
 
@@ -158,7 +158,7 @@ if ( ! class_exists( 'wpdb' ) ) {
 		 * @param string $output Output format.
 		 * @return mixed
 		 */
-		public function get_row( string $query, string $output = 'OBJECT' ): mixed {
+		public function get_row( $query, $output = 'OBJECT' ) {
 			return null;
 		}
 
@@ -168,7 +168,7 @@ if ( ! class_exists( 'wpdb' ) ) {
 		 * @param string $query SQL query.
 		 * @return mixed
 		 */
-		public function get_var( string $query ): mixed {
+		public function get_var( $query ) {
 			return null;
 		}
 
@@ -179,7 +179,7 @@ if ( ! class_exists( 'wpdb' ) ) {
 		 * @param string $output Output format.
 		 * @return mixed
 		 */
-		public function get_results( string $query, string $output = 'OBJECT' ): mixed {
+		public function get_results( $query, $output = 'OBJECT' ) {
 			return array();
 		}
 
@@ -190,7 +190,7 @@ if ( ! class_exists( 'wpdb' ) ) {
 		 * @param int    $x     Column offset.
 		 * @return array
 		 */
-		public function get_col( string $query, int $x = 0 ): array {
+		public function get_col( $query, $x = 0 ) {
 			return array();
 		}
 
@@ -200,8 +200,8 @@ if ( ! class_exists( 'wpdb' ) ) {
 		 * @param string $text Text to escape.
 		 * @return string
 		 */
-		public function esc_like( string $text ): string {
-			return addcslashes( $text, '_%\\' );
+		public function esc_like( $text ) {
+			return addcslashes( (string) $text, '_%\\' );
 		}
 
 		/**
@@ -210,7 +210,7 @@ if ( ! class_exists( 'wpdb' ) ) {
 		 * @param string $query SQL query.
 		 * @return int|bool
 		 */
-		public function query( string $query ): int|bool {
+		public function query( $query ) {
 			return true;
 		}
 	}
@@ -954,6 +954,20 @@ if ( ! function_exists( 'add_query_arg' ) ) {
 		$base_url = is_string( $param3 ) ? $param3 : '';
 		$sep      = str_contains( $base_url, '?' ) ? '&' : '?';
 		return $base_url . $sep . rawurlencode( $key ) . '=' . rawurlencode( $val );
+	}
+}
+
+if ( ! function_exists( 'wp_nonce_url' ) ) {
+	/**
+	 * Stub for wp_nonce_url.
+	 *
+	 * @param string     $actionurl URL to add nonce to.
+	 * @param int|string $action    Action name.
+	 * @param string     $name      Nonce name.
+	 * @return string
+	 */
+	function wp_nonce_url( string $actionurl, int|string $action = -1, string $name = '_wpnonce' ): string {
+		return add_query_arg( $name, wp_create_nonce( (string) $action ), $actionurl );
 	}
 }
 

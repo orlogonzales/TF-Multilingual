@@ -409,13 +409,17 @@ class Plugin {
 		$group_repo                         = new TranslationGroupRepository();
 		$translation_resolver               = new ContentTranslationResolver( $group_repo, $this->language_registry );
 		$this->custom_field_policy_registry = new CustomFieldPolicyRegistry();
+		$retained_registry                  = new RetainedTranslationRegistry( $GLOBALS['wpdb'] ?? null );
 		$this->editorial_service            = new TranslationEditorialService(
 			$this->language_registry,
 			$group_repo,
 			$translation_resolver,
 			null,
 			null,
-			$this->custom_field_policy_registry
+			$this->custom_field_policy_registry,
+			null,
+			null,
+			$retained_registry
 		);
 		$this->shared_meta_synchronizer     = new SharedMetaSynchronizer(
 			$this->custom_field_policy_registry,
@@ -683,10 +687,17 @@ class Plugin {
 		if ( null === $this->editorial_service ) {
 			$group_repo              = new TranslationGroupRepository();
 			$translation_resolver    = new ContentTranslationResolver( $group_repo, $this->get_language_registry() );
+			$retained_registry       = new RetainedTranslationRegistry( $GLOBALS['wpdb'] ?? null );
 			$this->editorial_service = new TranslationEditorialService(
 				$this->get_language_registry(),
 				$group_repo,
-				$translation_resolver
+				$translation_resolver,
+				null,
+				null,
+				null,
+				null,
+				null,
+				$retained_registry
 			);
 		}
 

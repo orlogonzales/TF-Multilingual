@@ -1814,5 +1814,24 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Ampliación de la suite de pruebas unitarias a **639 pruebas PHPUnit / 2.367 aserciones (0 fallos)** con 13 tests nuevos en `LanguageEditorialUiTest` y actualización de `DiagnosticServiceTest`.
     - Cumplimiento de **PHPCS 100% PASS**, `composer validate --strict` PASS, y certificación reproducible en `scratch/verify_fase_3_42.php` (**10/10 controles PASS, 0 FAIL**).
     - Invarianza total: **cero escrituras en producción `cms_ect`** (MD5 `4241ca7e7ec6399a594537cb04790c10` / 3.403 filas) y conservación íntegra de los `123` grupos y `139` elementos en `cms_ect_lab`.
+- **Vinculación y Desvinculación Editorial de Traducciones Existentes en el Panel Administrativo (`PostEditorialUi`, `TranslationEditorialService`, REST API) (Fase 3.43 / Directiva DT-TFML-074 — ADR-069):**
+  - **Servicios de Aplicación y Dominio Centralizados (`TranslationEditorialService`):**
+    - Implementación de `search_link_candidates()`, `link_translation()` y `unlink_translation()` centralizados en `TF\Multilingual\Editorial\TranslationEditorialService`, operando de manera idéntica y unificada tanto para peticiones de la interfaz gráfica WP-Admin como para llamadas de la REST API.
+    - Soporte integrado de `RetainedTranslationRegistry` para evitar vincular elementos retenidos en idiomas inactivos (ej. francés `8839, 8955, 8873`).
+    - Protección estricta de invariantes de dominio: validación obligatoria de subtipos homogéneos (`post` vs `page`), detección de conflictos por idiomas duplicados en el grupo, prevención de asignaciones cruzadas de posts ya vinculados a otros grupos, prohibición de auto-vinculación (`source_id === target_id`) e idiomas inactivos.
+  - **Experiencia de Usuario Editorial Avanzada en `PostEditorialUi`:**
+    - Maquetación por pestañas independientes para idiomas faltantes: pestaña `[+ Crear nueva]` para generar borradores limpios clonando metadatos compartidos, y pestaña `[🔗 Vincular existente]` para conectar contenidos preexistentes sin duplicación.
+    - Buscador dinámico de candidatos en vivo con AJAX (`admin-ajax.php?action=tfml_search_candidates`), control de *debounce* de 250ms, filtrado por tipo y subtipo de post y exclusión de elementos ya asociados a TFML.
+    - Despliegue interactivo de candidatos mostrando título, ID numérico, slug y estado (`publish`, `draft`, etc.), acompañado de caja de previsualización (`tfml-candidate-preview-box`) y mecanismo de respaldo manual directo por ID numérico.
+    - Botón de desvinculación `[Desvincular]` con icono `dashicons-editor-unlink`, confirmación JavaScript en navegador y procesamiento transaccional seguro con nonces individuales dedicados.
+  - **Desvinculación Segura sin Destrucción de Entidades Core (`wp_posts`):**
+    - `unlink_translation()` elimina limpiamente las filas relacionales en `tfml_group_elements` y actualiza/promueve el elemento canónico en `tfml_groups` si el elemento desvinculado era el canónico, garantizando CERO eliminaciones o mutaciones en `wp_posts` o `wp_terms`. El objeto de WordPress queda preservado al 100% como contenido libre e intacto.
+  - **Exposición REST API (`TranslationsController`):**
+    - Registro del endpoint `GET /wp-json/tf-multilingual/v1/translations/candidates` con validación estricta de capacidades (`edit_post`), sanitización de parámetros de búsqueda (`search`, `element_type`, `subtype`, `exclude_group_id`, `limit`) y respuestas JSON estructuradas.
+  - **Suite de Pruebas Automatizadas y Calidad:**
+    - Ampliación de la suite PHPUnit hasta **655 pruebas unitarias / 2.434 aserciones (0 fallos, 0 errores, 1 omitida)**, incorporando `tests/Unit/PostEditorialUiTest.php` (4 pruebas, 38 aserciones) y extendiendo `TranslationEditorialServiceTest` (10 pruebas nuevas), `TranslationsControllerTest` y `CanonicalUrlManagerTest`.
+    - Cumplimiento de **PHPCS 100% PASS** en 181 archivos bajo los estándares de WordPress Core (`WordPress-Extra`, `WordPress-Docs`).
+    - Certificación en el verificador reproducible `scratch/verify_fase_3_43.php` con **10/10 controles PASS (0 FAIL)**, captura visual de pantalla en `/brain/` (`fase_3_43_admin_post_link.png`) e invarianza absoluta en producción `cms_ect` (MD5 `4241ca7e7ec6399a594537cb04790c10` / 3.403 filas) y laboratorio `cms_ect_lab` (123 grupos, 139 elementos, 3 franceses retenidos).
+
 
 

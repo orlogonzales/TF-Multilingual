@@ -661,4 +661,147 @@ class TranslationEditorialServiceTest extends TestCase {
 		$this->assertSame( 2, $element_after_edit->get_current_content_version() );
 		$this->assertNotSame( $initial_fingerprint, $element_after_edit->get_translatable_fingerprint() );
 	}
+
+	/**
+	 * Tests successful linking of an existing post into a translation group.
+	 */
+	public function test_link_translation_success(): void {
+		$this->create_test_post( 101, 'page', 'publish', 'Actividades ES' );
+		$this->create_test_post( 102, 'page', 'publish', 'Activities EN' );
+
+		$group = $this->service->link_translation( 'post', 101, 102, 'en', 'es' );
+
+		$this->assertInstanceOf( \TF\Multilingual\Domain\Translation\TranslationGroup::class, $group );
+		$this->assertTrue( $group->has_translation( 'es' ) );
+		$this->assertTrue( $group->has_translation( 'en' ) );
+		$this->assertSame( 101, $group->get_canonical_element_id() );
+
+		$elem102 = $this->group_repo->find_element( 'post', 102 );
+		$this->assertNotNull( $elem102 );
+		$this->assertSame( 'en', $elem102->get_language_code() );
+	}
+
+	/**
+	 * Tests link_translation rejects identical source and target IDs.
+	 */
+	public function test_link_translation_rejects_identical_ids(): void {
+		$this->expectException( EditorialValidationException::class );
+		$this->service->link_translation( 'post', 101, 101, 'en' );
+	}
+
+	/**
+	 * Tests link_translation rejects inactive language.
+	 */
+	public function test_link_translation_rejects_inactive_language(): void {
+		$this->expectException( EditorialValidationException::class );
+		$this->service->link_translation( 'post', 101, 102, 'fr' );
+	}
+
+	/**
+	 * Tests link_translation rejects subtype mismatch.
+	 */
+	public function test_link_translation_rejects_subtype_mismatch(): void {
+		$this->create_test_post( 101, 'page', 'publish', 'Página' );
+		$this->create_test_post( 102, 'post', 'publish', 'Entrada' );
+
+		$this->expectException( EditorialValidationException::class );
+		$this->service->link_translation( 'post', 101, 102, 'en' );
+	}
+
+	/**
+	 * Tests link_translation rejects target already assigned to another group.
+	 */
+	public function test_link_translation_rejects_already_assigned_target(): void {
+		$this->create_test_post( 101, 'page', 'publish', 'Page 1' );
+		$this->create_test_post( 102, 'page', 'publish', 'Page 2' );
+
+		// Assign 102 to its own group first.
+		$this->service->assign_initial_language( 'post', 102, 'page', 'en' );
+
+		$this->expectException( EditorialConflictException::class );
+		$this->service->link_translation( 'post', 101, 102, 'en' );
+	}
+
+	/**
+	 * Tests link_translation rejects language duplicate when group already contains that language.
+	 */
+	public function test_link_translation_rejects_duplicate_language_in_group(): void {
+		$this->create_test_post( 101, 'page', 'publish', 'Page 1 ES' );
+		$this->create_test_post( 102, 'page', 'publish', 'Page 2 EN' );
+		$this->create_test_post( 103, 'page', 'publish', 'Page 3 EN Duplicate' );
+
+		$this->service->link_translation( 'post', 101, 102, 'en' );
+
+		$this->expectException( EditorialConflictException::class );
+		$this->service->link_translation( 'post', 101, 103, 'en' );
+	}
+
+	/**
+	 * Tests link_translation enforces user editing permissions.
+	 */
+	public function test_link_translation_enforces_permissions(): void {
+		$this->create_test_post( 101, 'page', 'publish', 'Page 1' );
+		$this->create_test_post( 102, 'page', 'publish', 'Page 2' );
+
+		$GLOBALS['wp_test_caps']['edit_post:102'] = false;
+
+		$this->expectException( EditorialPermissionException::class );
+		$this->service->link_translation( 'post', 101, 102, 'en' );
+	}
+
+	/**
+	 * Tests successful unlinking of an element from its translation group.
+	 */
+	public function test_unlink_translation_success(): void {
+		$this->create_test_post( 101, 'page', 'publish', 'Actividades ES' );
+		$this->create_test_post( 102, 'page', 'publish', 'Activities EN' );
+
+		$this->service->link_translation( 'post', 101, 102, 'en', 'es' );
+
+		$this->assertNotNull( $this->group_repo->find_element( 'post', 102 ) );
+
+		$success = $this->service->unlink_translation( 'post', 102 );
+		$this->assertTrue( $success );
+
+		// 102 must be gone from group elements.
+		$this->assertNull( $this->group_repo->find_element( 'post', 102 ) );
+
+		// WordPress post entity in Core remains intact.
+		$this->assertNotNull( $GLOBALS['wp_test_posts'][102] );
+	}
+
+	/**
+	 * Tests unlinking canonical promotes remaining element as new canonical.
+	 */
+	public function test_unlink_canonical_promotes_replacement(): void {
+		$this->create_test_post( 101, 'page', 'publish', 'Actividades ES' );
+		$this->create_test_post( 102, 'page', 'publish', 'Activities EN' );
+
+		$this->service->link_translation( 'post', 101, 102, 'en', 'es' );
+
+		$group = $this->group_repo->find_by_element( 'post', 101 );
+		$this->assertSame( 101, $group->get_canonical_element_id() );
+
+		// Unlink canonical 101.
+		$success = $this->service->unlink_translation( 'post', 101 );
+		$this->assertTrue( $success );
+
+		// Group reloaded from 102.
+		$reloaded = $this->group_repo->find_by_element( 'post', 102 );
+		$this->assertNotNull( $reloaded );
+		$this->assertSame( 102, $reloaded->get_canonical_element_id() );
+	}
+
+	/**
+	 * Tests unlink_translation enforces permissions.
+	 */
+	public function test_unlink_translation_enforces_permissions(): void {
+		$this->create_test_post( 101, 'page', 'publish', 'Página' );
+		$this->service->assign_initial_language( 'post', 101, 'page', 'es' );
+
+		$GLOBALS['wp_test_caps']['edit_post:101'] = false;
+
+		$this->expectException( EditorialPermissionException::class );
+		$this->service->unlink_translation( 'post', 101 );
+	}
 }
