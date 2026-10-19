@@ -404,8 +404,26 @@ class DiagnosticUi {
 								<td><?php echo esc_html( implode( ', ', array_map( 'strtoupper', $report['sections']['languages']['active_languages'] ) ) ); ?></td>
 							</tr>
 							<tr>
-								<td><strong><?php esc_html_e( 'Idiomas Inactivos', 'tf-multilingual' ); ?></strong></td>
+								<td><strong><?php esc_html_e( 'Idiomas Inactivos en Catálogo', 'tf-multilingual' ); ?></strong></td>
 								<td><?php echo ! empty( $report['sections']['languages']['inactive_languages'] ) ? esc_html( implode( ', ', array_map( 'strtoupper', $report['sections']['languages']['inactive_languages'] ) ) ) : '<em>' . esc_html__( 'Ninguno', 'tf-multilingual' ) . '</em>'; ?></td>
+							</tr>
+							<tr>
+								<td><strong><?php esc_html_e( 'Traducciones Retenidas (Idiomas Inactivos)', 'tf-multilingual' ); ?></strong></td>
+								<td>
+									<?php
+									$retained_total = (int) ( $report['sections']['languages']['retained_translations']['total'] ?? 0 );
+									if ( $retained_total > 0 ) {
+										$by_lang      = (array) ( $report['sections']['languages']['retained_translations']['by_lang'] ?? array() );
+										$lang_summary = array();
+										foreach ( $by_lang as $lc => $cnt ) {
+											$lang_summary[] = sprintf( '%s: %d', strtoupper( (string) $lc ), (int) $cnt );
+										}
+										echo '<span style="color:#0073aa; font-weight:600;">' . esc_html( (string) $retained_total ) . ' ' . esc_html__( 'elementos', 'tf-multilingual' ) . '</span> (' . esc_html( implode( ', ', $lang_summary ) ) . ') — <em>' . esc_html__( 'Protegidos en registro de migración', 'tf-multilingual' ) . '</em>';
+									} else {
+										echo '<em>' . esc_html__( 'Ninguna', 'tf-multilingual' ) . '</em>';
+									}
+									?>
+								</td>
 							</tr>
 						</tbody>
 					</table>
@@ -479,7 +497,24 @@ class DiagnosticUi {
 							</tr>
 							<tr>
 								<td><strong><?php esc_html_e( 'Menús y Navegación', 'tf-multilingual' ); ?></strong></td>
-								<td>✔ <?php esc_html_e( 'Activo', 'tf-multilingual' ); ?> (<?php echo (int) $report['sections']['modules']['menus']['locations_mapped']; ?> <?php esc_html_e( 'ubicaciones configuradas', 'tf-multilingual' ); ?>)</td>
+								<td>
+									✔ <?php esc_html_e( 'Activo', 'tf-multilingual' ); ?>
+									(
+									<?php
+									$menus_info = $report['sections']['modules']['menus'];
+									$theme_locs = (int) ( $menus_info['theme_locations_count'] ?? 0 );
+									$m_groups   = (int) ( $menus_info['menu_groups_count'] ?? 0 );
+									$m_mapped   = (int) ( $menus_info['locations_mapped'] ?? 0 );
+									echo sprintf(
+										/* translators: 1: theme locations count, 2: translated menu groups, 3: manual mappings */
+										esc_html__( '%1$d ubicaciones de tema detectadas, %2$d grupos de menús traducidos, %3$d mapeos manuales', 'tf-multilingual' ),
+										$theme_locs,
+										$m_groups,
+										$m_mapped
+									);
+									?>
+									)
+								</td>
 							</tr>
 							<tr>
 								<td><strong><?php esc_html_e( 'SEO y Sitemaps', 'tf-multilingual' ); ?></strong></td>

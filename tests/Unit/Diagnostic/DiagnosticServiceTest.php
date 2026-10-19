@@ -146,6 +146,7 @@ class DiagnosticServiceTest extends TestCase {
 		$this->assertSame( 2, $report['total_languages'] );
 		$this->assertContains( 'es', $report['active_languages'] );
 		$this->assertContains( 'en', $report['active_languages'] );
+		$this->assertArrayHasKey( 'retained_translations', $report );
 		$this->assertSame( 'good', $report['status'] );
 	}
 
@@ -186,6 +187,9 @@ class DiagnosticServiceTest extends TestCase {
 		$this->assertTrue( $report['media']['enabled'] );
 		$this->assertTrue( $report['strings']['enabled'] );
 		$this->assertTrue( $report['menus']['enabled'] );
+		$this->assertArrayHasKey( 'locations_mapped', $report['menus'] );
+		$this->assertArrayHasKey( 'theme_locations_count', $report['menus'] );
+		$this->assertArrayHasKey( 'menu_groups_count', $report['menus'] );
 		$this->assertTrue( $report['seo']['enabled'] );
 		$this->assertTrue( $report['rest']['enabled'] );
 		$this->assertSame( 'tf-multilingual/v1', $report['rest']['namespace'] );

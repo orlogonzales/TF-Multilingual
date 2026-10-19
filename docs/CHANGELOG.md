@@ -1796,4 +1796,23 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
   - **Inventario Real del Panel Administrativo de TF Multilingual y Verificador Reproducible (`scratch/verify_fase_3_41.php`):**
     - Auditoría funcional y visual (6 capturas PNG reales en navegador headless Edge) de todos los menús, pantallas editoriales y rutas REST de TF Multilingual, clasificando cada componente como `IMPLEMENTADO`, `PARCIAL` o `PENDIENTE`, y documentando el hallazgo en `SettingsRepository::sanitize_payload()` respecto a `nav_menu_locations` y el slug padre duplicado `tf-multilingual` vs `tfml-strings`.
     - Ampliación de `tests/Unit/CanonicalUrlManagerTest.php` y `tests/Unit/SeoFrontendFilterTest.php` hasta **626 pruebas PHPUnit / 2.317 aserciones (0 fallos)**, **180/180 archivos PHPCS PASS** y versionado de `scratch/verify_fase_3_41.php` (**12/12 controles PASS, 0 FAIL**) con **cero escrituras** en `cms_ect` y `cms_ect_lab` (`123` grupos, `139` elementos activos, `3` traducciones francesas retenidas).
+- **Coherencia del Panel Administrativo, Pantalla Funcional de Idiomas y Diagnóstico Enriquecido (Fase 3.42 / Directiva DT-TFML-073 — ADR-068):**
+  - **Armonización de la Jerarquía de Menús de WP-Admin (0 Submenús Duplicados):**
+    - Corrección de la duplicidad en el menú lateral de WordPress (`TF Multilingual` duplicando `Cadenas de texto`), estableciendo una jerarquía coherente de 3 pantallas especializadas: `TF Multilingual` / `Idiomas` (`admin.php?page=tf-multilingual`), `Cadenas de texto` (`admin.php?page=tfml-strings`) y `Diagnóstico` (`admin.php?page=tfml-diagnostic`).
+    - Registro de `add_submenu_page( self::PARENT_SLUG, ..., 'Idiomas', ..., self::PARENT_SLUG, ... )` para sustituir el primer submenú automático generado por WordPress Core, erradicando entradas redundantes.
+  - **Implementación de la Pantalla Funcional de Gestión de Idiomas (`LanguageEditorialUi`):**
+    - Creación de `TF\Multilingual\Admin\LanguageEditorialUi` con maquetación nativa de dos columnas (32% formulario / 66% catálogo con layout responsivo estilo WordPress Taxonomías).
+    - Selector predefinido ISO con autocompletado en cliente de código, nombre internacional, endónimo y locale gettext.
+    - Soporte integral de banderas SVG locales con diseño soberano respetando la paleta de Ecoterra (`assets/images/flags/fr.svg`).
+    - Invariantes estrictos de seguridad y dominio: validación obligatoria de `manage_options` y nonces individuales en todas las acciones mutadoras (`add_language`, `toggle_active`, `set_default`, `delete_language`, `update_language`).
+    - Blindaje soberano del idioma predeterminado: protección técnica absoluta contra desactivación o eliminación del idioma predeterminado (`es`).
+  - **Aclaración Diagnóstica de Navegación y Divulgación de Traducciones Retenidas:**
+    - Desglose transparente en `DiagnosticService` y Tarjeta 5 de `DiagnosticUi` de las 3 métricas de navegación: `2` ubicaciones de tema detectadas (`primary`, `footer`), `18` grupos de menús traducidos en Core, y `0` mapeos manuales de sobrescritura en ajustes, eliminando la ambigüedad de *"0 ubicaciones configuradas"*.
+    - Divulgación explícita de las `3` traducciones francesas retenidas (`8839, 8955, 8873`) gestionadas por `RetainedTranslationRegistry` en la Tarjeta 3 de `DiagnosticUi` y en el aviso superior de `LanguageEditorialUi`, confirmando que el francés no está activo pero permanece 100% custodiado.
+  - **Matriz Modular Soberana y Verificación Automatizada:**
+    - Incorporación de la matriz de arquitectura en `LanguageEditorialUi` mapeando servicios de dominio, REST API / Sitemaps y paneles WP-Admin, prescindiendo de pantallas *placeholder* vacías.
+    - Ampliación de la suite de pruebas unitarias a **639 pruebas PHPUnit / 2.367 aserciones (0 fallos)** con 13 tests nuevos en `LanguageEditorialUiTest` y actualización de `DiagnosticServiceTest`.
+    - Cumplimiento de **PHPCS 100% PASS**, `composer validate --strict` PASS, y certificación reproducible en `scratch/verify_fase_3_42.php` (**10/10 controles PASS, 0 FAIL**).
+    - Invarianza total: **cero escrituras en producción `cms_ect`** (MD5 `4241ca7e7ec6399a594537cb04790c10` / 3.403 filas) y conservación íntegra de los `123` grupos y `139` elementos en `cms_ect_lab`.
+
 

@@ -1,0 +1,991 @@
+<?php
+/**
+ * Language Editorial Admin UI Component.
+ *
+ * @package TF\Multilingual\Admin
+ */
+
+declare( strict_types=1 );
+
+namespace TF\Multilingual\Admin;
+
+use TF\Multilingual\Domain\Language\Exceptions\DefaultLanguageException;
+use TF\Multilingual\Domain\Language\Exceptions\DuplicateLanguageException;
+use TF\Multilingual\Domain\Language\Exceptions\InvalidLanguageException;
+use TF\Multilingual\Domain\Language\Exceptions\LanguageNotFoundException;
+use TF\Multilingual\Domain\Language\Language;
+use TF\Multilingual\Domain\Language\LanguageRegistry;
+use TF\Multilingual\Migration\RetainedTranslationRegistry;
+use Throwable;
+
+/**
+ * Class LanguageEditorialUi
+ *
+ * Provides a sovereign WordPress administration UI under "TF Multilingual > Idiomas"
+ * for managing configured languages, active states, and designating the sovereign default language.
+ */
+class LanguageEditorialUi {
+
+	/**
+	 * Top-level menu page slug.
+	 */
+	public const PARENT_SLUG = 'tf-multilingual';
+
+	/**
+	 * Menu page slug.
+	 */
+	public const PAGE_SLUG = 'tf-multilingual';
+
+	/**
+	 * Submenu alias slug for direct linking.
+	 */
+	public const ALIAS_SLUG = 'tfml-languages';
+
+	/**
+	 * Nonce action for adding a new language.
+	 */
+	public const NONCE_ACTION_ADD = 'tfml_add_language_action';
+
+	/**
+	 * Nonce action for toggling active state.
+	 */
+	public const NONCE_ACTION_TOGGLE = 'tfml_toggle_language_action';
+
+	/**
+	 * Nonce action for designating default language.
+	 */
+	public const NONCE_ACTION_DEFAULT = 'tfml_set_default_language_action';
+
+	/**
+	 * Nonce action for deleting a language.
+	 */
+	public const NONCE_ACTION_DELETE = 'tfml_delete_language_action';
+
+	/**
+	 * Nonce action for updating language properties.
+	 */
+	public const NONCE_ACTION_UPDATE = 'tfml_update_language_action';
+
+	/**
+	 * Nonce field name.
+	 */
+	public const NONCE_NAME = 'tfml_language_nonce';
+
+	/**
+	 * Language registry domain service.
+	 *
+	 * @var LanguageRegistry
+	 */
+	private LanguageRegistry $registry;
+
+	/**
+	 * Optional retained translations registry.
+	 *
+	 * @var RetainedTranslationRegistry|null
+	 */
+	private ?RetainedTranslationRegistry $retained_registry;
+
+	/**
+	 * Admin notice message.
+	 *
+	 * @var array{type: string, message: string}|null
+	 */
+	private ?array $notice = null;
+
+	/**
+	 * Constructor.
+	 *
+	 * @param LanguageRegistry                 $registry          Language registry service.
+	 * @param RetainedTranslationRegistry|null $retained_registry Optional retained translations registry.
+	 */
+	public function __construct(
+		LanguageRegistry $registry,
+		?RetainedTranslationRegistry $retained_registry = null
+	) {
+		$this->registry          = $registry;
+		$this->retained_registry = $retained_registry;
+	}
+
+	/**
+	 * Registers WordPress admin hooks.
+	 *
+	 * @return void
+	 */
+	public function init_hooks(): void {
+		if ( function_exists( 'add_action' ) ) {
+			add_action( 'admin_menu', array( $this, 'register_menu_page' ), 9 );
+			add_action( 'admin_init', array( $this, 'handle_form_submission' ) );
+		}
+	}
+
+	/**
+	 * Gets the required capability to manage languages.
+	 *
+	 * @return string
+	 */
+	public function get_capability(): string {
+		$capability = 'manage_options';
+		if ( function_exists( 'apply_filters' ) ) {
+			return (string) apply_filters( 'tfml_manage_languages_capability', $capability );
+		}
+
+		return $capability;
+	}
+
+	/**
+	 * Registers top-level and submenu pages in WordPress admin.
+	 *
+	 * @return void
+	 */
+	public function register_menu_page(): void {
+		if ( ! function_exists( 'add_menu_page' ) || ! function_exists( 'add_submenu_page' ) ) {
+			return;
+		}
+
+		$cap = $this->get_capability();
+
+		// Register parent menu if not already registered.
+		global $admin_page_hooks;
+		if ( ! isset( $admin_page_hooks[ self::PARENT_SLUG ] ) ) {
+			add_menu_page(
+				__( 'TF Multilingual', 'tf-multilingual' ),
+				__( 'TF Multilingual', 'tf-multilingual' ),
+				$cap,
+				self::PARENT_SLUG,
+				array( $this, 'render_page' ),
+				'dashicons-translation',
+				58
+			);
+		}
+
+		// Customize first submenu item to display as "Idiomas" instead of duplicating "TF Multilingual".
+		add_submenu_page(
+			self::PARENT_SLUG,
+			__( 'Idiomas — TF Multilingual', 'tf-multilingual' ),
+			__( 'Idiomas', 'tf-multilingual' ),
+			$cap,
+			self::PARENT_SLUG,
+			array( $this, 'render_page' )
+		);
+
+		// Also register the explicit alias slug "tfml-languages".
+		add_submenu_page(
+			null,
+			__( 'Idiomas — TF Multilingual', 'tf-multilingual' ),
+			__( 'Idiomas', 'tf-multilingual' ),
+			$cap,
+			self::ALIAS_SLUG,
+			array( $this, 'render_page' )
+		);
+	}
+
+	/**
+	 * Handles form actions and security validations.
+	 *
+	 * @return void
+	 */
+	public function handle_form_submission(): void {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$page = isset( $_GET['page'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['page'] ) ) : '';
+		if ( self::PARENT_SLUG !== $page && self::ALIAS_SLUG !== $page ) {
+			return;
+		}
+
+		if ( function_exists( 'current_user_can' ) && ! current_user_can( $this->get_capability() ) ) {
+			return;
+		}
+
+		// Determine action from POST or GET.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended
+		$action = isset( $_POST['tfml_action'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['tfml_action'] ) ) : ( isset( $_GET['tfml_action'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['tfml_action'] ) ) : '' );
+
+		if ( '' === $action ) {
+			return;
+		}
+
+		switch ( $action ) {
+			case 'add_language':
+				$this->process_add_language();
+				break;
+
+			case 'toggle_active':
+				$this->process_toggle_active();
+				break;
+
+			case 'set_default':
+				$this->process_set_default();
+				break;
+
+			case 'delete_language':
+				$this->process_delete_language();
+				break;
+
+			case 'update_language':
+				$this->process_update_language();
+				break;
+		}
+	}
+
+	/**
+	 * Processes adding a new language to the catalog.
+	 *
+	 * @return void
+	 */
+	private function process_add_language(): void {
+		if ( function_exists( 'check_admin_referer' ) ) {
+			check_admin_referer( self::NONCE_ACTION_ADD, self::NONCE_NAME );
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$code = isset( $_POST['code'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['code'] ) ) : '';
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$name = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['name'] ) ) : '';
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$native_name = isset( $_POST['native_name'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['native_name'] ) ) : '';
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$locale = isset( $_POST['locale'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['locale'] ) ) : '';
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$order = isset( $_POST['order'] ) ? (int) $_POST['order'] : 10;
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$active = ! empty( $_POST['active'] );
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$is_default = ! empty( $_POST['is_default'] );
+
+		if ( '' === $native_name ) {
+			$native_name = $name;
+		}
+
+		try {
+			$language = Language::create( $code, $locale, $name, $native_name, $active, $order );
+			$this->registry->add_language( $language, $is_default );
+			$this->registry->persist();
+
+			$msg = sprintf(
+				/* translators: 1: language name, 2: language code */
+				__( 'Idioma "%1$s" (%2$s) añadido correctamente al catálogo.', 'tf-multilingual' ),
+				$name,
+				$language->get_code()
+			);
+
+			// Check for retained translations.
+			if ( null !== $this->retained_registry ) {
+				$retained = $this->retained_registry->get_retained_for_language( $language->get_code() );
+				if ( ! empty( $retained ) ) {
+					$msg .= ' ' . sprintf(
+						/* translators: %d: number of retained translations */
+						__( 'Se detectaron %d traducciones retenidas para este idioma listas para sincronización futura.', 'tf-multilingual' ),
+						count( $retained )
+					);
+				}
+			}
+
+			$this->notice = array(
+				'type'    => 'success',
+				'message' => $msg,
+			);
+		} catch ( DuplicateLanguageException $e ) {
+			$this->notice = array(
+				'type'    => 'error',
+				/* translators: %s: language code */
+				'message' => sprintf( __( 'El código de idioma "%s" ya se encuentra registrado en el sistema.', 'tf-multilingual' ), esc_html( $code ) ),
+			);
+		} catch ( DefaultLanguageException $e ) {
+			$this->notice = array(
+				'type'    => 'error',
+				'message' => $e->getMessage(),
+			);
+		} catch ( InvalidLanguageException $e ) {
+			$this->notice = array(
+				'type'    => 'error',
+				/* translators: %s: error message */
+				'message' => sprintf( __( 'Datos de idioma inválidos: %s', 'tf-multilingual' ), $e->getMessage() ),
+			);
+		} catch ( Throwable $e ) {
+			$this->notice = array(
+				'type'    => 'error',
+				/* translators: %s: error message */
+				'message' => sprintf( __( 'Error al guardar el idioma: %s', 'tf-multilingual' ), $e->getMessage() ),
+			);
+		}
+	}
+
+	/**
+	 * Processes toggling the active state of a language.
+	 *
+	 * @return void
+	 */
+	private function process_toggle_active(): void {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$code = isset( $_GET['code'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['code'] ) ) : '';
+		if ( '' === $code ) {
+			return;
+		}
+
+		if ( function_exists( 'check_admin_referer' ) ) {
+			check_admin_referer( self::NONCE_ACTION_TOGGLE . '_' . $code, self::NONCE_NAME );
+		}
+
+		$current = $this->registry->get( $code );
+		if ( null === $current ) {
+			$this->notice = array(
+				'type'    => 'error',
+				/* translators: %s: language code */
+				'message' => sprintf( __( 'Idioma "%s" no encontrado.', 'tf-multilingual' ), esc_html( $code ) ),
+			);
+			return;
+		}
+
+		try {
+			if ( $current->is_active() ) {
+				$this->registry->deactivate( $code );
+				/* translators: %s: language code */
+				$msg = sprintf( __( 'Idioma "%s" desactivado correctamente.', 'tf-multilingual' ), esc_html( $code ) );
+			} else {
+				$this->registry->activate( $code );
+				/* translators: %s: language code */
+				$msg = sprintf( __( 'Idioma "%s" activado correctamente.', 'tf-multilingual' ), esc_html( $code ) );
+			}
+
+			$this->registry->persist();
+
+			$this->notice = array(
+				'type'    => 'success',
+				'message' => $msg,
+			);
+		} catch ( DefaultLanguageException $e ) {
+			$this->notice = array(
+				'type'    => 'error',
+				'message' => __( 'Invariante de seguridad: No se puede desactivar el idioma predeterminado soberano.', 'tf-multilingual' ),
+			);
+		} catch ( Throwable $e ) {
+			$this->notice = array(
+				'type'    => 'error',
+				'message' => $e->getMessage(),
+			);
+		}
+	}
+
+	/**
+	 * Processes designating a language as sovereign default.
+	 *
+	 * @return void
+	 */
+	private function process_set_default(): void {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$code = isset( $_GET['code'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['code'] ) ) : '';
+		if ( '' === $code ) {
+			return;
+		}
+
+		if ( function_exists( 'check_admin_referer' ) ) {
+			check_admin_referer( self::NONCE_ACTION_DEFAULT . '_' . $code, self::NONCE_NAME );
+		}
+
+		try {
+			$this->registry->set_default( $code );
+			$this->registry->persist();
+
+			$this->notice = array(
+				'type'    => 'success',
+				'message' => sprintf(
+					/* translators: %s: language code */
+					__( 'El idioma "%s" ha sido establecido como el idioma predeterminado soberano.', 'tf-multilingual' ),
+					esc_html( strtoupper( $code ) )
+				),
+			);
+		} catch ( DefaultLanguageException $e ) {
+			$this->notice = array(
+				'type'    => 'error',
+				'message' => $e->getMessage(),
+			);
+		} catch ( LanguageNotFoundException $e ) {
+			$this->notice = array(
+				'type'    => 'error',
+				/* translators: %s: language code */
+				'message' => sprintf( __( 'Idioma "%s" no encontrado.', 'tf-multilingual' ), esc_html( $code ) ),
+			);
+		} catch ( Throwable $e ) {
+			$this->notice = array(
+				'type'    => 'error',
+				'message' => $e->getMessage(),
+			);
+		}
+	}
+
+	/**
+	 * Processes deleting a language from the catalog.
+	 *
+	 * @return void
+	 */
+	private function process_delete_language(): void {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$code = isset( $_GET['code'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['code'] ) ) : '';
+		if ( '' === $code ) {
+			return;
+		}
+
+		if ( function_exists( 'check_admin_referer' ) ) {
+			check_admin_referer( self::NONCE_ACTION_DELETE . '_' . $code, self::NONCE_NAME );
+		}
+
+		try {
+			$this->registry->remove_language( $code );
+			$this->registry->persist();
+
+			$this->notice = array(
+				'type'    => 'success',
+				/* translators: %s: language code */
+				'message' => sprintf( __( 'Idioma "%s" eliminado correctamente del catálogo.', 'tf-multilingual' ), esc_html( $code ) ),
+			);
+		} catch ( DefaultLanguageException $e ) {
+			$this->notice = array(
+				'type'    => 'error',
+				'message' => __( 'Invariante de seguridad: No se puede eliminar el idioma predeterminado soberano.', 'tf-multilingual' ),
+			);
+		} catch ( Throwable $e ) {
+			$this->notice = array(
+				'type'    => 'error',
+				'message' => $e->getMessage(),
+			);
+		}
+	}
+
+	/**
+	 * Processes updating an existing language's properties.
+	 *
+	 * @return void
+	 */
+	private function process_update_language(): void {
+		if ( function_exists( 'check_admin_referer' ) ) {
+			check_admin_referer( self::NONCE_ACTION_UPDATE, self::NONCE_NAME );
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$code = isset( $_POST['code'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['code'] ) ) : '';
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$name = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['name'] ) ) : '';
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$native_name = isset( $_POST['native_name'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['native_name'] ) ) : '';
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$locale = isset( $_POST['locale'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['locale'] ) ) : '';
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$order = isset( $_POST['order'] ) ? (int) $_POST['order'] : 10;
+
+		try {
+			$this->registry->update_language(
+				$code,
+				array(
+					'name'        => $name,
+					'native_name' => $native_name,
+					'locale'      => $locale,
+					'order'       => $order,
+				)
+			);
+			$this->registry->persist();
+
+			$this->notice = array(
+				'type'    => 'success',
+				/* translators: %s: language code */
+				'message' => sprintf( __( 'Propiedades del idioma "%s" actualizadas correctamente.', 'tf-multilingual' ), esc_html( $code ) ),
+			);
+		} catch ( Throwable $e ) {
+			$this->notice = array(
+				'type'    => 'error',
+				'message' => $e->getMessage(),
+			);
+		}
+	}
+
+	/**
+	 * Returns standard predefined languages for user convenience.
+	 *
+	 * @return array<string, array{name: string, native_name: string, locale: string}>
+	 */
+	public function get_predefined_languages(): array {
+		return array(
+			'es'    => array(
+				'name'        => 'Spanish',
+				'native_name' => 'Español',
+				'locale'      => 'es_ES',
+			),
+			'en'    => array(
+				'name'        => 'English',
+				'native_name' => 'English',
+				'locale'      => 'en_US',
+			),
+			'pt'    => array(
+				'name'        => 'Portuguese',
+				'native_name' => 'Português',
+				'locale'      => 'pt_PT',
+			),
+			'pt-br' => array(
+				'name'        => 'Portuguese (Brazil)',
+				'native_name' => 'Português do Brasil',
+				'locale'      => 'pt_BR',
+			),
+			'fr'    => array(
+				'name'        => 'French',
+				'native_name' => 'Français',
+				'locale'      => 'fr_FR',
+			),
+			'de'    => array(
+				'name'        => 'German',
+				'native_name' => 'Deutsch',
+				'locale'      => 'de_DE',
+			),
+			'it'    => array(
+				'name'        => 'Italian',
+				'native_name' => 'Italiano',
+				'locale'      => 'it_IT',
+			),
+			'nl'    => array(
+				'name'        => 'Dutch',
+				'native_name' => 'Nederlands',
+				'locale'      => 'nl_NL',
+			),
+			'ru'    => array(
+				'name'        => 'Russian',
+				'native_name' => 'Русский',
+				'locale'      => 'ru_RU',
+			),
+			'zh-cn' => array(
+				'name'        => 'Chinese (Simplified)',
+				'native_name' => '简体中文',
+				'locale'      => 'zh_CN',
+			),
+			'ja'    => array(
+				'name'        => 'Japanese',
+				'native_name' => '日本語',
+				'locale'      => 'ja',
+			),
+		);
+	}
+
+	/**
+	 * Renders an HTML flag or fallback badge for a language code.
+	 *
+	 * @param string $code Language code.
+	 * @param string $name Language label.
+	 * @return string HTML representation.
+	 */
+	public function get_flag_html( string $code, string $name ): string {
+		$code_clean  = strtolower( (string) preg_replace( '/[^a-zA-Z0-9_-]/', '', trim( $code ) ) );
+		$plugin_root = dirname( __DIR__, 2 );
+		$flags_dir   = $plugin_root . '/assets/images/flags';
+		$flag_base   = function_exists( 'plugins_url' )
+			? plugins_url( 'assets/images/flags/', $plugin_root . '/tf-multilingual.php' )
+			: '/wp-content/plugins/tf-multilingual/assets/images/flags/';
+
+		foreach ( array( 'svg', 'png' ) as $ext ) {
+			$file = $flags_dir . '/' . $code_clean . '.' . $ext;
+			if ( is_file( $file ) && is_readable( $file ) ) {
+				$url = rtrim( $flag_base, '/' ) . '/' . $code_clean . '.' . $ext;
+				return sprintf(
+					'<img src="%s" alt="%s" style="width:24px; height:16px; vertical-align:middle; border-radius:2px; box-shadow:0 1px 2px rgba(0,0,0,0.15); display:inline-block;" />',
+					esc_url( $url ),
+					esc_attr( $name )
+				);
+			}
+		}
+
+		return sprintf(
+			'<span style="display:inline-block; padding:1px 6px; font-size:10px; font-weight:700; background:#e0e0e0; color:#333; border-radius:3px; letter-spacing:0.5px;">%s</span>',
+			esc_html( strtoupper( $code ) )
+		);
+	}
+
+	/**
+	 * Renders the main Languages administration page.
+	 *
+	 * @return void
+	 */
+	public function render_page(): void {
+		$all_languages = $this->registry->all();
+		$default_code  = $this->registry->get_default_code();
+		$predefined    = $this->get_predefined_languages();
+
+		// Check for edit mode.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$edit_code = isset( $_GET['edit'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['edit'] ) ) : '';
+		$edit_lang = '' !== $edit_code ? $this->registry->get( $edit_code ) : null;
+
+		// Retained translations audit.
+		$retained_summary = array();
+		if ( null !== $this->retained_registry ) {
+			$all_retained = $this->retained_registry->get_all();
+			foreach ( $all_retained as $rec ) {
+				$elems = (array) ( $rec['retained_elements'] ?? array() );
+				foreach ( $elems as $l => $item ) {
+					$l_clean                      = strtolower( (string) $l );
+					$retained_summary[ $l_clean ] = ( $retained_summary[ $l_clean ] ?? 0 ) + 1;
+				}
+			}
+		}
+
+		?>
+		<div class="wrap tfml-languages-wrap">
+			<h1 class="wp-heading-inline">
+				<?php esc_html_e( 'Idiomas — TF Multilingual', 'tf-multilingual' ); ?>
+			</h1>
+			<hr class="wp-header-end">
+
+			<?php if ( null !== $this->notice ) : ?>
+				<div class="notice notice-<?php echo esc_attr( $this->notice['type'] ); ?> is-dismissible" style="margin-top:15px;">
+					<p><?php echo esc_html( $this->notice['message'] ); ?></p>
+				</div>
+			<?php endif; ?>
+
+			<?php if ( ! empty( $retained_summary ) ) : ?>
+				<div class="notice notice-info" style="margin-top:15px;">
+					<p>
+						<strong><?php esc_html_e( 'Traducciones Retenidas Detectadas:', 'tf-multilingual' ); ?></strong>
+						<?php
+						$info_parts = array();
+						foreach ( $retained_summary as $lang_code => $count ) {
+							$info_parts[] = sprintf(
+								'<strong>%s</strong> (%d %s)',
+								esc_html( strtoupper( $lang_code ) ),
+								(int) $count,
+								_n( 'elemento', 'elementos', (int) $count, 'tf-multilingual' )
+							);
+						}
+						echo implode( ', ', $info_parts ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+						?>
+						— <em><?php esc_html_e( 'Contenido protegido en el registro de migración sin interferencia en las tablas activas. Si activa o añade estos idiomas, las traducciones podrán ser promovidas.', 'tf-multilingual' ); ?></em>
+					</p>
+				</div>
+			<?php endif; ?>
+
+			<div id="col-container" class="wp-clearfix" style="margin-top:20px;">
+
+				<!-- Columna Izquierda: Formulario Agregar / Editar -->
+				<div id="col-left" style="width:32%; float:left;">
+					<div class="col-wrap">
+						<div class="form-wrap">
+							<?php if ( null !== $edit_lang ) : ?>
+								<h2><?php esc_html_e( 'Editar idioma', 'tf-multilingual' ); ?>: <?php echo esc_html( $edit_lang->get_name() ); ?></h2>
+								<form method="post" action="<?php echo esc_url( admin_url( 'admin.php?page=' . self::PARENT_SLUG ) ); ?>">
+									<input type="hidden" name="tfml_action" value="update_language">
+									<input type="hidden" name="code" value="<?php echo esc_attr( $edit_lang->get_code() ); ?>">
+									<?php if ( function_exists( 'wp_nonce_field' ) ) : ?>
+										<?php wp_nonce_field( self::NONCE_ACTION_UPDATE, self::NONCE_NAME ); ?>
+									<?php endif; ?>
+
+									<div class="form-field form-required">
+										<label for="edit_code_display"><?php esc_html_e( 'Código de idioma', 'tf-multilingual' ); ?></label>
+										<input type="text" id="edit_code_display" value="<?php echo esc_attr( $edit_lang->get_code() ); ?>" disabled style="background:#eee; width:100%;">
+										<p class="description"><?php esc_html_e( 'El código lingüístico es la clave canónica y no se puede modificar.', 'tf-multilingual' ); ?></p>
+									</div>
+
+									<div class="form-field form-required">
+										<label for="edit_name"><?php esc_html_e( 'Nombre internacional (Admin)', 'tf-multilingual' ); ?></label>
+										<input type="text" name="name" id="edit_name" value="<?php echo esc_attr( $edit_lang->get_name() ); ?>" required style="width:100%;">
+									</div>
+
+									<div class="form-field form-required">
+										<label for="edit_native_name"><?php esc_html_e( 'Nombre nativo / Endónimo', 'tf-multilingual' ); ?></label>
+										<input type="text" name="native_name" id="edit_native_name" value="<?php echo esc_attr( $edit_lang->get_native_name() ); ?>" required style="width:100%;">
+									</div>
+
+									<div class="form-field form-required">
+										<label for="edit_locale"><?php esc_html_e( 'Locale de WordPress', 'tf-multilingual' ); ?></label>
+										<input type="text" name="locale" id="edit_locale" value="<?php echo esc_attr( $edit_lang->get_locale() ); ?>" required style="width:100%;">
+									</div>
+
+									<div class="form-field">
+										<label for="edit_order"><?php esc_html_e( 'Orden de visualización', 'tf-multilingual' ); ?></label>
+										<input type="number" name="order" id="edit_order" value="<?php echo (int) $edit_lang->get_order(); ?>" style="width:100px;">
+									</div>
+
+									<p class="submit" style="display:flex; gap:10px; align-items:center;">
+										<input type="submit" class="button button-primary" value="<?php esc_attr_e( 'Actualizar idioma', 'tf-multilingual' ); ?>">
+										<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . self::PARENT_SLUG ) ); ?>" class="button button-secondary"><?php esc_html_e( 'Cancelar', 'tf-multilingual' ); ?></a>
+									</p>
+								</form>
+							<?php else : ?>
+								<h2><?php esc_html_e( 'Añadir nuevo idioma', 'tf-multilingual' ); ?></h2>
+								<form method="post" action="<?php echo esc_url( admin_url( 'admin.php?page=' . self::PARENT_SLUG ) ); ?>">
+									<input type="hidden" name="tfml_action" value="add_language">
+									<?php if ( function_exists( 'wp_nonce_field' ) ) : ?>
+										<?php wp_nonce_field( self::NONCE_ACTION_ADD, self::NONCE_NAME ); ?>
+									<?php endif; ?>
+
+									<div class="form-field">
+										<label for="tfml_predefined_select"><?php esc_html_e( 'Elegir un idioma predefinido...', 'tf-multilingual' ); ?></label>
+										<select id="tfml_predefined_select" style="width:100%;">
+											<option value=""><?php esc_html_e( '— Seleccione para autocompletar —', 'tf-multilingual' ); ?></option>
+											<?php foreach ( $predefined as $p_code => $p_data ) : ?>
+												<?php $is_already = isset( $all_languages[ $p_code ] ); ?>
+												<option value="<?php echo esc_attr( $p_code ); ?>"
+													data-name="<?php echo esc_attr( $p_data['name'] ); ?>"
+													data-native="<?php echo esc_attr( $p_data['native_name'] ); ?>"
+													data-locale="<?php echo esc_attr( $p_data['locale'] ); ?>"
+													<?php echo $is_already ? 'disabled' : ''; ?>>
+													<?php echo esc_html( $p_data['native_name'] . ' (' . $p_data['name'] . ') [' . $p_code . ']' . ( $is_already ? ' — ' . __( 'Registrado', 'tf-multilingual' ) : '' ) ); ?>
+												</option>
+											<?php endforeach; ?>
+										</select>
+										<p class="description"><?php esc_html_e( 'Seleccione un idioma común o ingrese los valores manualmente debajo.', 'tf-multilingual' ); ?></p>
+									</div>
+
+									<div class="form-field form-required">
+										<label for="tfml_code"><?php esc_html_e( 'Código de idioma (Slug)', 'tf-multilingual' ); ?> <span class="description">(<?php esc_html_e( 'requerido', 'tf-multilingual' ); ?>)</span></label>
+										<input type="text" name="code" id="tfml_code" placeholder="ej. fr, de, it" required style="width:100%;">
+										<p class="description"><?php esc_html_e( 'Prefijo de 2 o 3 caracteres que figurará en las URLs (/fr/, /de/).', 'tf-multilingual' ); ?></p>
+									</div>
+
+									<div class="form-field form-required">
+										<label for="tfml_name"><?php esc_html_e( 'Nombre internacional', 'tf-multilingual' ); ?> <span class="description">(<?php esc_html_e( 'requerido', 'tf-multilingual' ); ?>)</span></label>
+										<input type="text" name="name" id="tfml_name" placeholder="ej. French, German" required style="width:100%;">
+									</div>
+
+									<div class="form-field form-required">
+										<label for="tfml_native_name"><?php esc_html_e( 'Nombre nativo / Endónimo', 'tf-multilingual' ); ?> <span class="description">(<?php esc_html_e( 'requerido', 'tf-multilingual' ); ?>)</span></label>
+										<input type="text" name="native_name" id="tfml_native_name" placeholder="ej. Français, Deutsch" required style="width:100%;">
+										<p class="description"><?php esc_html_e( 'Nombre en su propio idioma tal como aparecerá en el conmutador de navegación.', 'tf-multilingual' ); ?></p>
+									</div>
+
+									<div class="form-field form-required">
+										<label for="tfml_locale"><?php esc_html_e( 'Locale de WordPress', 'tf-multilingual' ); ?> <span class="description">(<?php esc_html_e( 'requerido', 'tf-multilingual' ); ?>)</span></label>
+										<input type="text" name="locale" id="tfml_locale" placeholder="ej. fr_FR, de_DE" required style="width:100%;">
+										<p class="description"><?php esc_html_e( 'Código de configuración regional utilizado por WordPress para traducciones gettext.', 'tf-multilingual' ); ?></p>
+									</div>
+
+									<div class="form-field">
+										<label for="tfml_order"><?php esc_html_e( 'Orden de visualización', 'tf-multilingual' ); ?></label>
+										<input type="number" name="order" id="tfml_order" value="<?php echo count( $all_languages ) * 10 + 10; ?>" style="width:100px;">
+									</div>
+
+									<div class="form-field" style="margin-top:15px;">
+										<label>
+											<input type="checkbox" name="active" value="1" checked>
+											<strong><?php esc_html_e( 'Activar inmediatamente para navegación pública', 'tf-multilingual' ); ?></strong>
+										</label>
+									</div>
+
+									<div class="form-field" style="margin-top:10px;">
+										<label>
+											<input type="checkbox" name="is_default" value="1">
+											<?php esc_html_e( 'Establecer como idioma predeterminado soberano', 'tf-multilingual' ); ?>
+										</label>
+									</div>
+
+									<p class="submit">
+										<input type="submit" class="button button-primary" value="<?php esc_attr_e( 'Añadir nuevo idioma', 'tf-multilingual' ); ?>">
+									</p>
+								</form>
+
+								<script>
+								(function(){
+									var sel = document.getElementById('tfml_predefined_select');
+									if (!sel) return;
+									sel.addEventListener('change', function(){
+										var opt = sel.options[sel.selectedIndex];
+										if (!opt || !opt.value) return;
+										document.getElementById('tfml_code').value = opt.value;
+										document.getElementById('tfml_name').value = opt.getAttribute('data-name') || '';
+										document.getElementById('tfml_native_name').value = opt.getAttribute('data-native') || '';
+										document.getElementById('tfml_locale').value = opt.getAttribute('data-locale') || '';
+									});
+								})();
+								</script>
+							<?php endif; ?>
+						</div>
+					</div>
+				</div>
+
+				<!-- Columna Derecha: Tabla de Idiomas Configurados -->
+				<div id="col-right" style="width:66%; float:right;">
+					<div class="col-wrap">
+						<table class="wp-list-table widefat striped tfml-languages-table" style="table-layout:auto;">
+							<thead>
+								<tr>
+									<th scope="col" style="width:48px; text-align:center;"><?php esc_html_e( 'Icono', 'tf-multilingual' ); ?></th>
+									<th scope="col" style="min-width:140px; white-space:nowrap;"><?php esc_html_e( 'Idioma / Endónimo', 'tf-multilingual' ); ?></th>
+									<th scope="col" style="width:65px; white-space:nowrap;"><?php esc_html_e( 'Código', 'tf-multilingual' ); ?></th>
+									<th scope="col" style="width:85px; white-space:nowrap;"><?php esc_html_e( 'Locale', 'tf-multilingual' ); ?></th>
+									<th scope="col" style="width:60px; text-align:center; white-space:nowrap;"><?php esc_html_e( 'Orden', 'tf-multilingual' ); ?></th>
+									<th scope="col" style="width:130px; text-align:center; white-space:nowrap;"><?php esc_html_e( 'Predeterminado', 'tf-multilingual' ); ?></th>
+									<th scope="col" style="width:85px; text-align:center; white-space:nowrap;"><?php esc_html_e( 'Estado', 'tf-multilingual' ); ?></th>
+									<th scope="col" style="width:170px; text-align:right; white-space:nowrap;"><?php esc_html_e( 'Acciones', 'tf-multilingual' ); ?></th>
+								</tr>
+							</thead>
+							<tbody>
+								<?php if ( empty( $all_languages ) ) : ?>
+									<tr>
+										<td colspan="8" style="text-align:center; padding:20px;">
+											<em><?php esc_html_e( 'No hay idiomas configurados en el catálogo.', 'tf-multilingual' ); ?></em>
+										</td>
+									</tr>
+								<?php else : ?>
+									<?php foreach ( $all_languages as $lang ) : ?>
+										<?php
+										$code       = $lang->get_code();
+										$is_default = ( $code === $default_code );
+										$is_active  = $lang->is_active();
+
+										$toggle_url = function_exists( 'wp_nonce_url' )
+											? wp_nonce_url(
+												admin_url( 'admin.php?page=' . self::PARENT_SLUG . '&tfml_action=toggle_active&code=' . urlencode( $code ) ),
+												self::NONCE_ACTION_TOGGLE . '_' . $code,
+												self::NONCE_NAME
+											)
+											: '#';
+
+										$default_url = function_exists( 'wp_nonce_url' )
+											? wp_nonce_url(
+												admin_url( 'admin.php?page=' . self::PARENT_SLUG . '&tfml_action=set_default&code=' . urlencode( $code ) ),
+												self::NONCE_ACTION_DEFAULT . '_' . $code,
+												self::NONCE_NAME
+											)
+											: '#';
+
+										$delete_url = function_exists( 'wp_nonce_url' )
+											? wp_nonce_url(
+												admin_url( 'admin.php?page=' . self::PARENT_SLUG . '&tfml_action=delete_language&code=' . urlencode( $code ) ),
+												self::NONCE_ACTION_DELETE . '_' . $code,
+												self::NONCE_NAME
+											)
+											: '#';
+
+										$edit_url = admin_url( 'admin.php?page=' . self::PARENT_SLUG . '&edit=' . urlencode( $code ) );
+										?>
+										<tr>
+											<td style="text-align:center; vertical-align:middle;">
+												<?php echo $this->get_flag_html( $code, $lang->get_native_name() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+											</td>
+											<td style="vertical-align:middle;">
+												<strong><?php echo esc_html( $lang->get_native_name() ); ?></strong>
+												<br>
+												<span style="color:#666; font-size:12px;"><?php echo esc_html( $lang->get_name() ); ?></span>
+											</td>
+											<td style="vertical-align:middle;">
+												<code><?php echo esc_html( $code ); ?></code>
+											</td>
+											<td style="vertical-align:middle;">
+												<code><?php echo esc_html( $lang->get_locale() ); ?></code>
+											</td>
+											<td style="text-align:center; vertical-align:middle;">
+												<?php echo (int) $lang->get_order(); ?>
+											</td>
+											<td style="text-align:center; vertical-align:middle;">
+												<?php if ( $is_default ) : ?>
+													<span class="badge" style="background:#1e3a2f; color:#ffffff; padding:4px 8px; border-radius:3px; font-weight:700; font-size:11px; display:inline-block;">
+														★ <?php esc_html_e( 'Predeterminado', 'tf-multilingual' ); ?>
+													</span>
+												<?php elseif ( $is_active ) : ?>
+													<a href="<?php echo esc_url( $default_url ); ?>" class="button button-small" title="<?php esc_attr_e( 'Hacer este idioma el predeterminado del sitio', 'tf-multilingual' ); ?>">
+														<?php esc_html_e( 'Hacer defecto', 'tf-multilingual' ); ?>
+													</a>
+												<?php else : ?>
+													<span style="color:#aaa; font-size:11px;"><em><?php esc_html_e( 'Inactivo', 'tf-multilingual' ); ?></em></span>
+												<?php endif; ?>
+											</td>
+											<td style="text-align:center; vertical-align:middle;">
+												<?php if ( $is_active ) : ?>
+													<span style="color:#46b450; font-weight:700; font-size:12px;">✔ <?php esc_html_e( 'Activo', 'tf-multilingual' ); ?></span>
+												<?php else : ?>
+													<span style="color:#999; font-weight:600; font-size:12px;">✖ <?php esc_html_e( 'Inactivo', 'tf-multilingual' ); ?></span>
+												<?php endif; ?>
+											</td>
+											<td style="text-align:right; vertical-align:middle;">
+												<div style="display:flex; justify-content:flex-end; gap:5px; align-items:center;">
+													<a href="<?php echo esc_url( $edit_url ); ?>" class="button button-small" title="<?php esc_attr_e( 'Editar propiedades del idioma', 'tf-multilingual' ); ?>">
+														<?php esc_html_e( 'Editar', 'tf-multilingual' ); ?>
+													</a>
+
+													<?php if ( ! $is_default ) : ?>
+														<a href="<?php echo esc_url( $toggle_url ); ?>" class="button button-small" title="<?php echo $is_active ? esc_attr__( 'Desactivar idioma', 'tf-multilingual' ) : esc_attr__( 'Activar idioma', 'tf-multilingual' ); ?>">
+															<?php echo $is_active ? esc_html__( 'Desactivar', 'tf-multilingual' ) : esc_html__( 'Activar', 'tf-multilingual' ); ?>
+														</a>
+														<a href="<?php echo esc_url( $delete_url ); ?>" class="button button-small button-link-delete" style="color:#dc3232;" onclick="return confirm('<?php echo esc_js( sprintf( /* translators: 1: language name, 2: language code */ __( '¿Está seguro de eliminar el idioma "%1$s" (%2$s)? Esta acción no puede deshacerse.', 'tf-multilingual' ), $lang->get_name(), $code ) ); ?>');">
+															<?php esc_html_e( 'Eliminar', 'tf-multilingual' ); ?>
+														</a>
+													<?php else : ?>
+														<span style="color:#888; font-size:11px; padding:0 4px;" title="<?php esc_attr_e( 'El idioma predeterminado no puede desactivarse ni eliminarse.', 'tf-multilingual' ); ?>">
+															🔒 <?php esc_html_e( 'Protegido', 'tf-multilingual' ); ?>
+														</span>
+													<?php endif; ?>
+												</div>
+											</td>
+										</tr>
+									<?php endforeach; ?>
+								<?php endif; ?>
+							</tbody>
+						</table>
+
+						<!-- Panel de Arquitectura de Módulos Futuros -->
+						<div class="card" style="max-width:100%; margin-top:25px; padding:15px; border-left:4px solid #1e3a2f;">
+							<h3 style="margin-top:0;"><?php esc_html_e( 'Matriz de Módulos & Estado Operativo de TF Multilingual', 'tf-multilingual' ); ?></h3>
+							<p style="margin-bottom:10px; color:#555;">
+								<?php esc_html_e( 'El sistema multilingüe se compone de servicios de dominio internos, endpoints REST soberanos e interfaces visuales de administración en WP-Admin.', 'tf-multilingual' ); ?>
+							</p>
+							<table class="widefat fixed striped" style="font-size:12px;">
+								<thead>
+									<tr>
+										<th style="width:25%;"><?php esc_html_e( 'Módulo', 'tf-multilingual' ); ?></th>
+										<th style="width:25%;"><?php esc_html_e( 'Dominio / Servicio Interno', 'tf-multilingual' ); ?></th>
+										<th style="width:25%;"><?php esc_html_e( 'REST API / Sitemaps', 'tf-multilingual' ); ?></th>
+										<th style="width:25%;"><?php esc_html_e( 'Panel WP-Admin', 'tf-multilingual' ); ?></th>
+									</tr>
+								</thead>
+								<tbody>
+									<tr>
+										<td><strong><?php esc_html_e( 'Idiomas', 'tf-multilingual' ); ?></strong></td>
+										<td><code>LanguageRegistry</code> (✔ Activo)</td>
+										<td><code>/tf-multilingual/v1/languages</code></td>
+										<td><span style="color:#46b450; font-weight:700;">✔ <?php esc_html_e( 'Pantalla Completa (Fase 3.42)', 'tf-multilingual' ); ?></span></td>
+									</tr>
+									<tr>
+										<td><strong><?php esc_html_e( 'Cadenas de Texto', 'tf-multilingual' ); ?></strong></td>
+										<td><code>StringTranslationService</code> (✔ Activo)</td>
+										<td><code>/tf-multilingual/v1/strings</code></td>
+										<td><span style="color:#46b450; font-weight:700;">✔ <?php esc_html_e( 'Pantalla Operativa', 'tf-multilingual' ); ?></span></td>
+									</tr>
+									<tr>
+										<td><strong><?php esc_html_e( 'Diagnóstico', 'tf-multilingual' ); ?></strong></td>
+										<td><code>DiagnosticService</code> (✔ Activo)</td>
+										<td><code>wp-json/wp/v2/site-health</code></td>
+										<td><span style="color:#46b450; font-weight:700;">✔ <?php esc_html_e( 'Pantalla Operativa', 'tf-multilingual' ); ?></span></td>
+									</tr>
+									<tr>
+										<td><strong><?php esc_html_e( 'Posts y Páginas', 'tf-multilingual' ); ?></strong></td>
+										<td><code>EditorialTranslationService</code> (✔ Activo)</td>
+										<td><code>/tf-multilingual/v1/translations</code></td>
+										<td><?php esc_html_e( 'Metabox en editor clásico/bloques y columnas', 'tf-multilingual' ); ?></td>
+									</tr>
+									<tr>
+										<td><strong><?php esc_html_e( 'Taxonomías y Términos', 'tf-multilingual' ); ?></strong></td>
+										<td><code>TermQueryFilter</code> (✔ Activo)</td>
+										<td><code>/tf-multilingual/v1/terms</code></td>
+										<td><?php esc_html_e( 'Columnas en edit-tags.php', 'tf-multilingual' ); ?></td>
+									</tr>
+									<tr>
+										<td><strong><?php esc_html_e( 'Media y Adjuntos', 'tf-multilingual' ); ?></strong></td>
+										<td><code>MediaTranslationResolver</code> (✔ Activo)</td>
+										<td><code>/tf-multilingual/v1/media</code></td>
+										<td><?php esc_html_e( 'Campos en modal de adjuntos', 'tf-multilingual' ); ?></td>
+									</tr>
+									<tr>
+										<td><strong><?php esc_html_e( 'Menús y Navegación', 'tf-multilingual' ); ?></strong></td>
+										<td><code>NavMenuFrontendFilter</code> (✔ Activo)</td>
+										<td><code>Theme Locations / Groups</code></td>
+										<td><?php esc_html_e( 'Asignaciones automáticas por TranslationGroup', 'tf-multilingual' ); ?></td>
+									</tr>
+									<tr>
+										<td><strong><?php esc_html_e( 'SEO y Sitemaps', 'tf-multilingual' ); ?></strong></td>
+										<td><code>HreflangGenerator / CanonicalUrl</code> (✔ Activo)</td>
+										<td><code>wp-sitemap.xml</code></td>
+										<td><?php esc_html_e( 'Filtros automáticos de cabecera', 'tf-multilingual' ); ?></td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
+					</div>
+				</div>
+
+			</div>
+		</div>
+		<?php
+	}
+}

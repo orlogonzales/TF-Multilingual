@@ -17,6 +17,8 @@ use TF\Multilingual\Domain\Navigation\NavMenuLocationRepository;
 use TF\Multilingual\Domain\Strings\StringRepository;
 use TF\Multilingual\Domain\Translation\TranslationGroupRepository;
 use TF\Multilingual\Infrastructure\Persistence\SchemaManager;
+use TF\Multilingual\Migration\RetainedTranslationRegistry;
+use Throwable;
 use wpdb;
 
 /**
@@ -77,15 +79,23 @@ class DiagnosticService {
 	private NavMenuLocationRepository $nav_menu_location_repository;
 
 	/**
+	 * Retained translations registry.
+	 *
+	 * @var RetainedTranslationRegistry|null
+	 */
+	private ?RetainedTranslationRegistry $retained_registry;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param LanguageRegistry           $language_registry            Language registry.
-	 * @param SettingsRepository         $settings_repository          Settings repository.
-	 * @param TranslationGroupRepository $group_repository             Translation group repository.
-	 * @param MediaTranslationRepository $media_repository             Media translation repository.
-	 * @param StringRepository           $string_repository            String repository.
-	 * @param NavMenuLocationRepository  $nav_menu_location_repository Nav menu location repository.
-	 * @param wpdb|null                  $db                           Optional database instance.
+	 * @param LanguageRegistry                 $language_registry            Language registry.
+	 * @param SettingsRepository               $settings_repository          Settings repository.
+	 * @param TranslationGroupRepository       $group_repository             Translation group repository.
+	 * @param MediaTranslationRepository       $media_repository             Media translation repository.
+	 * @param StringRepository                 $string_repository            String repository.
+	 * @param NavMenuLocationRepository        $nav_menu_location_repository Nav menu location repository.
+	 * @param wpdb|null                        $db                           Optional database instance.
+	 * @param RetainedTranslationRegistry|null $retained_registry            Optional retained translations registry.
 	 */
 	public function __construct(
 		LanguageRegistry $language_registry,
@@ -94,7 +104,8 @@ class DiagnosticService {
 		MediaTranslationRepository $media_repository,
 		StringRepository $string_repository,
 		NavMenuLocationRepository $nav_menu_location_repository,
-		?wpdb $db = null
+		?wpdb $db = null,
+		?RetainedTranslationRegistry $retained_registry = null
 	) {
 		$this->language_registry            = $language_registry;
 		$this->settings_repository          = $settings_repository;
@@ -107,7 +118,8 @@ class DiagnosticService {
 			global $wpdb;
 			$db = $wpdb;
 		}
-		$this->db = $db;
+		$this->db                = $db;
+		$this->retained_registry = null !== $retained_registry ? $retained_registry : ( ( null !== $db ) ? new RetainedTranslationRegistry( $db ) : null );
 	}
 
 	/**
@@ -217,14 +229,36 @@ class DiagnosticService {
 			$status = 'warning';
 		}
 
+		$retained_count   = 0;
+		$retained_by_lang = array();
+		if ( null !== $this->retained_registry ) {
+			try {
+				$all_retained = $this->retained_registry->get_all();
+				foreach ( $all_retained as $rec ) {
+					$elements = (array) ( $rec['retained_elements'] ?? array() );
+					foreach ( $elements as $l => $elem ) {
+						$l_clean = strtolower( (string) $l );
+						++$retained_count;
+						$retained_by_lang[ $l_clean ] = ( $retained_by_lang[ $l_clean ] ?? 0 ) + 1;
+					}
+				}
+			} catch ( Throwable $e ) {
+				// Non-fatal if retained table/option cannot be read.
+			}
+		}
+
 		return array(
-			'is_configured'      => $is_configured,
-			'default_language'   => $default_code,
-			'default_is_active'  => $default_is_active,
-			'total_languages'    => count( $all_langs ),
-			'active_languages'   => $active_langs,
-			'inactive_languages' => $inactive_langs,
-			'status'             => $status,
+			'is_configured'         => $is_configured,
+			'default_language'      => $default_code,
+			'default_is_active'     => $default_is_active,
+			'total_languages'       => count( $all_langs ),
+			'active_languages'      => $active_langs,
+			'inactive_languages'    => $inactive_langs,
+			'retained_translations' => array(
+				'total'   => $retained_count,
+				'by_lang' => $retained_by_lang,
+			),
+			'status'                => $status,
 		);
 	}
 
@@ -356,7 +390,25 @@ class DiagnosticService {
 			$string_trans_count = (int) ( $this->db->get_var( "SELECT COUNT(*) FROM `{$str_tr_table}`" ) ?? 0 ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		}
 
-		$mapped_locations = count( $this->nav_menu_location_repository->get_all_mappings() );
+		$mapped_locations      = count( $this->nav_menu_location_repository->get_all_mappings() );
+		$theme_locations       = function_exists( 'get_registered_nav_menus' ) ? get_registered_nav_menus() : array();
+		$theme_locations_count = count( $theme_locations );
+		$theme_mods            = function_exists( 'get_theme_mod' ) ? (array) get_theme_mod( 'nav_menu_locations', array() ) : array();
+		if ( count( $theme_mods ) > $theme_locations_count ) {
+			$theme_locations_count = count( $theme_mods );
+		}
+
+		$menu_groups_count = 0;
+		$groups_table      = $this->db->prefix . SchemaManager::TABLES['groups'];
+		if ( $this->check_table_exists( $groups_table ) ) {
+			$menu_groups_count = (int) ( $this->db->get_var(
+				$this->db->prepare(
+					"SELECT COUNT(*) FROM `{$groups_table}` WHERE `subtype` LIKE %s OR `element_type` LIKE %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+					$this->db->esc_like( 'nav_menu' ) . '%',
+					'%' . $this->db->esc_like( 'nav_menu' ) . '%'
+				)
+			) ?? 0 );
+		}
 
 		return array(
 			'media'   => array(
@@ -369,8 +421,10 @@ class DiagnosticService {
 				'total_translations' => $string_trans_count,
 			),
 			'menus'   => array(
-				'enabled'          => true,
-				'locations_mapped' => $mapped_locations,
+				'enabled'               => true,
+				'locations_mapped'      => $mapped_locations,
+				'theme_locations_count' => $theme_locations_count,
+				'menu_groups_count'     => $menu_groups_count,
 			),
 			'seo'     => array(
 				'enabled'   => true,

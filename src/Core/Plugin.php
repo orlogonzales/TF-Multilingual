@@ -12,6 +12,7 @@ namespace TF\Multilingual\Core;
 use TF\Multilingual\Admin\AdminListColumnsUi;
 use TF\Multilingual\Admin\CustomFieldsSettingsUi;
 use TF\Multilingual\Admin\DiagnosticUi;
+use TF\Multilingual\Admin\LanguageEditorialUi;
 use TF\Multilingual\Admin\MediaEditorialUi;
 use TF\Multilingual\Admin\NavMenuEditorialUi;
 use TF\Multilingual\Admin\PostEditorialUi;
@@ -248,6 +249,13 @@ class Plugin {
 	 * @var StringTranslationService|null
 	 */
 	private ?StringTranslationService $string_translation_service = null;
+
+	/**
+	 * Language editorial UI component.
+	 *
+	 * @var LanguageEditorialUi|null
+	 */
+	private ?LanguageEditorialUi $language_editorial_ui = null;
 
 	/**
 	 * String editorial UI component.
@@ -490,6 +498,10 @@ class Plugin {
 			$translation_resolver,
 			$group_repo
 		);
+		$this->language_editorial_ui            = new LanguageEditorialUi(
+			$this->language_registry,
+			$retained_registry
+		);
 		$this->string_repository                = new StringRepository();
 		$this->string_translation_service       = new StringTranslationService(
 			$this->string_repository,
@@ -536,7 +548,9 @@ class Plugin {
 			$group_repo,
 			$this->media_repository,
 			$this->string_repository,
-			$this->nav_menu_location_repository
+			$this->nav_menu_location_repository,
+			null,
+			$retained_registry
 		);
 		$this->diagnostic_ui                    = new DiagnosticUi(
 			$this->diagnostic_service
@@ -589,6 +603,7 @@ class Plugin {
 		$this->nav_menu_frontend_filter->init_hooks();
 		$this->block_navigation_frontend_filter->init_hooks();
 		$this->nav_menu_editorial_ui->init_hooks();
+		$this->language_editorial_ui->init_hooks();
 		$this->string_editorial_ui->init_hooks();
 		$this->seo_frontend_filter->init_hooks();
 		$this->rest_api_registrar->init_hooks();
@@ -971,6 +986,22 @@ class Plugin {
 		}
 
 		return $this->string_translation_service;
+	}
+
+	/**
+	 * Gets the language editorial UI instance.
+	 *
+	 * @return LanguageEditorialUi
+	 */
+	public function get_language_editorial_ui(): LanguageEditorialUi {
+		if ( null === $this->language_editorial_ui ) {
+			$this->language_editorial_ui = new LanguageEditorialUi(
+				$this->get_language_registry(),
+				new RetainedTranslationRegistry()
+			);
+		}
+
+		return $this->language_editorial_ui;
 	}
 
 	/**

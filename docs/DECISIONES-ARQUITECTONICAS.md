@@ -1722,3 +1722,44 @@
 - **JUSTIFICACIÓN:** Subsanar el defecto SEO de `<link rel="canonical">` en páginas internas secundarias antes de continuar con nuevas importaciones, esclarecer sin mutaciones el mecanismo de acceso a `/wp-login.php` en el laboratorio y entregar a la Dirección Técnica una radiografía empírica completa del estado real del panel administrativo de TF Multilingual.
 - **CONSECUENCIAS:** Suite PHPUnit ampliada a **626 pruebas / 2.317 aserciones (0 fallos)**, PHPCS en **180/180 archivos PASS**, verificador reproducible `scratch/verify_fase_3_41.php` con **12/12 controles PASS (0 FAIL)**, compatibilidad de `scratch/verify_fase_3_40.php` (**10/10 PASS**), 6 capturas PNG reales del panel y **cero escrituras** en `cms_ect` y `cms_ect_lab` (`123` grupos, `139` elementos activos, `3` traducciones francesas retenidas).
 
+---
+
+### ADR-068: Coherencia de la Jerarquía del Menú de Administración, Pantalla Funcional de Idiomas (`LanguageEditorialUi`) y Desglose Diagnóstico de Navegación y Retención Lingüística (Fase 3.42 / Directiva DT-TFML-073)
+- **FECHA:** 2026-10-18 / 2026-10-19
+- **DECISIÓN:**
+  1. **Armonización de la Jerarquía de Menús de WP-Admin (0 Submenús Duplicados):**
+     - Se eliminó la duplicidad histórica donde la entrada de primer nivel `TF Multilingual` apuntaba de forma confusa a `Cadenas de texto` (`admin.php?page=tfml-strings`), generando una entrada hija redundante.
+     - La jerarquía soberana de administración queda estructurada en exactamente 3 pantallas especializadas:
+       - **`TF Multilingual` / `Idiomas`** (`admin.php?page=tf-multilingual`, con alias `admin.php?page=tfml-languages`): gestión integral del catálogo lingüístico y visualización de la matriz arquitectónica (`LanguageEditorialUi`).
+       - **`Cadenas de texto`** (`admin.php?page=tfml-strings`): registro y traducción de strings gettext independientes (`StringEditorialUi`).
+       - **`Diagnóstico`** (`admin.php?page=tfml-diagnostic`): auditoría integral de integridad relacional, esquemas y salud del sistema (`DiagnosticUi`).
+     - Al registrar el submenú de `Idiomas` con el mismo slug padre `tf-multilingual`, WordPress Core reemplaza automáticamente el submenú por defecto, garantizando cero elementos duplicados en la barra lateral.
+  2. **Implementación de la Pantalla Funcional de Gestión de Idiomas (`LanguageEditorialUi`):**
+     - Se implementó la clase de presentación editorial [`src/Admin/LanguageEditorialUi.php`](../src/Admin/LanguageEditorialUi.php) integrada con `LanguageRegistry` y `SettingsRepository`.
+     - **Diseño de dos columnas al estilo WordPress nativo:** columna izquierda (32% ancho) con formulario de adición/edición; columna derecha (66% ancho) con tabla responsiva de idiomas configurados y matriz del sistema.
+     - **Autocompletado de idiomas predefinidos:** selector rápido con catálogo estándar (español, inglés, portugués, francés, alemán, italiano, etc.) que autocompleta instantáneamente mediante JavaScript los campos de slug, nombre internacional, endónimo y locale gettext.
+     - **Renderizado de insignias de bandera SVG soberanas:** resolución dinámica de banderas locales en [`assets/images/flags/`](../assets/images/flags/), incorporando la insignia SVG soberana para el idioma francés (`fr.svg`) respetando la paleta de color institucional de Ecoterra (`#1e3a2f` y `#c5a880`).
+     - **Invariantes estrictos de seguridad y dominio:**
+       - Todas las mutaciones (`add_language`, `toggle_active`, `set_default`, `delete_language`, `update_language`) exigen capacidad `manage_options` y nonces individuales dedicados (`NONCE_ACTION_*`).
+       - **Invariante Soberano de Idioma Predeterminado:** Se bloquea tajantemente la desactivación o eliminación del idioma predeterminado del sitio (arrojando mensaje de error preventivo al usuario si se intenta forzar por URL o manipulación DOM).
+  3. **Desglose Transparente y Aclaración de las Métricas de Navegación en Diagnóstico:**
+     - Se reemplazó la ambigua métrica *"0 ubicaciones configuradas"* por un desglose detallado de las **3 dimensiones reales** de la navegación:
+       - **Ubicaciones del tema detectadas (`2`):** `primary` y `footer` registradas en `theme_mods` del tema activo `ecoCMS`.
+       - **Grupos de menús traducidos (`18`):** total de grupos activos en `tfml_groups` con `subtype = 'nav_menu_item'`.
+       - **Mapeos manuales configurados (`0`):** asignaciones directas de sobrescritura en `tfml_settings['nav_menu_locations']`, reflejando que la resolución de conmutación opera de forma automática por correspondencia de grupos de traducción.
+     - Este refinamiento se incorporó tanto en [`src/Diagnostic/DiagnosticService.php`](../src/Diagnostic/DiagnosticService.php) como en la Tarjeta 5 de [`src/Admin/DiagnosticUi.php`](../src/Admin/DiagnosticUi.php).
+  4. **Divulgación Soberana de Traducciones Retenidas (`RetainedTranslationRegistry`):**
+     - Tanto en la pantalla de `Idiomas` como en la Tarjeta 3 de `Diagnóstico`, se expone explícitamente la presencia de las **3 traducciones francesas retenidas** (`8839, 8955, 8873`).
+     - Se aclara a los administradores que el francés no forma parte del catálogo activo de navegación pública (`es`, `en`, `pt`), pero sus datos están custodiados e inmunes a pérdidas dentro del registro de migración, listos para ser promovidos cuando el propietario decida activar dicho idioma.
+  5. **Matriz de Servicios de Dominio vs Endpoints REST vs Pantallas WP-Admin:**
+     - En lugar de crear pantallas o submenús con marcadores de posición (*placeholders*) vacíos que confunden la experiencia de usuario, se diseñó e integró la **Matriz Modular de TF Multilingual** al pie de la pantalla de Idiomas.
+     - La matriz informa con total transparencia técnica qué módulos operan a nivel de servicios PHP de dominio interno, cuáles están expuestos vía REST API / Sitemaps, y cuáles disponen de paneles visuales nativos en `/wp-admin/`.
+  6. **Aislamiento Absoluto e Invarianza de Datos Certificada:**
+     - Cero escrituras en la base de datos de producción `cms_ect` (MD5 inmutable `4241ca7e7ec6399a594537cb04790c10` / 3.403 filas).
+     - Invarianza total en la base de datos de laboratorio `cms_ect_lab`: 123 grupos de traducción, 139 elementos activos y 3 traducciones retenidas.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.42 / Directiva DT-TFML-073 — Coherencia del Panel Administrativo & Pantalla Funcional de Idiomas.
+- **JUSTIFICACIÓN:** Transformar las capacidades del motor lingüístico en una experiencia de administración intuitiva, segura y transparente, resolviendo duplicidades en menús, dotando de interfaz gráfica a la gestión de idiomas, y aclarando con precisión diagnóstica las métricas de menús y la retención del francés.
+- **CONSECUENCIAS:** Suite de pruebas unitarias ampliada a **639 pruebas / 2.367 aserciones (0 fallos)** con 13 tests nuevos específicos para `LanguageEditorialUi`, verificación PHPCS 100% limpia, verificador automatizado `scratch/verify_fase_3_42.php` certificado con **10/10 controles PASS (0 FAIL)**, capturas visuales reales generadas en `/brain/` y cumplimiento estricto del aislamiento entre proyectos.
+
+
