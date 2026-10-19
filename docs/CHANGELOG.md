@@ -1853,6 +1853,32 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Cumplimiento de **PHPCS 100% PASS en 183/183 archivos**.
     - Certificación en el verificador reproducible `scratch/verify_fase_3_43a.php` con **10/10 controles PASS (0 FAIL)**, captura visual de alta resolución `fase_3_43a_admin_post_link.png` y verificación frontend de 4/4 páginas con HTTP 200 y canonicals correctos.
     - Invarianza absoluta de datos: producción `cms_ect` intocada (MD5 `4241ca7e7ec6399a594537cb04790c10` / 3.403 filas) y laboratorio `cms_ect_lab` invariable (123 grupos, 139 elementos, 3 franceses retenidos).
+- **Centro Administrativo de Traducciones y Resolución de Reserva de Fase 3.43A (Fase 3.44 / Directiva DT-TFML-076 — ADR-071):**
+  - **Resolución Definitiva de la Reserva de Fase 3.43A (Preservación de Grupos con Retenidas):**
+    - Implementación del parámetro opcional `$purge_empty_group = true` en `TranslationGroupRepository::remove_translation()`.
+    - En `TranslationEditorialService::unlink_translation()`, se consulta si el grupo tiene registros en `RetainedTranslationRegistry::get_by_group_id($group_id)`. Si existen traducciones históricas retenidas (ej. francés), `$purge_empty_group` se establece en `false`, preservando la fila del grupo en `tfml_groups` con `canonical_element_id = null`.
+    - Se garantiza la conservación de la clave foránea conceptual, la consistencia con el manifiesto de migración y la futura promovabilidad de la traducción retenida (`promote_retained_translation`) cuando se active el idioma francés.
+  - **Nuevo Centro de Traducciones en el Panel de Administración (`TranslationsOverviewUi`):**
+    - Creación de `TF\Multilingual\Admin\TranslationsOverviewUi`, registrando la pantalla de gestión centralizada `TF Multilingual → Traducciones` (`admin.php?page=tfml-translations`).
+    - Calibración de la jerarquía de submenús mediante prioridades en `admin_menu`: Idiomas (9) -> Traducciones (10) -> Cadenas de texto (11) -> Diagnóstico (12), eliminando cualquier duplicidad o desorden en el menú lateral.
+    - Control estricto de acceso basado en capacidades nativas (`edit_posts`).
+  - **Resumen Ejecutivo y Métricas Globales (4 Tarjetas KPI):**
+    - Encabezado con 4 tarjetas de estadísticas nativas de WordPress: Grupos Registrados (123), Elementos Vinculados (139), Idiomas Activos (ES, EN, PT) y Traducciones Retenidas (3 registros FR).
+  - **Motor de Búsqueda, Filtrado Avanzado y Paginación (`query_groups_overview`):**
+    - Implementación de `query_groups_overview()` en `TranslationGroupRepository` con consultas SQL paginadas (`LIMIT` y `OFFSET`) y cálculos de totales globales y filtrados.
+    - Soporte de búsqueda textual por título, slug o ID (`s`), filtrado por subtipo exacto (`subtype`) mediante `get_distinct_subtypes()`, filtrado por estado editorial (`status`: todos, completas, incompletas, revisión) y por idioma presente (`lang`).
+  - **Tabla Central de Traducciones e Indicadores Editoriales:**
+    - Maquetación con `.wp-list-table.widefat.fixed.striped`, mostrando Grupo/Subtipo, Contenido Canónico (con enlace directo al editor y estado de publicación), etiqueta `Origen`, y una columna por cada idioma activo (`ES`, `EN`, `PT`).
+    - Insignias de estado con iconos oficiales: `Actualizada` (verde), `Requiere revisión` (amarillo) y `— Sin traducción [+ Traducir]` (enlace rápido al editor).
+  - **Sección Informativa de Custodia Histórica Francesa:**
+    - Tarjeta `.postbox` dedicada que expone con total transparencia técnica las 3 traducciones retenidas de la migración WPML (`Accueil #8839`, `Activités #8955`, `Nous #8873`), sus TRIDs de origen (`197`, `9201`, `9545`), grupo TFML asociado y estado de custodia inactiva.
+  - **Naturaleza Estrictamente de Solo Lectura y Aislamiento de Datos:**
+    - Cero operaciones de escritura o mutación en la pantalla del Centro de Traducciones.
+    - Invarianza total: producción `cms_ect` intocada (MD5 inmutable `4241ca7e7ec6399a594537cb04790c10` / 3.403 filas) y laboratorio `cms_ect_lab` invariable (123 grupos, 139 elementos, 3 franceses retenidos).
+  - **Suite de Pruebas Unitarias y Calidad:**
+    - Ampliación de la suite PHPUnit a **681 pruebas unitarias / 2.526 aserciones (100% PASS, 0 fallos, 0 errores, 1 omitida)**, sumando 11 nuevas pruebas entre `TranslationsOverviewUiTest` y `TranslationGroupRepositoryTest`.
+    - Cumplimiento de **PHPCS 100% PASS en todo `src/` (102/102 archivos)**.
+    - Certificación en el verificador reproducible `scratch/verify_fase_3_44.php` con **10/10 controles PASS (0 FAIL)**, capturas visuales de alta resolución `fase_3_44_admin_translations.png` y `fase_3_44_admin_translations_full.png`, y verificación frontend de 4/4 páginas con HTTP 200 y canonicals correctos.
 
 
 

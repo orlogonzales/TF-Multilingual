@@ -958,4 +958,72 @@ class TranslationEditorialServiceTest extends TestCase {
 		$this->assertNotNull( $this->group_repo->find_element( 'post', 701 ) );
 		$this->assertNotNull( $this->group_repo->find_element( 'post', 702 ) );
 	}
+
+	/**
+	 * Tests unlinking the last active element from a group with retained translations preserves the group.
+	 *
+	 * Ensures that historical traceability, manifests, and RetainedTranslationRegistry references
+	 * remain 100% consistent, allowing future promotion when the retained language is activated.
+	 */
+	public function test_unlink_last_active_element_preserves_group_when_retained_translations_exist(): void {
+		$this->create_test_post( 801, 'page', 'publish', 'Single Active Post ES' );
+		$this->create_test_post( 802, 'page', 'publish', 'Retained Post FR' );
+
+		$group    = $this->service->assign_initial_language( 'post', 801, 'page', 'es' );
+		$group_id = (int) $group->get_id();
+
+		// Register retained French translation in this group.
+		$this->retained_registry->register(
+			'wpml',
+			8888,
+			$group_id,
+			'post',
+			'page',
+			array( 'fr' => 802 )
+		);
+
+		$this->assertTrue( $this->retained_registry->has_retained_element( 'post', 802 ) );
+
+		// Unlink the only active element (801).
+		$success = $this->service->unlink_translation( 'post', 801 );
+		$this->assertTrue( $success );
+
+		// Active element 801 is no longer registered.
+		$this->assertNull( $this->group_repo->find_element( 'post', 801 ) );
+
+		// The group row in tfml_groups MUST STILL EXIST to preserve traceability for retained translations.
+		$reloaded_group = $this->group_repo->find( $group_id );
+		$this->assertNotNull( $reloaded_group );
+		$this->assertSame( $group_id, (int) $reloaded_group->get_id() );
+		$this->assertNull( $reloaded_group->get_canonical_element_id() );
+		$this->assertEmpty( $reloaded_group->get_elements() );
+
+		// Retained registry record is intact and still points to this group.
+		$retained_rec = $this->retained_registry->get_by_group_id( $group_id );
+		$this->assertNotNull( $retained_rec );
+		$this->assertSame( 8888, (int) $retained_rec['trid'] );
+
+		// Now simulate future activation of French language in LanguageRegistry.
+		$this->registry->update_language( 'fr', array( 'active' => true ) );
+
+		$validator = new \TF\Multilingual\Domain\Translation\WordPressElementValidator( $this->db );
+
+		// Promote the retained French translation into the preserved group.
+		$promoted_elem = $this->retained_registry->promote_retained_translation(
+			$group_id,
+			'fr',
+			$this->group_repo,
+			$this->registry,
+			$validator
+		);
+
+		$this->assertSame( 802, $promoted_elem->get_element_id() );
+		$this->assertSame( 'fr', $promoted_elem->get_language_code() );
+
+		// Group now has French element and has restored canonical.
+		$final_group = $this->group_repo->find( $group_id );
+		$this->assertNotNull( $final_group );
+		$this->assertSame( 802, $final_group->get_canonical_element_id() );
+		$this->assertCount( 1, $final_group->get_elements() );
+	}
 }

@@ -18,6 +18,7 @@ use TF\Multilingual\Admin\NavMenuEditorialUi;
 use TF\Multilingual\Admin\PostEditorialUi;
 use TF\Multilingual\Admin\StringEditorialUi;
 use TF\Multilingual\Admin\TermEditorialUi;
+use TF\Multilingual\Admin\TranslationsOverviewUi;
 use TF\Multilingual\Diagnostic\DiagnosticService;
 use TF\Multilingual\API\ServicioTraduccionPublico;
 use TF\Multilingual\Compatibilidad\AdaptadorCompatibilidadWpml;
@@ -256,6 +257,13 @@ class Plugin {
 	 * @var LanguageEditorialUi|null
 	 */
 	private ?LanguageEditorialUi $language_editorial_ui = null;
+
+	/**
+	 * Translations overview UI component.
+	 *
+	 * @var TranslationsOverviewUi|null
+	 */
+	private ?TranslationsOverviewUi $translations_overview_ui = null;
 
 	/**
 	 * String editorial UI component.
@@ -506,6 +514,12 @@ class Plugin {
 			$this->language_registry,
 			$retained_registry
 		);
+		$this->translations_overview_ui         = new TranslationsOverviewUi(
+			$group_repo,
+			$this->language_registry,
+			$this->editorial_service,
+			$retained_registry
+		);
 		$this->string_repository                = new StringRepository();
 		$this->string_translation_service       = new StringTranslationService(
 			$this->string_repository,
@@ -608,6 +622,7 @@ class Plugin {
 		$this->block_navigation_frontend_filter->init_hooks();
 		$this->nav_menu_editorial_ui->init_hooks();
 		$this->language_editorial_ui->init_hooks();
+		$this->translations_overview_ui->init_hooks();
 		$this->string_editorial_ui->init_hooks();
 		$this->seo_frontend_filter->init_hooks();
 		$this->rest_api_registrar->init_hooks();
@@ -1186,6 +1201,25 @@ class Plugin {
 		}
 
 		return $this->diagnostic_ui;
+	}
+
+	/**
+	 * Gets the translations overview UI component instance.
+	 *
+	 * @return TranslationsOverviewUi
+	 */
+	public function get_translations_overview_ui(): TranslationsOverviewUi {
+		if ( null === $this->translations_overview_ui ) {
+			$group_repo                     = new TranslationGroupRepository();
+			$this->translations_overview_ui = new TranslationsOverviewUi(
+				$group_repo,
+				$this->get_language_registry(),
+				$this->get_editorial_service(),
+				new RetainedTranslationRegistry()
+			);
+		}
+
+		return $this->translations_overview_ui;
 	}
 
 	/**

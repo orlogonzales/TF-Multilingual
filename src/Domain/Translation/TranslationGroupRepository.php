@@ -518,6 +518,7 @@ class TranslationGroupRepository {
 	 * @param int      $group_id                 Group ID.
 	 * @param string   $language_code            Language code to remove.
 	 * @param int|null $new_canonical_element_id Required if removing canonical and others remain.
+	 * @param bool     $purge_empty_group        Whether to delete group row when 0 elements remain. Set false to preserve group for retained translations.
 	 * @return bool True on success, false if translation was not present.
 	 * @throws TranslationGroupNotFoundException If group does not exist.
 	 * @throws InvalidTranslationElementException If new canonical is missing or invalid.
@@ -525,7 +526,8 @@ class TranslationGroupRepository {
 	public function remove_translation(
 		int $group_id,
 		string $language_code,
-		?int $new_canonical_element_id = null
+		?int $new_canonical_element_id = null,
+		bool $purge_empty_group = true
 	): bool {
 		$group          = $this->find_or_fail( $group_id );
 		$canonical_lang = Language::normalize_code( $language_code );
@@ -583,14 +585,28 @@ class TranslationGroupRepository {
 
 			// 2. Handle group lifecycle.
 			if ( 0 === $remaining_count ) {
-				// Empty group policy: purge orphaned group row automatically.
-				$deleted_grp = $this->db->delete(
-					$this->table_groups,
-					array( 'id' => $group_id ),
-					array( '%d' )
-				);
-				if ( false === $deleted_grp ) {
-					$this->handle_db_error( sprintf( 'Failed to purge empty translation group %d.', $group_id ) );
+				if ( $purge_empty_group ) {
+					// Empty group policy: purge orphaned group row automatically.
+					$deleted_grp = $this->db->delete(
+						$this->table_groups,
+						array( 'id' => $group_id ),
+						array( '%d' )
+					);
+					if ( false === $deleted_grp ) {
+						$this->handle_db_error( sprintf( 'Failed to purge empty translation group %d.', $group_id ) );
+					}
+				} else {
+					// Preserve group row for historical/retained translations traceability.
+					$updated_grp = $this->db->update(
+						$this->table_groups,
+						array( 'canonical_element_id' => null ),
+						array( 'id' => $group_id ),
+						array( '%d' ),
+						array( '%d' )
+					);
+					if ( false === $updated_grp ) {
+						$this->handle_db_error( sprintf( 'Failed to update canonical element of preserved group %d.', $group_id ) );
+					}
 				}
 			} elseif ( $is_canonical && null !== $new_canonical_element_id ) {
 				// Update canonical element pointer.
@@ -755,6 +771,139 @@ class TranslationGroupRepository {
 			'total'       => $total,
 			'total_pages' => $total_pages,
 		);
+	}
+
+	/**
+	 * Queries and paginates translation groups for the administrative overview screen.
+	 *
+	 * Supports filtering by subtype, language, and search query.
+	 *
+	 * @param array<string, mixed> $args Query arguments.
+	 * @return array{
+	 *     items: array<int, TranslationGroup>,
+	 *     total: int,
+	 *     total_pages: int,
+	 *     total_groups_count: int,
+	 *     total_elements_count: int,
+	 * }
+	 */
+	public function query_groups_overview( array $args = array() ): array {
+		$page     = max( 1, (int) ( $args['page'] ?? 1 ) );
+		$per_page = max( 1, min( 100, (int) ( $args['per_page'] ?? 20 ) ) );
+		$offset   = ( $page - 1 ) * $per_page;
+
+		$subtype      = isset( $args['subtype'] ) && '' !== trim( (string) $args['subtype'] ) ? trim( (string) $args['subtype'] ) : null;
+		$element_type = isset( $args['element_type'] ) && '' !== trim( (string) $args['element_type'] ) ? trim( (string) $args['element_type'] ) : null;
+		$language     = isset( $args['language'] ) && '' !== trim( (string) $args['language'] ) ? Language::normalize_code( (string) $args['language'] ) : null;
+		$search       = isset( $args['search'] ) && '' !== trim( (string) $args['search'] ) ? trim( (string) $args['search'] ) : null;
+
+		$where_clauses = array();
+		$params        = array();
+
+		if ( null !== $subtype ) {
+			$where_clauses[] = 'g.`subtype` = %s';
+			$params[]        = $subtype;
+		}
+
+		if ( null !== $element_type ) {
+			$where_clauses[] = 'g.`element_type` = %s';
+			$params[]        = $element_type;
+		}
+
+		if ( null !== $language ) {
+			$where_clauses[] = "EXISTS (SELECT 1 FROM `{$this->table_group_elements}` ge_lang WHERE ge_lang.`group_id` = g.`id` AND ge_lang.`language_code` = %s)";
+			$params[]        = $language;
+		}
+
+		if ( null !== $search ) {
+			if ( ctype_digit( $search ) ) {
+				$search_id       = (int) $search;
+				$where_clauses[] = "(g.`id` = %d OR g.`canonical_element_id` = %d OR EXISTS (SELECT 1 FROM `{$this->table_group_elements}` ge_id WHERE ge_id.`group_id` = g.`id` AND ge_id.`element_id` = %d))";
+				$params[]        = $search_id;
+				$params[]        = $search_id;
+				$params[]        = $search_id;
+			} else {
+				$esc_like = method_exists( $this->db, 'esc_like' )
+					? $this->db->esc_like( $search )
+					: addcslashes( $search, '_%\\' );
+				$like     = '%' . $esc_like . '%';
+
+				$posts_table = isset( $this->db->posts ) ? $this->db->posts : ( ( $this->db->prefix ?? 'wp_' ) . 'posts' );
+				$terms_table = isset( $this->db->terms ) ? $this->db->terms : ( ( $this->db->prefix ?? 'wp_' ) . 'terms' );
+
+				$where_clauses[] = "(g.`subtype` LIKE %s OR EXISTS (SELECT 1 FROM `{$this->table_group_elements}` ge_s LEFT JOIN `{$posts_table}` p ON (ge_s.`element_type` = 'post' AND ge_s.`element_id` = p.`ID`) LEFT JOIN `{$terms_table}` t ON (ge_s.`element_type` = 'term' AND ge_s.`element_id` = t.`term_id`) WHERE ge_s.`group_id` = g.`id` AND (p.`post_title` LIKE %s OR p.`post_name` LIKE %s OR t.`name` LIKE %s OR t.`slug` LIKE %s)))";
+				$params[]        = $like;
+				$params[]        = $like;
+				$params[]        = $like;
+				$params[]        = $like;
+				$params[]        = $like;
+			}
+		}
+
+		$where_sql = ! empty( $where_clauses ) ? implode( ' AND ', $where_clauses ) : '1=1';
+
+		// Count matching groups.
+		$count_query = empty( $params )
+			? "SELECT COUNT(*) FROM `{$this->table_groups}` g WHERE {$where_sql}"
+			: $this->db->prepare( "SELECT COUNT(*) FROM `{$this->table_groups}` g WHERE {$where_sql}", ...$params );
+
+		$total = (int) $this->db->get_var( $count_query );
+
+		// Global counts (for KPI summary cards).
+		$global_groups_query   = "SELECT COUNT(*) FROM `{$this->table_groups}`";
+		$global_elements_query = "SELECT COUNT(*) FROM `{$this->table_group_elements}`";
+		$total_groups_count    = (int) $this->db->get_var( $global_groups_query );
+		$total_elements_count  = (int) $this->db->get_var( $global_elements_query );
+
+		if ( 0 === $total ) {
+			return array(
+				'items'                => array(),
+				'total'                => 0,
+				'total_pages'          => 0,
+				'total_groups_count'   => $total_groups_count,
+				'total_elements_count' => $total_elements_count,
+			);
+		}
+
+		$total_pages = (int) ceil( $total / $per_page );
+
+		// Fetch page group IDs.
+		$ids_params = array_merge( $params, array( $per_page, $offset ) );
+		$ids_query  = $this->db->prepare(
+			"SELECT g.`id` FROM `{$this->table_groups}` g WHERE {$where_sql} ORDER BY g.`id` DESC LIMIT %d OFFSET %d",
+			...$ids_params
+		);
+
+		$group_ids = $this->db->get_col( $ids_query );
+		$items     = array();
+
+		if ( is_array( $group_ids ) ) {
+			foreach ( $group_ids as $gid ) {
+				$group = $this->find( (int) $gid );
+				if ( null !== $group ) {
+					$items[] = $group;
+				}
+			}
+		}
+
+		return array(
+			'items'                => $items,
+			'total'                => $total,
+			'total_pages'          => $total_pages,
+			'total_groups_count'   => $total_groups_count,
+			'total_elements_count' => $total_elements_count,
+		);
+	}
+
+	/**
+	 * Retrieves all distinct subtypes present in translation groups.
+	 *
+	 * @return array<int, string>
+	 */
+	public function get_distinct_subtypes(): array {
+		$sql = "SELECT DISTINCT `subtype` FROM `{$this->table_groups}` WHERE `subtype` != '' ORDER BY `subtype` ASC";
+		$col = $this->db->get_col( $sql );
+		return is_array( $col ) ? array_values( array_filter( $col ) ) : array();
 	}
 
 	/**

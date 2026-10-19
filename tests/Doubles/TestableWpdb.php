@@ -423,7 +423,86 @@ class TestableWpdb extends wpdb {
 			return $count;
 		}
 
+		if ( preg_match( '/SELECT COUNT\(.*\) FROM `?[^` ]*tfml_groups`?/i', $query ) ) {
+			if ( preg_match( '/subtype`? = \'([^\']+)\'/i', $query, $m ) ) {
+				$st    = $m[1];
+				$count = 0;
+				foreach ( $this->groups as $g ) {
+					if ( ( $g['subtype'] ?? '' ) === $st ) {
+						++$count;
+					}
+				}
+				return $count;
+			}
+			return count( $this->groups );
+		}
+
+		if ( preg_match( '/SELECT COUNT\(.*\) FROM `?[^` ]*tfml_group_elements`?/i', $query ) ) {
+			return count( $this->group_elements );
+		}
+
 		return null;
+	}
+
+	/**
+	 * Simulates get_col.
+	 *
+	 * @param string $query SQL query.
+	 * @param int    $x     Column offset.
+	 * @return array<int, mixed>
+	 */
+	public function get_col( $query = null, $x = 0 ) {
+		if ( preg_match( '/SELECT DISTINCT `?subtype`? FROM `?[^` ]*tfml_groups`?/i', $query ) ) {
+			$subtypes = array();
+			foreach ( $this->groups as $g ) {
+				$st = (string) ( $g['subtype'] ?? '' );
+				if ( '' !== $st && ! in_array( $st, $subtypes, true ) ) {
+					$subtypes[] = $st;
+				}
+			}
+			sort( $subtypes );
+			return $subtypes;
+		}
+
+		if ( preg_match( '/SELECT `?[a-z0-9_.]*`?id`? FROM `?[^` ]*tfml_groups`?/i', $query ) ) {
+			$matching_ids   = array();
+			$subtype_filter = null;
+			if ( preg_match( '/subtype`? = \'([^\']+)\'/i', $query, $m ) ) {
+				$subtype_filter = $m[1];
+			}
+			$lang_filter = null;
+			if ( preg_match( '/language_code`? = \'([^\']+)\'/i', $query, $m ) ) {
+				$lang_filter = $m[1];
+			}
+			foreach ( $this->groups as $id => $g ) {
+				if ( null !== $subtype_filter && ( $g['subtype'] ?? '' ) !== $subtype_filter ) {
+					continue;
+				}
+				if ( null !== $lang_filter ) {
+					$has_lang = false;
+					foreach ( $this->group_elements as $ge ) {
+						if ( (int) $ge['group_id'] === (int) $id && $ge['language_code'] === $lang_filter ) {
+							$has_lang = true;
+							break;
+						}
+					}
+					if ( ! $has_lang ) {
+						continue;
+					}
+				}
+				$matching_ids[] = (int) $id;
+			}
+			rsort( $matching_ids );
+
+			if ( preg_match( '/LIMIT (\d+) OFFSET (\d+)/i', $query, $m ) ) {
+				$limit  = (int) $m[1];
+				$offset = (int) $m[2];
+				return array_slice( $matching_ids, $offset, $limit );
+			}
+			return $matching_ids;
+		}
+
+		return array();
 	}
 
 	/**

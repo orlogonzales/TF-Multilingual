@@ -1822,6 +1822,46 @@
 - **CONTEXTO:** Fase 3.43A / Directiva DT-TFML-075 — Hardening de Vinculación y Desvinculación Editorial.
 - **JUSTIFICACIÓN:** Resolver las observaciones técnicas de seguridad erradicando el uso del método GET para operaciones que modifican el estado del sistema, reforzando la protección CSRF y previniendo manipulaciones maliciosas entre grupos editoriales.
 - **CONSECUENCIAS:** Suite de pruebas PHPUnit ampliada a **670 pruebas / 2.475 aserciones (100% PASS, 0 errores, 1 omitida)**, PHPCS 100% limpio en **183/183 archivos**, verificador reproducible `scratch/verify_fase_3_43a.php` certificado con **10/10 controles PASS (0 FAIL)**, captura visual de alta resolución `fase_3_43a_admin_post_link.png` y 4/4 URLs frontend verificadas con HTTP 200 y canonicals válidos.
+---
+
+### ADR-071: Centro Administrativo de Traducciones, Consulta Unificada de Contenidos Multilingües y Resolución Definitiva de la Reserva de Fase 3.43A sobre Traducciones Retenidas (TranslationsOverviewUi, TranslationGroupRepository, TranslationEditorialService) (Fase 3.44 / Directiva DT-TFML-076)
+- **FECHA:** 2026-10-19
+- **DECISIÓN:**
+  1. **Resolución Definitiva de la Reserva de Fase 3.43A (Preservación de Grupos con Retenidas):**
+     - En [`src/Domain/Translation/TranslationGroupRepository.php`](../src/Domain/Translation/TranslationGroupRepository.php), se actualizó el método `remove_translation()` admitiendo el parámetro booleano `$purge_empty_group = true`. Cuando `$purge_empty_group` es falso y se desvincula el último elemento activo (0 elementos restantes), la fila del grupo en `tfml_groups` no es purgada; en su lugar, se actualiza `canonical_element_id` a `null`.
+     - En [`src/Editorial/TranslationEditorialService.php`](../src/Editorial/TranslationEditorialService.php), el método `unlink_translation()` consulta previamente a `RetainedTranslationRegistry::get_by_group_id($group_id)`. Si el grupo alberga traducciones históricas retenidas (e.g. idioma francés), se instruye al repositorio para preservar la fila del grupo (`$purge_empty = false`).
+     - Esto resuelve definitivamente la reserva de Fase 3.43A: se mantiene la clave foránea conceptual, la trazabilidad del manifiesto de migración, y se garantiza que `promote_retained_translation()` pueda reconectar y promover de inmediato la entidad retenida como nuevo canónico una vez activado el idioma en el futuro.
+  2. **Nuevo Centro de Traducciones en el Panel de Administración (`TranslationsOverviewUi`):**
+     - Se creó la clase [`src/Admin/TranslationsOverviewUi.php`](../src/Admin/TranslationsOverviewUi.php), registrando la nueva pantalla `TF Multilingual → Traducciones` (`admin.php?page=tfml-translations`).
+     - Se integró la jerarquía de submenús mediante prioridades calibradas en la acción `admin_menu`:
+       * Prioridad 9: `Idiomas` (`page=tf-multilingual`)
+       * Prioridad 10: `Traducciones` (`page=tfml-translations`)
+       * Prioridad 11: `Cadenas de texto` (`page=tfml-strings`)
+       * Prioridad 12: `Diagnóstico` (`page=tfml-diagnostic`)
+     - Capacidad requerida para consulta: `edit_posts`.
+  3. **Resumen Ejecutivo y Métricas Globales (Tarjetas KPI):**
+     - El encabezado del Centro de Traducciones despliega 4 tarjetas estadísticas basadas en el sistema de diseño nativo de WordPress:
+       * **Grupos Registrados:** Total de grupos activos en el sistema (123).
+       * **Elementos Vinculados:** Total de publicaciones y términos gestionados (139).
+       * **Idiomas Activos:** Idiomas con catálogo público en producción (`ES`, `EN`, `PT`).
+       * **Traducciones Retenidas:** Registros en custodia histórica (3 registros FR).
+  4. **Motor de Consulta Paginado y Filtros Flexibles (`query_groups_overview`):**
+     - En [`src/Domain/Translation/TranslationGroupRepository.php`](../src/Domain/Translation/TranslationGroupRepository.php), se implementó `query_groups_overview( array $args = array() ): array`, que ejecuta consultas SQL optimizadas con `LIMIT` y `OFFSET`, calculando totales globales y paginados.
+     - Soporta búsqueda de texto en títulos, slugs o IDs de elemento (`s`), filtro por subtipo exacto (`subtype`) mediante catálogo dinámico `get_distinct_subtypes()`, filtro por estado de traducción (`status`: todos, completas, incompletas, revisión) y filtro por idioma presente (`lang`).
+  5. **Tabla Central de Traducciones e Indicadores Editoriales:**
+     - La tabla utiliza clases estándar `.wp-list-table.widefat.fixed.striped` con columnas para: Grupo / Subtipo, Contenido Canónico (con enlace directo al editor y estado del post), y una columna por cada idioma activo (`ES`, `EN`, `PT`).
+     - Cada celda presenta insignias de estado: `Actualizada` (verde, `dashicons-yes`), `Requiere revisión` (amarillo, `dashicons-warning`), `— Sin traducción [+ Traducir]` (enlace rápido al editor).
+     - El contenido canónico está claramente diferenciado con la etiqueta visual `Origen`.
+  6. **Sección Informativa de Custodia Histórica Francesa:**
+     - Al pie de la pantalla, un contenedor `.postbox` con borde distintivo expone con total transparencia técnica las 3 traducciones retenidas de la migración WPML (`Accueil #8839`, `Activités #8955`, `Nous #8873`), sus TRIDs de origen (`197`, `9201`, `9545`), grupo TFML vinculado y su estado de custodia inactiva.
+  7. **Cero Mutaciones y Aislamiento Absoluto de Datos:**
+     - La pantalla es 100% de lectura / consulta; no realiza ninguna operación de escritura en base de datos.
+     - Producción `cms_ect` intocada: MD5 inmutable `4241ca7e7ec6399a594537cb04790c10` (3.403 filas).
+     - Laboratorio `cms_ect_lab` invariable: 123 grupos, 139 elementos y 3 traducciones retenidas preservadas.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.44 / Directiva DT-TFML-076 — Centro Administrativo de Traducciones.
+- **JUSTIFICACIÓN:** Dotar a los administradores de un panel centralizado para visualizar, buscar y supervisar el estado de todas las traducciones del sitio, al tiempo que se resuelve de manera definitiva la reserva de Fase 3.43A protegiendo las traducciones retenidas ante desvinculaciones.
+- **CONSECUENCIAS:** Suite de pruebas PHPUnit ampliada a **681 pruebas / 2.526 aserciones (100% PASS, 0 errores, 1 omitida)**, PHPCS 100% limpio en todo `src/` (**102/102 archivos**), verificador reproducible `scratch/verify_fase_3_44.php` certificado con **10/10 controles PASS (0 FAIL)**, capturas visuales de alta definición generadas en `/brain/` (`fase_3_44_admin_translations.png`, `fase_3_44_admin_translations_full.png`) y 4/4 URLs frontend verificadas con HTTP 200 y canonicals correctos.
 
 
 

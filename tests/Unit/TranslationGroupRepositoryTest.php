@@ -346,4 +346,71 @@ class TranslationGroupRepositoryTest extends TestCase {
 		$this->assertTrue( $results[202]->has_translation( 'es' ) );
 		$this->assertTrue( $results[202]->has_translation( 'en' ) );
 	}
+
+	/**
+	 * Tests remove_translation with purge_empty_group = false preserves group row.
+	 */
+	public function test_remove_translation_preserves_group_when_purge_is_false(): void {
+		$group = $this->repository->create_group( 'post', 'tours', 101, 'es', true );
+		$this->assertSame( 101, $group->get_canonical_element_id() );
+
+		// Remove the only translation with purge_empty_group = false.
+		$result = $this->repository->remove_translation( $group->get_id(), 'es', null, false );
+		$this->assertTrue( $result );
+
+		// Group must still exist.
+		$reloaded = $this->repository->find( $group->get_id() );
+		$this->assertNotNull( $reloaded );
+		$this->assertSame( $group->get_id(), $reloaded->get_id() );
+		$this->assertNull( $reloaded->get_canonical_element_id() );
+		$this->assertTrue( $reloaded->is_empty() );
+		$this->assertSame( array(), $reloaded->get_elements() );
+	}
+
+	/**
+	 * Tests get_distinct_subtypes returns sorted list of subtypes.
+	 */
+	public function test_get_distinct_subtypes(): void {
+		$this->repository->create_group( 'post', 'tours', 101, 'es' );
+		$this->repository->create_group( 'post', 'page', 102, 'es' );
+		$this->repository->create_group( 'post', 'destination', 103, 'es' );
+
+		$subtypes = $this->repository->get_distinct_subtypes();
+		$this->assertContains( 'tours', $subtypes );
+		$this->assertContains( 'page', $subtypes );
+		$this->assertContains( 'destination', $subtypes );
+	}
+
+	/**
+	 * Tests query_groups_overview pagination and filtering.
+	 */
+	public function test_query_groups_overview(): void {
+		$g1 = $this->repository->create_group( 'post', 'tours', 101, 'es', true );
+		$this->repository->add_translation( $g1->get_id(), 102, 'en' );
+
+		$g2 = $this->repository->create_group( 'post', 'page', 201, 'es', true );
+
+		$result = $this->repository->query_groups_overview(
+			array(
+				'page'     => 1,
+				'per_page' => 10,
+			)
+		);
+
+		$this->assertArrayHasKey( 'items', $result );
+		$this->assertArrayHasKey( 'total', $result );
+		$this->assertArrayHasKey( 'total_pages', $result );
+		$this->assertArrayHasKey( 'total_groups_count', $result );
+		$this->assertArrayHasKey( 'total_elements_count', $result );
+		$this->assertGreaterThanOrEqual( 2, $result['total_groups_count'] );
+
+		// Filter by subtype
+		$filtered = $this->repository->query_groups_overview(
+			array(
+				'subtype' => 'tours',
+			)
+		);
+		$this->assertSame( 1, $filtered['total'] );
+		$this->assertSame( 'tours', $filtered['items'][0]->get_subtype() );
+	}
 }

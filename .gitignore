@@ -23,6 +23,7 @@ Thumbs.db
 # Logs and scratch
 *.log
 /scratch/*
+!/scratch/verify_fase_3_44.php
 !/scratch/verify_fase_3_43a.php
 !/scratch/verify_fase_3_43.php
 !/scratch/verify_fase_3_42.php

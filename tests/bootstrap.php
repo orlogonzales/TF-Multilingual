@@ -1271,6 +1271,34 @@ if ( ! function_exists( 'esc_html__' ) ) {
 	}
 }
 
+if ( ! function_exists( 'number_format_i18n' ) ) {
+	/**
+	 * Stub for number_format_i18n.
+	 *
+	 * @param float|int $number   Number to format.
+	 * @param int       $decimals Decimals.
+	 * @return string
+	 */
+	function number_format_i18n( $number, int $decimals = 0 ): string {
+		return number_format( (float) $number, $decimals );
+	}
+}
+
+if ( ! function_exists( '_n' ) ) {
+	/**
+	 * Stub for _n.
+	 *
+	 * @param string $single Single text.
+	 * @param string $plural Plural text.
+	 * @param int    $number Number.
+	 * @param string $domain Domain.
+	 * @return string
+	 */
+	function _n( string $single, string $plural, int $number, string $domain = 'default' ): string {
+		return ( 1 === $number ) ? $single : $plural;
+	}
+}
+
 if ( ! function_exists( 'esc_attr' ) ) {
 	/**
 	 * Stub for esc_attr.

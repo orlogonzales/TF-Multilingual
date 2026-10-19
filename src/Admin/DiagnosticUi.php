@@ -62,7 +62,7 @@ class DiagnosticUi {
 	 */
 	public function init_hooks(): void {
 		if ( function_exists( 'add_action' ) ) {
-			add_action( 'admin_menu', array( $this, 'register_menu_page' ) );
+			add_action( 'admin_menu', array( $this, 'register_menu_page' ), 12 );
 		}
 
 		if ( function_exists( 'add_filter' ) ) {

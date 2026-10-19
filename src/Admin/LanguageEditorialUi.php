@@ -952,7 +952,7 @@ class LanguageEditorialUi {
 										<td><strong><?php esc_html_e( 'Posts y Páginas', 'tf-multilingual' ); ?></strong></td>
 										<td><code>EditorialTranslationService</code> (✔ Activo)</td>
 										<td><code>/tf-multilingual/v1/translations</code></td>
-										<td><?php esc_html_e( 'Metabox en editor clásico/bloques y columnas', 'tf-multilingual' ); ?></td>
+										<td><span style="color:#46b450; font-weight:700;">✔ <?php esc_html_e( 'Centro de Traducciones (Fase 3.44)', 'tf-multilingual' ); ?></span>, <?php esc_html_e( 'Metabox en editor y columnas', 'tf-multilingual' ); ?></td>
 									</tr>
 									<tr>
 										<td><strong><?php esc_html_e( 'Taxonomías y Términos', 'tf-multilingual' ); ?></strong></td>

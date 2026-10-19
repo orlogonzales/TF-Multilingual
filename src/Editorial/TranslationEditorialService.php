@@ -1102,10 +1102,20 @@ class TranslationEditorialService {
 			}
 		}
 
+		// Determine if group holds retained translations in RetainedTranslationRegistry.
+		$has_retained = false;
+		if ( null !== $this->retained_registry ) {
+			$retained_record = $this->retained_registry->get_by_group_id( (int) $group->get_id() );
+			$has_retained    = ( null !== $retained_record && ! empty( $retained_record['retained_elements'] ) );
+		}
+
+		$purge_empty = ! $has_retained;
+
 		$success = $this->group_repository->remove_translation(
 			(int) $group->get_id(),
 			$element_lang,
-			$new_canonical_id
+			$new_canonical_id,
+			$purge_empty
 		);
 
 		$this->translation_resolver->flush_cache();
