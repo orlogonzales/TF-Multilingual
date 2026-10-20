@@ -49,11 +49,12 @@ class SettingsRepositoryTest extends TestCase {
 
 		$this->assertSame(
 			array(
-				'default_language' => null,
-				'languages'        => array(),
-				'custom_fields'    => array(
+				'default_language'   => null,
+				'languages'          => array(),
+				'custom_fields'      => array(
 					'policies' => array(),
 				),
+				'nav_menu_locations' => array(),
 			),
 			$settings
 		);
@@ -162,6 +163,56 @@ class SettingsRepositoryTest extends TestCase {
 		$this->assertSame( 'ignore', $sanitized['custom_fields']['policies']['tracking_id'] );
 		$this->assertArrayNotHasKey( 'invalid_prop', $sanitized['custom_fields']['policies'] );
 		$this->assertArrayNotHasKey( '', $sanitized['custom_fields']['policies'] );
+	}
+
+	/**
+	 * Tests payload sanitization filters out invalid nav menu locations.
+	 */
+	public function test_sanitize_payload_nav_menu_locations(): void {
+		$payload = array(
+			'nav_menu_locations' => array(
+				'primary' => array(
+					'en'      => 45,
+					'pt'      => '67',
+					'invalid' => 0,
+					''        => 88,
+				),
+				''        => array(
+					'en' => 12,
+				),
+				'empty'   => array(
+					'en' => -1,
+				),
+			),
+		);
+
+		$sanitized = $this->repository->sanitize_payload( $payload );
+
+		$this->assertArrayHasKey( 'primary', $sanitized['nav_menu_locations'] );
+		$this->assertSame( 45, $sanitized['nav_menu_locations']['primary']['en'] );
+		$this->assertSame( 67, $sanitized['nav_menu_locations']['primary']['pt'] );
+		$this->assertArrayNotHasKey( 'invalid', $sanitized['nav_menu_locations']['primary'] );
+		$this->assertArrayNotHasKey( '', $sanitized['nav_menu_locations']['primary'] );
+		$this->assertArrayNotHasKey( '', $sanitized['nav_menu_locations'] );
+		$this->assertArrayNotHasKey( 'empty', $sanitized['nav_menu_locations'] );
+	}
+
+	/**
+	 * Tests save and load nav menu locations roundtrip.
+	 */
+	public function test_save_and_load_nav_menu_locations(): void {
+		$payload = array(
+			'nav_menu_locations' => array(
+				'primary' => array(
+					'en' => 45,
+				),
+			),
+		);
+
+		$this->assertTrue( $this->repository->save( $payload ) );
+		$loaded = $this->repository->load();
+		$this->assertArrayHasKey( 'primary', $loaded['nav_menu_locations'] );
+		$this->assertSame( 45, $loaded['nav_menu_locations']['primary']['en'] );
 	}
 
 	/**

@@ -127,10 +127,6 @@ class NavMenuLocationRepository {
 	}
 
 	/**
-	 * Sets the menu ID for a given theme location and language.
-	 *
-	 * @param string   $location      Theme location identifier.
-	/**
 	 * In-memory cache of mappings.
 	 *
 	 * @var array<string, array<string, int>>|null

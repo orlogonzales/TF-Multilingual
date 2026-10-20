@@ -149,6 +149,15 @@ class NavMenuLocationRepositoryTest extends TestCase {
 
 		$resolved = $this->location_repo->get_menu_for_location( 'primary', 'en' );
 		$this->assertSame( 98, $resolved );
+
+		// Verify fresh instance loads the persisted mapping from settings option.
+		$fresh_repo = new NavMenuLocationRepository(
+			$this->settings_repo,
+			$this->lang_registry,
+			$this->resolver,
+			true
+		);
+		$this->assertSame( 98, $fresh_repo->get_menu_for_location( 'primary', 'en' ) );
 	}
 
 	/**

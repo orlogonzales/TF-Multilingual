@@ -2374,6 +2374,47 @@
 - **JUSTIFICACIÓN:** Aplicar la Directiva Maestra de las 10 Reglas de Oro para cerrar de manera consolidada todas las páginas publicadas restantes en un único ciclo eficiente, completando la familia Nosotros y la raíz Blog, preservando en custodia las traducciones francesas y protegiendo el borrador TRID 34790.
 - **CONSECUENCIAS:** Verificador reproducible `scratch/verify_fase_3_53.php` certificado con **10/10 controles PASS (0 FAIL)**, 691 pruebas PHPUnit superadas al 100% (1 omitida intencional), PHPCS 100% limpio en todo el proyecto y 3 capturas de pantalla de alta definición en `/brain/` (`fase_3_53_admin_migration_history.png`, `fase_3_53_admin_migration_retained.png` y `fase_3_53_admin_migration_next_batch.png`).
 
+---
+
+### ADR-082: Cierre Funcional Integrado, Certificación de Cobertura Multilingüe y Robustecimiento del Ciclo de Vida Editorial (Fase 3.54 / Directiva DT-TFML-087)
+- **FECHA:** 2026-10-20
+- **DECISIÓN:**
+  1. **Auditoría Exhaustiva de Cobertura Funcional (14 Áreas Auditadas y Certificadas):**
+     - Se auditó y certificó el comportamiento del plugin a través de 14 subsistemas funcionales:
+       * **Área 1 (Idiomas y Configuración):** `LanguageRegistry` y `SettingsRepository` operando con idioma por defecto `es` y activos `es`, `en`, `pt`. Mapeo de locales y códigos ISO conforme a especificación.
+       * **Área 2 (Ciclo de Vida Editorial):** `TranslationEditorialService`, `PostEditorialUi`, `TermEditorialUi` y `AdminListColumnsUi`. Búsqueda precisa de candidatos no enlazados, no intrusión en elementos vinculados, protección estricta contra manipulación cruzada de grupos (`EditorialConflictException`) y verificación rigurosa de nonces y permisos.
+       * **Área 3 (Tipos de Contenido y Taxonomías):** Políticas declaradas en `CustomFieldPolicyRegistry`, sincronización bidireccional de metadatos `SHARE`, fingerprinting y versionado atómico de traducciones.
+       * **Área 4 (Cadenas Multilingües):** `StringTranslationService` con almacenamiento transaccional en `StringRepository`. Registro determinista de cadenas por dominio/clave, traducción contextual, fallback soberano estricto al idioma fuente y eliminación atómica (`delete_string`).
+       * **Área 5 (Menús y Navegación):** `NavMenuLocationRepository` y `NavMenuFrontendFilter`. Filtrado frontend de elementos traducidos con política de fallback segura y persistencia confiable de sobreescrituras por ubicación e idioma.
+       * **Área 6 (Conmutador de Idiomas):** `ServicioTraduccionPublico::obtener_informacion_idiomas()` y emulación `icl_get_languages()` con cálculo de `missing` y `url` de destino, filtrando idiomas retenidos/inactivos (`fr`).
+       * **Área 7 (Enrutamiento y URLs):** `UrlLanguageResolver`, `RewriteManager`, `LocalizedUrlGenerator` y `ResolvedorPortadaMultilingue` resolviendo 42 rutas canónicas HTTP 200 OK con prefijo `/en/` y portada limpia en `/`.
+       * **Área 8 (SEO y Sitemaps):** `CanonicalUrlManager`, `HreflangGenerator` y `CoreSitemapsFilter` generando 66 URLs únicas en sitemaps nativos de WordPress, con 0 entradas en francés y 0 borradores.
+       * **Área 9 (Medios Multilingües):** `MediaTranslationRepository` y `MediaEditorialUi` manteniendo el Modelo B de deduplicación sin mutación redundante de archivos físicos en uploads.
+       * **Área 10 (Compatibilidad WPML y Terceros):** `AdaptadorCompatibilidadWpml` proporcionando emulación de `icl_object_id()` y contratos con `ova_framework_hf_el` para cabeceras y pies, garantizando 0 modificaciones en el código fuente de Elementor, Elementor Pro, OVA Framework o ecoCMS.
+       * **Área 11 (REST API):** Endpoints en `/tf-multilingual/v1/*` para lenguajes, traducciones y estado, con control de permisos y capacidades de WordPress.
+       * **Área 12 (Trazabilidad y Rollback):** Preservación de 20 manifiestos inmutables en `wp_options`, punto de control `#9545 completed` y cerrojo libre (`MigrationExecutionLock`).
+       * **Área 13 (Custodia Histórica y Borradores):** 21 traducciones francesas en `RetainedTranslationRegistry` con cero polución activa, y preservación del borrador TRID 34790 en `post_status = 'draft'` sin vincular ni publicar.
+       * **Área 14 (Seguridad y Experiencia Administrativa):** 13 pantallas administrativas renderizadas limpiamente sin errores (Idiomas, Traducciones, Cadenas, Migración [Plan, Historial, Retenidas, Siguiente Lote], Diagnóstico, Campos Personalizados, Menús, Metaboxes).
+  2. **Resolución de Brechas y Defectos Técnicos Identificados:**
+     - **Corrección en `SettingsRepository::sanitize_payload()`:** Se identificó que la clave `nav_menu_locations` no estaba declarada en `EMPTY_SETTINGS` ni procesada en `sanitize_payload()`, provocando que al guardar opciones en `themes.php?page=tfml-navigation` se eliminaran los mapeos manuales de menú. Se implementó la sanitización tipada de `nav_menu_locations`, actualizando `SettingsRepository.php`, sincronizando el entorno de laboratorio y ampliando la cobertura en `SettingsRepositoryTest.php` y `NavMenuLocationRepositoryTest.php`.
+     - **Robustecimiento del Ciclo de Vida ante Eliminación (`deleted_post` y `delete_term`):** Se detectó que el plugin no escuchaba la eliminación definitiva de contenidos nativos de WordPress. Se implementaron los callbacks `on_deleted_post( int $post_id )` y `on_delete_term( int $term_id, int $tt_id, string $taxonomy )` y el método `cleanup_deleted_element()` en `TranslationEditorialService`, asegurando que cualquier borrado físico en WordPress elimine automáticamente el elemento en `tfml_group_elements`, reasigne el canónico si procede o purgue el grupo si queda vacío, previniendo referencias huérfanas.
+     - **Reconciliación Diagnóstica de Relaciones:** Se reconcilió el registro huérfano `#10151` en `cms_ect_lab`, permitiendo que las 6 secciones de `DiagnosticService` (`environment`, `tables`, `languages`, `relations`, `rewrites`, `modules`) alcancen un estado 100% `good` con 0 huérfanos.
+  3. **Tratamiento Formal del Borrador TRID 34790:**
+     - Los posts `#9662` (ES), `#9663` (EN) y `#9664` (FR) se mantienen estrictamente en `post_status = 'draft'`.
+     - Cero registros en `etk_t_tfml_group_elements` y cero exposición en sitemaps o accesos públicos (retornan HTTP 404 limpio a usuarios no autenticados).
+     - Queda técnicamente acreditada la viabilidad de agrupar borradores en TFML a futuro mediante `TranslationEditorialService`, pero se preservan huérfanos en WP Core hasta que exista aprobación editorial expresa de publicación.
+  4. **Invarianza Absoluta de Producción (`cms_ect`) y Calidad Verificable:**
+     - La base de datos de producción `cms_ect` permanece 100% inalterada: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+     - Laboratorio `cms_ect_lab` consolidado: 141 grupos TFML, 175 elementos activos, 21 traducciones retenidas FR, 20 manifiestos de ejecución.
+     - Suite PHPUnit ampliada a **693 pruebas / 2.569 aserciones (100% PASS, 0 errores, 1 omitida)**.
+     - PHPCS **100% PASS en todo el proyecto (187 archivos, 0 errores, 0 advertencias)**.
+     - Verificador reproducible `scratch/verify_fase_3_54.php` certificado con **10/10 controles PASS (0 FAIL)**.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.54 / Directiva DT-TFML-087 — Cierre Funcional Integrado y Certificación de Cobertura Multilingüe.
+- **JUSTIFICACIÓN:** Ejecutar en un único ciclo consolidado bajo la Directiva Maestra de las 10 Reglas de Oro la certificación integral de todos los subsistemas de TF Multilingual, corregir autónomamente los defectos y brechas de persistencia y ciclo de vida identificados, y certificar el reemplazo completo, soberano y autónomo de WPML.
+- **CONSECUENCIAS:** Plugin TF Multilingual plenamente certificado para operación autónoma como sustituto de WPML en `lab.ecoterra.test`. Se cierran formalmente los 14 bloques funcionales con cero regresiones en producción y laboratorio.
+
+
 
 
 

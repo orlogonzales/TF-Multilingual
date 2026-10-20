@@ -25,11 +25,12 @@ class SettingsRepository {
 	 * Canonical empty settings payload.
 	 */
 	public const EMPTY_SETTINGS = array(
-		'default_language' => null,
-		'languages'        => array(),
-		'custom_fields'    => array(
+		'default_language'   => null,
+		'languages'          => array(),
+		'custom_fields'      => array(
 			'policies' => array(),
 		),
+		'nav_menu_locations' => array(),
 	);
 
 	/**
@@ -38,7 +39,7 @@ class SettingsRepository {
 	 * If the option is non-existent, malformed or corrupted, returns the safe default
 	 * empty structure without raising fatals or warnings.
 	 *
-	 * @return array{default_language: ?string, languages: array<string, array<string, mixed>>, custom_fields: array{policies: array<string, string>}}
+	 * @return array{default_language: ?string, languages: array<string, array<string, mixed>>, custom_fields: array{policies: array<string, string>}, nav_menu_locations: array<string, array<string, int>>}
 	 */
 	public function load(): array {
 		$raw = get_option( self::OPTION_NAME, null );
@@ -85,7 +86,7 @@ class SettingsRepository {
 	 * Sanitizes raw settings payload into predictable canonical structure.
 	 *
 	 * @param mixed $raw Raw input.
-	 * @return array{default_language: ?string, languages: array<string, array<string, mixed>>, custom_fields: array{policies: array<string, string>}}
+	 * @return array{default_language: ?string, languages: array<string, array<string, mixed>>, custom_fields: array{policies: array<string, string>}, nav_menu_locations: array<string, array<string, int>>}
 	 */
 	public function sanitize_payload( mixed $raw ): array {
 		if ( ! is_array( $raw ) ) {
@@ -125,10 +126,29 @@ class SettingsRepository {
 			}
 		}
 
+		$nav_menu_locations = array();
+		if ( isset( $raw['nav_menu_locations'] ) && is_array( $raw['nav_menu_locations'] ) ) {
+			foreach ( $raw['nav_menu_locations'] as $loc => $langs ) {
+				if ( is_string( $loc ) && '' !== trim( $loc ) && is_array( $langs ) ) {
+					$clean_loc                        = strtolower( trim( $loc ) );
+					$nav_menu_locations[ $clean_loc ] = array();
+					foreach ( $langs as $code => $menu_id ) {
+						if ( is_string( $code ) && '' !== trim( $code ) && ( is_int( $menu_id ) || is_numeric( $menu_id ) ) && (int) $menu_id > 0 ) {
+							$nav_menu_locations[ $clean_loc ][ Language::normalize_code( $code ) ] = (int) $menu_id;
+						}
+					}
+					if ( empty( $nav_menu_locations[ $clean_loc ] ) ) {
+						unset( $nav_menu_locations[ $clean_loc ] );
+					}
+				}
+			}
+		}
+
 		return array(
-			'default_language' => $default,
-			'languages'        => $languages,
-			'custom_fields'    => $custom_fields,
+			'default_language'   => $default,
+			'languages'          => $languages,
+			'custom_fields'      => $custom_fields,
+			'nav_menu_locations' => $nav_menu_locations,
 		);
 	}
 }

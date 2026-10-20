@@ -1528,10 +1528,12 @@ class TranslationEditorialService {
 		}
 
 		add_action( 'save_post', array( $this, 'on_save_post' ), 50, 3 );
+		add_action( 'deleted_post', array( $this, 'on_deleted_post' ), 50, 1 );
 		add_action( 'added_post_meta', array( $this, 'on_meta_added' ), 50, 4 );
 		add_action( 'updated_post_meta', array( $this, 'on_meta_updated' ), 50, 4 );
 		add_action( 'deleted_post_meta', array( $this, 'on_meta_deleted' ), 50, 3 );
 		add_action( 'edited_term', array( $this, 'on_edited_term' ), 50, 3 );
+		add_action( 'delete_term', array( $this, 'on_delete_term' ), 50, 3 );
 	}
 
 	/**
@@ -1545,10 +1547,12 @@ class TranslationEditorialService {
 		}
 
 		remove_action( 'save_post', array( $this, 'on_save_post' ), 50 );
+		remove_action( 'deleted_post', array( $this, 'on_deleted_post' ), 50 );
 		remove_action( 'added_post_meta', array( $this, 'on_meta_added' ), 50 );
 		remove_action( 'updated_post_meta', array( $this, 'on_meta_updated' ), 50 );
 		remove_action( 'deleted_post_meta', array( $this, 'on_meta_deleted' ), 50 );
 		remove_action( 'edited_term', array( $this, 'on_edited_term' ), 50 );
+		remove_action( 'delete_term', array( $this, 'on_delete_term' ), 50 );
 	}
 
 	/**
@@ -1652,5 +1656,93 @@ class TranslationEditorialService {
 		}
 
 		$this->sync_term_version( $term_id, $taxonomy );
+	}
+
+	/**
+	 * Callback for deleted_post hook.
+	 *
+	 * Cleans up translation group associations when a post is permanently deleted.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return void
+	 */
+	public function on_deleted_post( int $post_id ): void {
+		if ( $post_id <= 0 ) {
+			return;
+		}
+
+		$this->cleanup_deleted_element( 'post', $post_id );
+	}
+
+	/**
+	 * Callback for delete_term hook.
+	 *
+	 * Cleans up translation group associations when a term is permanently deleted.
+	 *
+	 * @param int    $term_id  Term ID.
+	 * @param int    $tt_id    Term taxonomy ID.
+	 * @param string $taxonomy Taxonomy name.
+	 * @return void
+	 */
+	public function on_delete_term( int $term_id, int $tt_id = 0, string $taxonomy = '' ): void {
+		if ( $term_id <= 0 ) {
+			return;
+		}
+
+		$this->cleanup_deleted_element( 'term', $term_id );
+	}
+
+	/**
+	 * Cleans up an element when permanently deleted from WordPress.
+	 *
+	 * @param string $element_type 'post' or 'term'.
+	 * @param int    $element_id   Object ID.
+	 * @return void
+	 */
+	public function cleanup_deleted_element( string $element_type, int $element_id ): void {
+		$group = $this->group_repository->find_by_element( $element_type, $element_id );
+		if ( null === $group ) {
+			return;
+		}
+
+		$element_lang = null;
+		foreach ( $group->get_elements() as $elem ) {
+			if ( $elem->get_element_id() === $element_id ) {
+				$element_lang = $elem->get_language_code();
+				break;
+			}
+		}
+
+		if ( null === $element_lang ) {
+			return;
+		}
+
+		$new_canonical_id = null;
+		if ( $group->get_canonical_element_id() === $element_id ) {
+			foreach ( $group->get_elements() as $elem ) {
+				if ( $elem->get_element_id() !== $element_id ) {
+					$new_canonical_id = $elem->get_element_id();
+					break;
+				}
+			}
+		}
+
+		$has_retained = false;
+		if ( null !== $this->retained_registry ) {
+			$retained_record = $this->retained_registry->get_by_group_id( (int) $group->get_id() );
+			$has_retained    = ( null !== $retained_record && ! empty( $retained_record['retained_elements'] ) );
+		}
+
+		$purge_empty = ! $has_retained;
+
+		$this->group_repository->remove_translation(
+			(int) $group->get_id(),
+			$element_lang,
+			$new_canonical_id,
+			$purge_empty
+		);
+
+		$this->translation_resolver->flush_cache();
+		$this->clear_editorial_cache();
 	}
 }
