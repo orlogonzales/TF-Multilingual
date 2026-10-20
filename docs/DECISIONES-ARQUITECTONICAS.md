@@ -2312,6 +2312,68 @@
 - **JUSTIFICACIÓN:** Aplicar la Directiva Maestra de las 10 Reglas de Oro para cerrar un incremento funcional completo en un único ciclo, culminando todas las páginas públicas de la familia Experiencia Transformadora sin fragmentaciones innecesarias y preservando en custodia los borradores y las traducciones francesas.
 - **CONSECUENCIAS:** Verificador reproducible `scratch/verify_fase_3_52.php` certificado con **10/10 controles PASS (0 FAIL)**, 691 pruebas PHPUnit superadas al 100% (1 omitida intencional), PHPCS 100% limpio en todo el proyecto y 3 capturas de pantalla de alta definición en `/brain/` (`fase_3_52_admin_migration_history.png`, `fase_3_52_admin_migration_retained.png` y `fase_3_52_admin_migration_next_batch.png`).
 
+---
+
+### ADR-081: Culminación Consolidada de Páginas Publicadas Pendientes (Familia Nosotros y Blog) (Fase 3.53 / DT-TFML-086)
+
+- **TÍTULO:** Culminación Consolidada de Páginas Publicadas Pendientes (Familia Nosotros y Blog) (Fase 3.53 / DT-TFML-086)
+- **FECHA:** 2026-10-20
+- **AUTOR:** Antigravity AI
+- **DECISIÓN:**
+  1. **Aislamiento y Preflight Riguroso:**
+     - Centinela WPML en producción `cms_ect`: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+     - Centinela WPML en laboratorio `cms_ect_lab`: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10`.
+     - Baseline inicial de TFML en `cms_ect_lab`: 136 grupos, 165 elementos, 16 FR retenidas, 19 manifiestos, checkpoint `completed`, lock libre.
+     - Respaldo físico SQL completo generado fuera de webroot: `D:/laragon/backup/tfml_staging/cms_ect_lab_pre_fase_3_53_pilot_trids_424_9838_34823_34632_34831_20261020_172034.sql` (18.108.243 bytes, SHA-256 `143300312888d93c3d5fbd4dde4d3be3b6fe17f5abbff021b6ddab5ec932054d`).
+  2. **Certificación en Base de Datos Desechable (`cms_ect_lab_restore_verify`):**
+     - Restauración en BD efímera en 5,31s confirmando baseline exacto (136/165/16/19).
+     - Ejecución de prueba con `WpmlMigrationExecutor`: grupos 136 -> 141, elementos 165 -> 175, retenidas 16 -> 21, manifiestos 19 -> 20.
+     - Prueba de idempotencia estricta en segunda pasada: 5 grupos saltados legítimamente (`idempotent_skipped`) con 0 duplicidades.
+     - Prueba de reversión selectiva mediante `WpmlMigrationRollbackService::rollback_groups()`: retorno exacto y limpio al estado 136/165/16.
+     - Destrucción segura de la base efímera (`DROP DATABASE`) y metadatos inmutables en `.meta.json`.
+  3. **Ejecución Transaccional Atómica Única en `cms_ect_lab`:**
+     - Fingerprints canónicos:
+       * Plan maestro: `1953cf03d42cae4b54f71ed75f22ea0dfd7ec4f35d2261c710416f039db6cea2`.
+       * Plan piloto: `e4252839267b6395307f7eed5bfb67f12e4e09d626ba58738bfb64772cedf5d4`.
+     - Ejecución atómica mediante `WpmlMigrationExecutor::execute_batch()` en 0,0509s:
+       * **TRID 424** -> Asignado a **Grupo TFML #603** (Canónico Post `#424` ¿Quiénes Somos? [ES], Miembro Post `#8352` Who Are We? [EN], Retenida Post `#8880` Qui somme nous? en `RetainedTranslationRegistry`).
+       * **TRID 9838** -> Asignado a **Grupo TFML #604** (Canónico Post `#8316` Reviews [ES], Miembro Post `#8321` Reviews [EN], Retenida Post `#8910` Avis en `RetainedTranslationRegistry`).
+       * **TRID 34632** -> Asignado a **Grupo TFML #605** (Canónico Post `#8801` Accesibilidad y Transportes [ES], Miembro Post `#8802` Accessibility and Transportation [EN], Retenida Post `#8908` Accessibilité et Transport en `RetainedTranslationRegistry`).
+       * **TRID 34823** -> Asignado a **Grupo TFML #606** (Canónico Post `#9864` Términos y Condiciones [ES], Miembro Post `#9863` Terms and Conditions [EN], Retenida Post `#9865` Qui somme nous? [draft] en `RetainedTranslationRegistry`).
+       * **TRID 34831** -> Asignado a **Grupo TFML #607** (Canónico Post `#10109` Blog [ES], Miembro Post `#10110` Blog [EN], Retenida Post `#10111` Blog en `RetainedTranslationRegistry`).
+     - Manifiesto inmutable `tfml_migration_manifest_pilot-published-pages-5-trids-424-9838-34823-34632-34831` persistido, checkpoint actualizado a `completed` y lock libre.
+  4. **Preservación Jerárquica y Exclusión de Borrador:**
+     - Las 4 páginas subordinadas a Nosotros (Grupo TFML #589) preservan estrictamente su subordinación:
+       * Posts `#424`, `#8316`, `#9864`, `#8801` apuntan a `post_parent = 6237` (ES).
+       * Posts `#8352`, `#8321`, `#9863`, `#8802` apuntan a `post_parent = 8354` (EN).
+       * Posts `#8880`, `#8910`, `#9865`, `#8908` apuntan a `post_parent = 8873` (FR en custodia).
+     - La página Blog (TRID 34831) preserva su condición de raíz autónoma con `post_parent = 0` (Posts `#10109`, `#10110`, `#10111`).
+     - El borrador TRID 34790 (Posts `#9662`, `#9663`, `#9664`) permanece intacto con `post_status = 'draft'`, sin publicar y con 0 registros en TFML.
+     - Métricas consolidadas en `cms_ect_lab`:
+       * Grupos TFML: de 136 a **141**.
+       * Elementos Activos: de 165 a **175**.
+       * Traducciones Retenidas FR: de 16 a **21**.
+       * Manifiestos de Migración: de 19 a **20**.
+       * Cero elementos en francés activos (`fr_active = 0`) y cero duplicidades relacionales.
+       * Reconciliación global con 0 discrepancias (`reconcile()`).
+  5. **Certificación Funcional HTTP, Menús y Sitemaps:**
+     - HTTP 200 OK con lang exacto, canonical localizado y hreflang simétrico en:
+       * `/nosotros/quienes-somos/` (ES) y `/en/about-us/who-are-we/` (EN)
+       * `/nosotros/reviews/` (ES) y `/en/about-us/reviews/` (EN)
+       * `/nosotros/terminos-y-condiciones/` (ES) y `/en/about-us/terms-and-conditions/` (EN)
+       * `/nosotros/accesibilidad-y-transportes/` (ES) y `/en/about-us/accessibility-and-transportation/` (EN)
+       * `/blog/` (ES) y `/en/blog/` (EN)
+       * No regresión en las 32 rutas históricas previas (42 rutas certificadas en total).
+       * `/fr/` y `/pt/` responden 404 limpio.
+     - Menú de escritorio `menu-menu-es-ingles`: se auto-localizan 15 enlaces EN (`Home`, `About Us`, `Who Are We?`, `Reviews`, `Terms and Conditions`, `Comfort and Tranquility`, `Transformative Experience`, `Birdwatching`, `Andean Cock of the Rock Lek`, `Coffee Experience`, `Photo Gallery`, `Activities`, `Tour Packages`, `Ecoterra Experience`, `Authentic Nature`). Enlaces no migrados: 1 seguro (`#`). Cero 404s prematuros (`premature_en_cnt = 0`).
+     - Sitemaps nativos: provider `page` se expande de 33 a **43** URLs (+10). Total consolidado del sitemap pasa de 56 a **66** URLs únicas (0 francés, 0 duplicados, `blog_public = 0`).
+  6. **Invarianza Absoluta de Producción (`cms_ect`):**
+     - La base de datos de producción `cms_ect` permanece 100% inalterada: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.53 / Directiva DT-TFML-086 — Culminación consolidada de páginas publicadas pendientes.
+- **JUSTIFICACIÓN:** Aplicar la Directiva Maestra de las 10 Reglas de Oro para cerrar de manera consolidada todas las páginas publicadas restantes en un único ciclo eficiente, completando la familia Nosotros y la raíz Blog, preservando en custodia las traducciones francesas y protegiendo el borrador TRID 34790.
+- **CONSECUENCIAS:** Verificador reproducible `scratch/verify_fase_3_53.php` certificado con **10/10 controles PASS (0 FAIL)**, 691 pruebas PHPUnit superadas al 100% (1 omitida intencional), PHPCS 100% limpio en todo el proyecto y 3 capturas de pantalla de alta definición en `/brain/` (`fase_3_53_admin_migration_history.png`, `fase_3_53_admin_migration_retained.png` y `fase_3_53_admin_migration_next_batch.png`).
+
 
 
 

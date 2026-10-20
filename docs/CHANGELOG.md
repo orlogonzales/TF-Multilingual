@@ -2205,6 +2205,62 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Verificador reproducible `scratch/verify_fase_3_52.php` certificado con **10/10 controles PASS (0 FAIL)**.
     - Artefactos visuales de alta resolución generados en `/brain/`: `fase_3_52_admin_migration_history.png`, `fase_3_52_admin_migration_retained.png` y `fase_3_52_admin_migration_next_batch.png`.
 
+- **Culminación Consolidada de Páginas Publicadas Pendientes (Familia Nosotros y Blog) (Fase 3.53 / Directiva DT-TFML-086):**
+  - **Aplicación de las 10 Reglas de Oro:**
+    - Ejecución de un incremento funcional consolidado en un único ciclo completo (preflight, respaldo, base desechable, migración atómica, verificación HTTP/sitemaps/menús, 10 controles PASS y cierre).
+  - **Aislamiento, Preflight y Respaldo Físico:**
+    - Verificación exitosa de compuertas previas: centinela WPML en producción `cms_ect` (3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`), centinela WPML en laboratorio `cms_ect_lab` (3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`), estado base de TFML verificado (136 grupos, 165 elementos, 16 FR retenidas, 19 manifiestos, checkpoint `completed` y lock libre).
+    - Verificación previa de las 4 parejas subordinadas de Nosotros (`#424/#8352`, `#8316/#8321`, `#9864/#9863`, `#8801/#8802`) con `post_parent` apuntando a Grupo #589 (`#6237` en ES y `#8354` en EN).
+    - Verificación de la raíz Blog (`#10109/#10110`) con `post_parent = 0`.
+    - Exclusión estricta del borrador TRID 34790 (`#9662`, `#9663`, `#9664`) manteniéndolo intacto en `post_status = 'draft'` sin alterar ni publicar.
+    - Generación de respaldo físico SQL completo fuera de DocumentRoot en `D:/laragon/backup/tfml_staging/cms_ect_lab_pre_fase_3_53_pilot_trids_424_9838_34823_34632_34831_20261020_172034.sql` (18.108.243 bytes, SHA-256 `143300312888d93c3d5fbd4dde4d3be3b6fe17f5abbff021b6ddab5ec932054d`).
+  - **Certificación y Pruebas en Base de Datos Desechable (`cms_ect_lab_restore_verify`):**
+    - Restauración completa del volcado en base de datos efímera (`cms_ect_lab_restore_verify`) en 5,31s comprobando métricas idénticas al baseline (136 grupos, 165 elementos, 16 retenidas, 19 manifiestos).
+    - Ejecución de prueba del lote piloto `pilot-published-pages-5-trids-424-9838-34823-34632-34831`: 136 -> 141 grupos, 165 -> 175 elementos, 16 -> 21 retenidas, 19 -> 20 manifiestos.
+    - Prueba de idempotencia estricta en segundo ciclo: 5 grupos saltados (`idempotent_skipped`), 0 grupos duplicados.
+    - Prueba de reversión selectiva mediante `WpmlMigrationRollbackService::rollback_groups()`: retorno limpio al estado base previo (136 grupos, 165 elementos, 16 retenidas).
+    - Destrucción segura de la base de datos efímera y persistencia de metadatos de auditoría en `meta.json`.
+  - **Validación Criptográfica y Ejecución Transaccional Atómica en `cms_ect_lab`:**
+    - Verificación determinista de huellas: huella del plan maestro `1953cf03d42cae4b54f71ed75f22ea0dfd7ec4f35d2261c710416f039db6cea2` y huella del piloto canónico `e4252839267b6395307f7eed5bfb67f12e4e09d626ba58738bfb64772cedf5d4`.
+    - Ejecución atómica única vía `WpmlMigrationExecutor::execute_batch()` en 0,0509s:
+      * TRID 424 -> Asignado al Grupo TFML #603 (canónico Post `#424` ¿Quiénes Somos? [ES], miembro Post `#8352` Who Are We? [EN], Post `#8880` Qui somme nous? en custodia francesa inactiva en `RetainedTranslationRegistry`).
+      * TRID 9838 -> Asignado al Grupo TFML #604 (canónico Post `#8316` Reviews [ES], miembro Post `#8321` Reviews [EN], Post `#8910` Avis en custodia francesa inactiva en `RetainedTranslationRegistry`).
+      * TRID 34632 -> Asignado al Grupo TFML #605 (canónico Post `#8801` Accesibilidad y Transportes [ES], miembro Post `#8802` Accessibility and Transportation [EN], Post `#8908` Accessibilité et Transport en custodia francesa inactiva en `RetainedTranslationRegistry`).
+      * TRID 34823 -> Asignado al Grupo TFML #606 (canónico Post `#9864` Términos y Condiciones [ES], miembro Post `#9863` Terms and Conditions [EN], Post `#9865` Qui somme nous? [draft] en custodia francesa inactiva en `RetainedTranslationRegistry`).
+      * TRID 34831 -> Asignado al Grupo TFML #607 (canónico Post `#10109` Blog [ES], miembro Post `#10110` Blog [EN], Post `#10111` Blog en custodia francesa inactiva en `RetainedTranslationRegistry`).
+    - Generación de manifiesto inmutable `tfml_migration_manifest_pilot-published-pages-5-trids-424-9838-34823-34632-34831` y actualización del checkpoint a `completed` con lock libre.
+  - **Preservación Jerárquica y Consolidación de Métricas en Laboratorio:**
+    - Las 4 parejas de Nosotros preservan estrictamente su subordinación jerárquica con Nosotros (Grupo #589): `#424`, `#8316`, `#9864`, `#8801` son hijas de `#6237` (ES); `#8352`, `#8321`, `#9863`, `#8802` son hijas de `#8354` (EN).
+    - Blog preserva su independencia en la raíz con `post_parent = 0` (`#10109`, `#10110`, `#10111`).
+    - Grupos TFML: de 136 a **141**.
+    - Elementos Activos: de 165 a **175**.
+    - Traducciones Retenidas FR: de 16 a **21**.
+    - Manifiestos de Migración: de 19 a **20**.
+    - Cero elementos en francés activos (`fr_active = 0`) y cero duplicidades relacionales.
+    - Reconciliación global con 0 discrepancias (`reconcile()`).
+  - **Certificación Funcional de Enrutamiento, Menús y Sitemaps:**
+    - Comprobación en servidor HTTP real (`http://lab.ecoterra.test`):
+      * `/nosotros/quienes-somos/` (Post #424): HTTP 200, `lang="es-ES"`, canonical `/nosotros/quienes-somos/`, hreflang simétrico.
+      * `/en/about-us/who-are-we/` (Post #8352): HTTP 200, `lang="en-US"`, canonical `/en/about-us/who-are-we/`, hreflang simétrico.
+      * `/nosotros/reviews/` (Post #8316): HTTP 200, `lang="es-ES"`, canonical `/nosotros/reviews/`, hreflang simétrico.
+      * `/en/about-us/reviews/` (Post #8321): HTTP 200, `lang="en-US"`, canonical `/en/about-us/reviews/`, hreflang simétrico.
+      * `/nosotros/terminos-y-condiciones/` (Post #9864): HTTP 200, `lang="es-ES"`, canonical `/nosotros/terminos-y-condiciones/`, hreflang simétrico.
+      * `/en/about-us/terms-and-conditions/` (Post #9863): HTTP 200, `lang="en-US"`, canonical `/en/about-us/terms-and-conditions/`, hreflang simétrico.
+      * `/nosotros/accesibilidad-y-transportes/` (Post #8801): HTTP 200, `lang="es-ES"`, canonical `/nosotros/accesibilidad-y-transportes/`, hreflang simétrico.
+      * `/en/about-us/accessibility-and-transportation/` (Post #8802): HTTP 200, `lang="en-US"`, canonical `/en/about-us/accessibility-and-transportation/`, hreflang simétrico.
+      * `/blog/` (Post #10109): HTTP 200, `lang="es-ES"`, hreflang simétrico.
+      * `/en/blog/` (Post #10110): HTTP 200, `lang="en-US"`, hreflang simétrico.
+      * Cero regresiones en rutas previamente migradas: 32/32 rutas históricas responden HTTP 200 (42 rutas públicas totales certificadas); `/fr/` y `/pt/` responden 404 limpio.
+    - Menú de escritorio `menu-menu-es-ingles`: se auto-localizan 15 enlaces EN (`Home`, `About Us`, `Who Are We?`, `Reviews`, `Terms and Conditions`, `Comfort and Tranquility`, `Transformative Experience`, `Birdwatching`, `Andean Cock of the Rock Lek`, `Coffee Experience`, `Photo Gallery`, `Activities`, `Tour Packages`, `Ecoterra Experience`, `Authentic Nature`), cubriendo el 100% de las páginas del menú sin enlaces rotos 404 prematuros (`premature_en_cnt = 0`). Enlace no migrado: 1 seguro (`#`).
+    - Sitemaps nativos de Core: provider `page` pasa de 33 a **43** URLs (+10); total general consolidado pasa de 56 a **66** URLs únicas (0 francés, 0 duplicados, `blog_public = 0`).
+  - **Invarianza Absoluta de Producción (`cms_ect`):**
+    - La base de datos de producción `cms_ect` permanece 100% inalterada: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+  - **Gobernanza, Calidad y Verificación Reproducible:**
+    - Suite de pruebas PHPUnit: **691 pruebas unitarias / 2.558 aserciones (100% PASS, 0 fallos, 0 errores, 1 omitida intencional)**.
+    - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)**.
+    - Verificador reproducible `scratch/verify_fase_3_53.php` certificado con **10/10 controles PASS (0 FAIL)**.
+    - Artefactos visuales de alta resolución generados en `/brain/`: `fase_3_53_admin_migration_history.png`, `fase_3_53_admin_migration_retained.png` y `fase_3_53_admin_migration_next_batch.png`.
+
 
 
 
