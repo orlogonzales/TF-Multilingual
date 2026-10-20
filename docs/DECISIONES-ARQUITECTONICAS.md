@@ -2199,6 +2199,62 @@
 - **JUSTIFICACIÓN:** Migrar de forma atómica y segura las páginas raíz autónomas de Naturaleza Auténtica y Experiencia EcoTerra, incrementando la cobertura real del catálogo multilingüe y de navegación, sin dependencias padre pendientes y con custodia francesa aislada.
 - **CONSECUENCIAS:** Verificador reproducible `scratch/verify_fase_3_50.php` certificado con **10/10 controles PASS (0 FAIL)**, 691 pruebas PHPUnit superadas al 100% (1 omitida intencional), PHPCS 100% limpio en todo el proyecto y 2 capturas de pantalla de alta definición en `/brain/` (`fase_3_50_admin_migration_history.png` y `fase_3_50_admin_migration_retained.png`).
 
+---
+
+### ADR-079: Importación Transaccional de Confort y Tranquilidad y Experiencia Transformadora y Desbloqueo Jerárquico de Hijas (Fase 3.51 / DT-TFML-084)
+
+- **TÍTULO:** Importación Transaccional de Confort y Tranquilidad y Experiencia Transformadora y Desbloqueo Jerárquico de Hijas (Fase 3.51 / DT-TFML-084)
+- **FECHA:** 2026-10-19
+- **AUTOR:** Antigravity AI
+- **DECISIÓN:**
+  1. **Aislamiento y Preflight Riguroso:**
+     - Centinela WPML en producción `cms_ect`: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+     - Centinela WPML en laboratorio `cms_ect_lab`: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10`.
+     - Baseline inicial de TFML en `cms_ect_lab`: 131 grupos, 155 elementos, 11 FR retenidas, 17 manifiestos, checkpoint `completed`, lock libre.
+     - Respaldo físico SQL completo generado fuera de webroot: `D:/laragon/backup/tfml_staging/cms_ect_lab_pre_fase_3_51_pilot_trids_9818_34652_20261019_221419.sql` (18.038.166 bytes, SHA-256 `3277ba8ae14d11e9127e35bece095765d271beb36b4b5e3307daeeecea57e5e9`).
+  2. **Certificación en Base de Datos Desechable (`cms_ect_lab_restore_verify`):**
+     - Restauración en BD efímera en 5,64s confirmando baseline exacto (131/155/11/17).
+     - Ejecución de prueba con `WpmlMigrationExecutor`: grupos 131 -> 133, elementos 155 -> 159, retenidas 11 -> 13, manifiestos 17 -> 18.
+     - Prueba de idempotencia estricta en segunda pasada: 2 grupos saltados legítimamente (`idempotent_skipped`) con 0 duplicidades.
+     - Prueba de reversión selectiva mediante `WpmlMigrationRollbackService::rollback_groups()`: retorno exacto y limpio al estado 131/155/11.
+     - Destrucción segura de la base efímera (`DROP DATABASE`) y metadatos inmutables en `.meta.json`.
+  3. **Ejecución Transaccional Atómica Única en `cms_ect_lab`:**
+     - Fingerprints canónicos:
+       * Plan maestro: `dc0b907aa9b6638a40cb37bf69d0a25a93e025e3469755419a074f6d7a8c5934`.
+       * Plan piloto: `ac60f6058fd89f8afdc2d67352bab69008e3ae3cf3afa33610b47524253be44d`.
+     - Ejecución atómica mediante `WpmlMigrationExecutor::execute_batch()` en 0,035s:
+       * **TRID 9818** -> Asignado a **Grupo TFML #598** (Canónico Post `#8042` Confort y Tranquilidad [ES], Miembro Post `#8613` Comfort and Tranquility [EN], Retenida Post `#8952` Chambres en `RetainedTranslationRegistry`).
+       * **TRID 34652** -> Asignado a **Grupo TFML #599** (Canónico Post `#9218` Experiencia Transformadora [ES], Miembro Post `#9219` Transformative Experience [EN], Retenida Post `#9220` Qui somme nous? en `RetainedTranslationRegistry`).
+     - Manifiesto inmutable `tfml_migration_manifest_pilot-nav-2-trids-9818-34652` persistido, checkpoint actualizado a `completed` y lock libre.
+  4. **Desbloqueo Jerárquico de Hijas y Consolidación de Métricas:**
+     - Ambas páginas son raíces independientes (`post_parent = 0`) en todos los idiomas (ES, EN, FR).
+     - La incorporación de Experiencia Transformadora en Grupo #599 desbloquea formalmente la elegibilidad de sus 4 páginas dependientes en WPML:
+       * TRID 34660 (*Avistamiento de Aves / Birdwatching*): padres `#9218` (ES), `#9219` (EN) y `#9220` (FR) en Grupo #599.
+       * TRID 34776 (*Lek de Gallito de las Rocas / Andean Cock of the Rock Lek*): padres `#9218` (ES), `#9219` (EN) y `#9220` (FR) en Grupo #599.
+       * TRID 34790 (Borrador): padres `#9218` (ES), `#9219` (EN) y `#9220` (FR) en Grupo #599.
+       * TRID 34791 (*Experiencia De Café / Coffee Experience*): padres `#9218` (ES), `#9219` (EN) y `#9220` (FR) en Grupo #599.
+     - Métricas consolidadas en `cms_ect_lab`:
+       * Grupos TFML: de 131 a **133**.
+       * Elementos Activos: de 155 a **159**.
+       * Traducciones Retenidas FR: de 11 a **13**.
+       * Manifiestos de Migración: de 17 a **18**.
+       * Cero elementos en francés activos (`fr_active = 0`) y cero duplicidades relacionales.
+       * Reconciliación global con 0 discrepancias (`reconcile()`).
+  5. **Certificación Funcional HTTP, Menús y Sitemaps:**
+     - HTTP 200 OK con lang exacto, canonical localizado y hreflang simétrico en:
+       * `/confort-y-tranquilidad/` (ES) y `/en/comfort-and-tranquility/` (EN)
+       * `/experiencia-transformadora/` (ES) y `/en/transformative-experience/` (EN)
+       * No regresión en las 22 rutas históricas previas.
+       * `/fr/` y `/pt/` responden 404 limpio.
+     - Menú de escritorio `menu-menu-es-ingles`: se auto-localizan 9 enlaces EN (`Home`, `About Us`, `Comfort and Tranquility`, `Transformative Experience`, `Photo Gallery`, `Activities`, `Tour Packages`, `Ecoterra Experience`, `Authentic Nature`). Las 6 páginas aún no migradas se mantienen protegidas sin 404 prematuros (`premature_en_cnt = 0`).
+     - Sitemaps nativos: provider `page` se expande de 23 a **27** URLs. Total consolidado del sitemap pasa de 46 a **50** URLs únicas (0 francés, 0 duplicados, `blog_public = 0`).
+  6. **Invarianza Absoluta de Producción (`cms_ect`):**
+     - La base de datos de producción `cms_ect` permanece 100% inalterada: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.51 / Directiva DT-TFML-084 — Importación de dos páginas raíz y desbloqueo jerárquico.
+- **JUSTIFICACIÓN:** Migrar transaccionalmente las páginas raíz Confort y Tranquilidad y Experiencia Transformadora, ampliando el catálogo multilingüe y habilitando el desbloqueo jerárquico de sus 4 páginas hijas para lotes subsiguientes.
+- **CONSECUENCIAS:** Verificador reproducible `scratch/verify_fase_3_51.php` certificado con **10/10 controles PASS (0 FAIL)**, 691 pruebas PHPUnit superadas al 100% (1 omitida intencional), PHPCS 100% limpio en todo el proyecto y 2 capturas de pantalla de alta definición en `/brain/` (`fase_3_51_admin_migration_history.png` y `fase_3_51_admin_migration_retained.png`).
+
 
 
 

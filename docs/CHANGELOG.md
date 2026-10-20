@@ -2115,6 +2115,47 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)**.
     - Verificador reproducible `scratch/verify_fase_3_50.php` certificado con **10/10 controles PASS (0 FAIL)**.
     - Artefactos visuales de alta resolución generados en `/brain/`: `fase_3_50_admin_migration_history.png` y `fase_3_50_admin_migration_retained.png`.
+- **Importación Transaccional de Dos Páginas Raíz y Desbloqueo Jerárquico de Hijas (Fase 3.51 / Directiva DT-TFML-084 — ADR-079):**
+  - **Compuertas Previas y Respaldo Físico Fuera de DocumentRoot:**
+    - Verificación exitosa de compuertas previas: centinela WPML en producción `cms_ect` (3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`), centinela WPML en laboratorio `cms_ect_lab` (3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`), estado base de TFML verificado (131 grupos, 155 elementos, 11 FR retenidas, 17 manifiestos, checkpoint `completed` y lock libre).
+    - Verificación previa de los 6 posts objetivos (`#8042`, `#8613`, `#8952`, `#9218`, `#9219`, `#9220`): condición de raíces autónomas (`post_parent = 0` en ES, EN, FR) y cero pertenencia previa a TFML.
+    - Generación de respaldo físico SQL completo fuera de DocumentRoot en `D:/laragon/backup/tfml_staging/cms_ect_lab_pre_fase_3_51_pilot_trids_9818_34652_20261019_221419.sql` (18.038.166 bytes, SHA-256 `3277ba8ae14d11e9127e35bece095765d271beb36b4b5e3307daeeecea57e5e9`).
+  - **Certificación y Pruebas en Base de Datos Desechable (`cms_ect_lab_restore_verify`):**
+    - Restauración completa del volcado en base de datos efímera (`cms_ect_lab_restore_verify`) en 5,64s comprobando métricas idénticas al baseline (131 grupos, 155 elementos, 11 retenidas, 17 manifiestos).
+    - Ejecución de prueba del lote piloto `pilot-nav-2-trids-9818-34652`: 131 -> 133 grupos, 155 -> 159 elementos, 11 -> 13 retenidas, 17 -> 18 manifiestos.
+    - Prueba de idempotencia estricta en segundo ciclo: 2 grupos saltados (`idempotent_skipped`), 0 grupos duplicados.
+    - Prueba de reversión selectiva mediante `WpmlMigrationRollbackService::rollback_groups()`: retorno limpio al estado base previo (131 grupos, 155 elementos, 11 retenidas).
+    - Destrucción segura de la base de datos efímera y persistencia de metadatos de auditoría en `meta.json`.
+  - **Validación Criptográfica y Ejecución Transaccional Atómica en `cms_ect_lab`:**
+    - Verificación determinista de huellas: huella del plan maestro `dc0b907aa9b6638a40cb37bf69d0a25a93e025e3469755419a074f6d7a8c5934` y huella del piloto canónico `ac60f6058fd89f8afdc2d67352bab69008e3ae3cf3afa33610b47524253be44d`.
+    - Ejecución atómica única vía `WpmlMigrationExecutor::execute_batch()` en 0,035s:
+      * TRID 9818 -> Asignado al Grupo TFML #598 (canónico Post `#8042` Confort y Tranquilidad [ES], miembro Post `#8613` Comfort and Tranquility [EN], Post `#8952` Chambres en custodia francesa inactiva en `RetainedTranslationRegistry`).
+      * TRID 34652 -> Asignado al Grupo TFML #599 (canónico Post `#9218` Experiencia Transformadora [ES], miembro Post `#9219` Transformative Experience [EN], Post `#9220` Qui somme nous? en custodia francesa inactiva en `RetainedTranslationRegistry`).
+    - Generación de manifiesto inmutable `tfml_migration_manifest_pilot-nav-2-trids-9818-34652` y actualización del checkpoint a `completed` con lock libre.
+  - **Desbloqueo Jerárquico de Hijas y Consolidación de Métricas en Laboratorio:**
+    - Acreditación formal de los 4 grupos hijos de Experiencia Transformadora (TRIDs 34660, 34776, 34790, 34791), cuyos posts padres apuntan a Grupo TFML #599 (`#9218` en ES, `#9219` en EN y `#9220` en FR).
+    - Grupos TFML: de 131 a **133**.
+    - Elementos Activos: de 155 a **159**.
+    - Traducciones Retenidas FR: de 11 a **13**.
+    - Manifiestos de Migración: de 17 a **18**.
+    - Cero elementos en francés activos (`fr_active = 0`) y cero duplicidades relacionales.
+    - Reconciliación global con 0 discrepancias (`reconcile()`).
+  - **Certificación Funcional de Enrutamiento, Menús y Sitemaps:**
+    - Comprobación en servidor HTTP real (`http://lab.ecoterra.test`):
+      * `/confort-y-tranquilidad/` (Post #8042): HTTP 200, `lang="es-ES"`, canonical `/confort-y-tranquilidad/`, hreflang simétrico y alternativo.
+      * `/en/comfort-and-tranquility/` (Post #8613): HTTP 200, `lang="en-US"`, canonical `/en/comfort-and-tranquility/`, hreflang simétrico y alternativo.
+      * `/experiencia-transformadora/` (Post #9218): HTTP 200, `lang="es-ES"`, canonical `/experiencia-transformadora/`, hreflang simétrico y alternativo.
+      * `/en/transformative-experience/` (Post #9219): HTTP 200, `lang="en-US"`, canonical `/en/transformative-experience/`, hreflang simétrico y alternativo.
+      * Cero regresiones en rutas previamente migradas: 22/22 rutas históricas responden HTTP 200; `/fr/` y `/pt/` responden 404 limpio.
+    - Menú de escritorio `menu-menu-es-ingles`: se auto-localizan 9 enlaces EN (`Home`, `About Us`, `Comfort and Tranquility`, `Transformative Experience`, `Photo Gallery`, `Activities`, `Tour Packages`, `Ecoterra Experience`, `Authentic Nature`), manteniendo la protección de las 6 páginas pendientes sin enlaces rotos 404 prematuros (`premature_en_cnt = 0`).
+    - Sitemaps nativos de Core: provider `page` pasa de 23 a **27** URLs; total general consolidado pasa de 46 a **50** URLs únicas (0 francés, 0 duplicados, `blog_public = 0`).
+  - **Invarianza Absoluta de Producción (`cms_ect`):**
+    - La base de datos de producción `cms_ect` permanece 100% inalterada: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+  - **Gobernanza, Calidad y Verificación Reproducible:**
+    - Suite de pruebas PHPUnit: **691 pruebas unitarias / 2.558 aserciones (100% PASS, 0 fallos, 0 errores, 1 omitida intencional)**.
+    - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)**.
+    - Verificador reproducible `scratch/verify_fase_3_51.php` certificado con **10/10 controles PASS (0 FAIL)**.
+    - Artefactos visuales de alta resolución generados en `/brain/`: `fase_3_51_admin_migration_history.png` y `fase_3_51_admin_migration_retained.png`.
 
 
 
