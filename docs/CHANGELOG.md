@@ -2075,6 +2075,46 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)**.
     - Verificador reproducible `scratch/verify_fase_3_49.php` certificado con **10/10 controles PASS (0 FAIL)**.
     - Artefactos visuales de alta resolución generados en `/brain/`: `fase_3_49_admin_migration_history.png` y `fase_3_49_admin_migration_retained.png`.
+- **Importación Transaccional Controlada de Páginas Raíz Autónomas Naturaleza Auténtica y Experiencia EcoTerra (Fase 3.50 / Directiva DT-TFML-083 — ADR-078):**
+  - **Compuertas Previas y Respaldo Físico Fuera de DocumentRoot:**
+    - Verificación exitosa de compuertas previas: centinela WPML en producción `cms_ect` (3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`), centinela WPML en laboratorio `cms_ect_lab` (3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`), estado base de TFML verificado (129 grupos, 151 elementos, 9 FR retenidas, 16 manifiestos, checkpoint `completed` y lock libre).
+    - Verificación previa de los 6 posts objetivos (`#6938`, `#8330`, `#9025`, `#7285`, `#8337`, `#8981`): 100% páginas públicas con `post_status = publish`, condición de raíces autónomas (`post_parent = 0` en ES, EN, FR) y cero pertenencia previa a TFML.
+    - Generación de respaldo físico SQL completo fuera de DocumentRoot en `D:/laragon/backup/tfml_staging/cms_ect_lab_pre_fase_3_50_pilot_trids_9634_9697_20261019_215632.sql` (17.933.465 bytes, SHA-256 `5e2878e60da8608a4517d49156d33c980806202e8bea99eac4dbfe1af84d3921`).
+  - **Certificación y Pruebas en Base de Datos Desechable (`cms_ect_lab_restore_verify`):**
+    - Restauración completa del volcado en base de datos efímera (`cms_ect_lab_restore_verify`) en 6,08s comprobando métricas idénticas al baseline (129 grupos, 151 elementos, 9 retenidas, 16 manifiestos).
+    - Ejecución de prueba del lote piloto `pilot-nav-2-trids-9634-9697`: 129 -> 131 grupos, 151 -> 155 elementos, 9 -> 11 retenidas, 16 -> 17 manifiestos.
+    - Prueba de idempotencia estricta en segundo ciclo: 2 grupos saltados (`idempotent_skipped`), 0 grupos duplicados.
+    - Prueba de reversión selectiva mediante `WpmlMigrationRollbackService::rollback_groups()`: retorno limpio al estado base previo (129 grupos, 151 elementos, 9 retenidas).
+    - Destrucción segura de la base de datos efímera y persistencia de metadatos de auditoría en `meta.json`.
+  - **Validación Criptográfica y Ejecución Transaccional Atómica en `cms_ect_lab`:**
+    - Verificación determinista de huellas: huella del plan maestro `132af2cc6ffefaaea6af20d36b52ea324cedc4cc159395bcab0797361d87f4a3` y huella del piloto canónico `d19ae044d6dc39182c18c377932b09c22aebb5f8a27c529f9370530d8e03b09e`.
+    - Ejecución atómica única vía `WpmlMigrationExecutor::execute_batch()` en 0,032s:
+      * TRID 9634 -> Asignado al Grupo TFML #596 (canónico Post `#6938` Naturaleza Autentica [ES], miembro Post `#8330` Authentic Nature [EN], Post `#9025` Nature en custodia francesa inactiva en `RetainedTranslationRegistry`).
+      * TRID 9697 -> Asignado al Grupo TFML #597 (canónico Post `#7285` Experiencia EcoTerra [ES], miembro Post `#8337` Ecoterra Experience [EN], Post `#8981` Expérience Ecoterra en custodia francesa inactiva en `RetainedTranslationRegistry`).
+    - Generación de manifiesto inmutable `tfml_migration_manifest_pilot-nav-2-trids-9634-9697` y actualización del checkpoint a `completed` con lock libre.
+  - **Consolidación de Métricas en Laboratorio:**
+    - Grupos TFML: de 129 a **131**.
+    - Elementos Activos: de 151 a **155**.
+    - Traducciones Retenidas FR: de 9 a **11**.
+    - Manifiestos de Migración: de 16 a **17**.
+    - Cero elementos en francés activos (`fr_active = 0`) y cero duplicidades relacionales.
+    - Reconciliación global con 0 discrepancias (`reconcile()`).
+  - **Certificación Funcional de Enrutamiento, Menús y Sitemaps:**
+    - Comprobación en servidor HTTP real (`http://lab.ecoterra.test`):
+      * `/naturaleza-autentica/` (Post #6938): HTTP 200, `lang="es-ES"`, canonical `/naturaleza-autentica/`, hreflang simétrico y alternativo.
+      * `/en/authentic-nature/` (Post #8330): HTTP 200, `lang="en-US"`, canonical `/en/authentic-nature/`, hreflang simétrico y alternativo.
+      * `/experiencia-ecoterra/` (Post #7285): HTTP 200, `lang="es-ES"`, canonical `/experiencia-ecoterra/`, hreflang simétrico y alternativo.
+      * `/en/ecoterra-experience/` (Post #8337): HTTP 200, `lang="en-US"`, canonical `/en/ecoterra-experience/`, hreflang simétrico y alternativo.
+      * Cero regresiones en rutas previamente migradas: 18/18 rutas históricas (`/`, `/en/`, `/nosotros/`, `/en/about-us/`, `/actividades/`, `/en/activities/`, `/galeria/`, `/en/gallery/`, `/contactenos/`, `/en/contact-us/`, `/paquetes/`, `/en/tour-packages/`, `/servicios/`, `/en/services/`, `/servicios/salon-de-eventos/`, `/en/services/event-room/`, `/servicios/restaurante/`, `/en/services/restaurant/`) responden HTTP 200; `/fr/` y `/pt/` responden 404 limpio.
+    - Menú de escritorio `menu-menu-es-ingles`: se auto-localizan 7 enlaces EN (`Home`, `About Us`, `Activities`, `Photo Gallery`, `Tour Packages`, `Authentic Nature`, `Ecoterra Experience`), manteniendo la protección de las 8 páginas pendientes sin enlaces rotos 404 prematuros (`premature_en_cnt = 0`).
+    - Sitemaps nativos de Core: provider `page` pasa de 19 a **23** URLs; total general consolidado pasa de 42 a **46** URLs únicas (0 francés, 0 duplicados, `blog_public = 0`).
+  - **Invarianza Absoluta de Producción (`cms_ect`):**
+    - La base de datos de producción `cms_ect` permanece 100% inalterada: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+  - **Gobernanza, Calidad y Verificación Reproducible:**
+    - Suite de pruebas PHPUnit: **691 pruebas unitarias / 2.558 aserciones (100% PASS, 0 fallos, 0 errores, 1 omitida intencional)**.
+    - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)**.
+    - Verificador reproducible `scratch/verify_fase_3_50.php` certificado con **10/10 controles PASS (0 FAIL)**.
+    - Artefactos visuales de alta resolución generados en `/brain/`: `fase_3_50_admin_migration_history.png` y `fase_3_50_admin_migration_retained.png`.
 
 
 

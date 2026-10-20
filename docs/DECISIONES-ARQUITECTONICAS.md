@@ -2148,6 +2148,57 @@
 - **JUSTIFICACIÓN:** Migrar de forma atómica y segura las páginas hijas dependientes de Servicios una vez desbloqueado su padre en la fase anterior, validando el comportamiento integral de la jerarquía multinivel de WordPress, sitemaps, resolvers y custodia francesa.
 - **CONSECUENCIAS:** Verificador reproducible `scratch/verify_fase_3_49.php` certificado con **10/10 controles PASS (0 FAIL)**, 691 pruebas PHPUnit superadas al 100% (1 omitida intencional), PHPCS 100% limpio en todo el proyecto y 2 capturas de pantalla de alta definición en `/brain/` (`fase_3_49_admin_migration_history.png` y `fase_3_49_admin_migration_retained.png`).
 
+---
+
+### ADR-078: Importación Transaccional de Páginas Raíz Autónomas (Naturaleza Auténtica y Experiencia EcoTerra) y Expansión de Catálogo Multilingüe (Fase 3.50 / DT-TFML-083)
+
+- **TÍTULO:** Importación Transaccional de Páginas Raíz Autónomas (Naturaleza Auténtica y Experiencia EcoTerra) y Expansión de Catálogo Multilingüe (Fase 3.50 / DT-TFML-083)
+- **FECHA:** 2026-10-19
+- **AUTOR:** Antigravity AI
+- **DECISIÓN:**
+  1. **Aislamiento y Preflight Riguroso:**
+     - Centinela WPML en producción `cms_ect`: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+     - Centinela WPML en laboratorio `cms_ect_lab`: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10`.
+     - Baseline inicial de TFML en `cms_ect_lab`: 129 grupos, 151 elementos, 9 FR retenidas, 16 manifiestos, checkpoint `completed`, lock libre.
+     - Respaldo físico SQL completo generado fuera de webroot: `D:/laragon/backup/tfml_staging/cms_ect_lab_pre_fase_3_50_pilot_trids_9634_9697_20261019_215632.sql` (17.933.465 bytes, SHA-256 `5e2878e60da8608a4517d49156d33c980806202e8bea99eac4dbfe1af84d3921`).
+  2. **Certificación en Base de Datos Desechable (`cms_ect_lab_restore_verify`):**
+     - Restauración en BD efímera en 6,08s confirmando baseline exacto (129/151/9/16).
+     - Ejecución de prueba con `WpmlMigrationExecutor`: grupos 129 -> 131, elementos 151 -> 155, retenidas 9 -> 11, manifiestos 16 -> 17.
+     - Prueba de idempotencia estricta en segunda pasada: 2 grupos saltados legítimamente (`idempotent_skipped`) con 0 duplicidades.
+     - Prueba de reversión selectiva mediante `WpmlMigrationRollbackService::rollback_groups()`: retorno exacto y limpio al estado 129/151/9.
+     - Destrucción segura de la base efímera (`DROP DATABASE`) y metadatos inmutables en `.meta.json`.
+  3. **Ejecución Transaccional Atómica Única en `cms_ect_lab`:**
+     - Fingerprints canónicos:
+       * Plan maestro: `132af2cc6ffefaaea6af20d36b52ea324cedc4cc159395bcab0797361d87f4a3`.
+       * Plan piloto: `d19ae044d6dc39182c18c377932b09c22aebb5f8a27c529f9370530d8e03b09e`.
+     - Ejecución atómica mediante `WpmlMigrationExecutor::execute_batch()` en 0,032s:
+       * **TRID 9634** -> Asignado a **Grupo TFML #596** (Canónico Post `#6938` Naturaleza Autentica [ES], Miembro Post `#8330` Authentic Nature [EN], Retenida Post `#9025` Nature en `RetainedTranslationRegistry`).
+       * **TRID 9697** -> Asignado a **Grupo TFML #597** (Canónico Post `#7285` Experiencia EcoTerra [ES], Miembro Post `#8337` Ecoterra Experience [EN], Retenida Post `#8981` Expérience Ecoterra en `RetainedTranslationRegistry`).
+     - Manifiesto inmutable `tfml_migration_manifest_pilot-nav-2-trids-9634-9697` persistido, checkpoint actualizado a `completed` y lock libre.
+  4. **Preservación Jerárquica y Consolidación de Métricas:**
+     - Ambas páginas son raíces independientes (`post_parent = 0`) en todos los idiomas (ES, EN, FR).
+     - Métricas consolidadas en `cms_ect_lab`:
+       * Grupos TFML: de 129 a **131**.
+       * Elementos Activos: de 151 a **155**.
+       * Traducciones Retenidas FR: de 9 a **11**.
+       * Manifiestos de Migración: de 16 a **17**.
+       * Cero elementos en francés activos (`fr_active = 0`) y cero duplicidades relacionales.
+       * Reconciliación global con 0 discrepancias (`reconcile()`).
+  5. **Certificación Funcional HTTP, Menús y Sitemaps:**
+     - HTTP 200 OK con lang exacto, canonical localizado y hreflang simétrico en:
+       * `/naturaleza-autentica/` (ES) y `/en/authentic-nature/` (EN)
+       * `/experiencia-ecoterra/` (ES) y `/en/ecoterra-experience/` (EN)
+       * No regresión en las 18 rutas históricas (`/`, `/en/`, `/nosotros/`, `/en/about-us/`, `/actividades/`, `/en/activities/`, `/galeria/`, `/en/gallery/`, `/contactenos/`, `/en/contact-us/`, `/paquetes/`, `/en/tour-packages/`, `/servicios/`, `/en/services/`, `/servicios/salon-de-eventos/`, `/en/services/event-room/`, `/servicios/restaurante/`, `/en/services/restaurant/`).
+       * `/fr/` y `/pt/` responden 404 limpio.
+     - Menú de escritorio `menu-menu-es-ingles`: se auto-localizan 7 enlaces EN (`Home`, `About Us`, `Activities`, `Photo Gallery`, `Tour Packages`, `Authentic Nature`, `Ecoterra Experience`). Las 8 páginas aún no migradas se mantienen protegidas sin 404 prematuros (`premature_en_cnt = 0`).
+     - Sitemaps nativos: provider `page` se expande de 19 a **23** URLs. Total consolidado del sitemap pasa de 42 a **46** URLs únicas (0 francés, 0 duplicados, `blog_public = 0`).
+  6. **Invarianza Absoluta de Producción (`cms_ect`):**
+     - La base de datos de producción `cms_ect` permanece 100% inalterada: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.50 / Directiva DT-TFML-083 — Siguiente piloto de navegación: TRID 9634 y 9697.
+- **JUSTIFICACIÓN:** Migrar de forma atómica y segura las páginas raíz autónomas de Naturaleza Auténtica y Experiencia EcoTerra, incrementando la cobertura real del catálogo multilingüe y de navegación, sin dependencias padre pendientes y con custodia francesa aislada.
+- **CONSECUENCIAS:** Verificador reproducible `scratch/verify_fase_3_50.php` certificado con **10/10 controles PASS (0 FAIL)**, 691 pruebas PHPUnit superadas al 100% (1 omitida intencional), PHPCS 100% limpio en todo el proyecto y 2 capturas de pantalla de alta definición en `/brain/` (`fase_3_50_admin_migration_history.png` y `fase_3_50_admin_migration_retained.png`).
+
 
 
 
