@@ -2157,6 +2157,54 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Verificador reproducible `scratch/verify_fase_3_51.php` certificado con **10/10 controles PASS (0 FAIL)**.
     - Artefactos visuales de alta resolución generados en `/brain/`: `fase_3_51_admin_migration_history.png` y `fase_3_51_admin_migration_retained.png`.
 
+- **Culminación Integral de la Familia Experiencia Transformadora y Preservación de Borradores (Fase 3.52 / Directiva DT-TFML-085-R1):**
+  - **Aplicación de las 10 Reglas de Oro:**
+    - Ejecución de un incremento funcional completo en un único ciclo transaccional y validado (preflight, respaldo, base desechable, migración atómica, verificación HTTP/sitemaps, 10 controles PASS y cierre).
+  - **Aislamiento, Preflight y Respaldo Físico:**
+    - Verificación exitosa de compuertas previas: centinela WPML en producción `cms_ect` (3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`), centinela WPML en laboratorio `cms_ect_lab` (3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`), estado base de TFML verificado (133 grupos, 159 elementos, 13 FR retenidas, 18 manifiestos, checkpoint `completed` y lock libre).
+    - Verificación previa de las 3 parejas subordinadas publicadas (`#9248/#9249`, `#9614/#9615`, `#9666/#9667`) con `post_parent` apuntando a Grupo #599 (`#9218` en ES y `#9219` en EN).
+    - Exclusión estricta del borrador TRID 34790 (`#9662`, `#9663`, `#9664`) manteniéndolo intacto en `post_status = 'draft'` sin alterar ni publicar.
+    - Generación de respaldo físico SQL completo fuera de DocumentRoot en `D:/laragon/backup/tfml_staging/cms_ect_lab_pre_fase_3_52_pilot_trids_34660_34776_34791_20261020_044707.sql` (18.057.779 bytes, SHA-256 `0f6f35e6cfa370bb301ccbdc97016dc33d6e308dc6021e1420964ab28bab66f0`).
+  - **Certificación y Pruebas en Base de Datos Desechable (`cms_ect_lab_restore_verify`):**
+    - Restauración completa del volcado en base de datos efímera (`cms_ect_lab_restore_verify`) en 5,23s comprobando métricas idénticas al baseline (133 grupos, 159 elementos, 13 retenidas, 18 manifiestos).
+    - Ejecución de prueba del lote piloto `pilot-transformative-3-trids-34660-34776-34791`: 133 -> 136 grupos, 159 -> 165 elementos, 13 -> 16 retenidas, 18 -> 19 manifiestos.
+    - Prueba de idempotencia estricta en segundo ciclo: 3 grupos saltados (`idempotent_skipped`), 0 grupos duplicados.
+    - Prueba de reversión selectiva mediante `WpmlMigrationRollbackService::rollback_groups()`: retorno limpio al estado base previo (133 grupos, 159 elementos, 13 retenidas).
+    - Destrucción segura de la base de datos efímera y persistencia de metadatos de auditoría en `meta.json`.
+  - **Validación Criptográfica y Ejecución Transaccional Atómica en `cms_ect_lab`:**
+    - Verificación determinista de huellas: huella del plan maestro `4faadfe3fcddfe60ed6c058fd6cf540f44067f85d40f7c2793d56093bc48864c` y huella del piloto canónico `1eec9800e20fee259ac91fb67409c04a2f1f961d8e7f63d0c2f090174f67bd86`.
+    - Ejecución atómica única vía `WpmlMigrationExecutor::execute_batch()` en 0,0485s:
+      * TRID 34660 -> Asignado al Grupo TFML #600 (canónico Post `#9248` Avistamiento de Aves [ES], miembro Post `#9249` Birdwatching [EN], Post `#9250` Qui somme nous? en custodia francesa inactiva en `RetainedTranslationRegistry`).
+      * TRID 34776 -> Asignado al Grupo TFML #601 (canónico Post `#9614` Lek de Gallito de las Rocas [ES], miembro Post `#9615` Andean Cock of the Rock Lek [EN], Post `#9616` Qui somme nous? en custodia francesa inactiva en `RetainedTranslationRegistry`).
+      * TRID 34791 -> Asignado al Grupo TFML #602 (canónico Post `#9666` Experiencia De Café [ES], miembro Post `#9667` Coffee Experience [EN], Post `#9668` Qui somme nous? en custodia francesa inactiva en `RetainedTranslationRegistry`).
+    - Generación de manifiesto inmutable `tfml_migration_manifest_pilot-transformative-3-trids-34660-34776-34791` y actualización del checkpoint a `completed` con lock libre.
+  - **Preservación Jerárquica y Consolidación de Métricas en Laboratorio:**
+    - Las 3 parejas preservan estrictamente su subordinación jerárquica con Experiencia Transformadora (Grupo #599): `#9248`, `#9614`, `#9666` son hijas de `#9218` (ES); `#9249`, `#9615`, `#9667` son hijas de `#9219` (EN).
+    - Grupos TFML: de 133 a **136**.
+    - Elementos Activos: de 159 a **165**.
+    - Traducciones Retenidas FR: de 13 a **16**.
+    - Manifiestos de Migración: de 18 a **19**.
+    - Cero elementos en francés activos (`fr_active = 0`) y cero duplicidades relacionales.
+    - Reconciliación global con 0 discrepancias (`reconcile()`).
+  - **Certificación Funcional de Enrutamiento, Menús y Sitemaps:**
+    - Comprobación en servidor HTTP real (`http://lab.ecoterra.test`):
+      * `/experiencia-transformadora/avistamiento-de-aves/` (Post #9248): HTTP 200, `lang="es-ES"`, canonical `/experiencia-transformadora/avistamiento-de-aves/`, hreflang simétrico.
+      * `/en/transformative-experience/birdwatching/` (Post #9249): HTTP 200, `lang="en-US"`, canonical `/en/transformative-experience/birdwatching/`, hreflang simétrico.
+      * `/experiencia-transformadora/lek-de-gallito-de-las-rocas/` (Post #9614): HTTP 200, `lang="es-ES"`, canonical `/experiencia-transformadora/lek-de-gallito-de-las-rocas/`, hreflang simétrico.
+      * `/en/transformative-experience/andean-cock-of-the-rock-lek/` (Post #9615): HTTP 200, `lang="en-US"`, canonical `/en/transformative-experience/andean-cock-of-the-rock-lek/`, hreflang simétrico.
+      * `/experiencia-transformadora/experiencia-de-cafe/` (Post #9666): HTTP 200, `lang="es-ES"`, canonical `/experiencia-transformadora/experiencia-de-cafe/`, hreflang simétrico.
+      * `/en/transformative-experience/coffee-experience/` (Post #9667): HTTP 200, `lang="en-US"`, canonical `/en/transformative-experience/coffee-experience/`, hreflang simétrico.
+      * Cero regresiones en rutas previamente migradas: 26/26 rutas históricas responden HTTP 200 (32 rutas públicas totales certificadas); `/fr/` y `/pt/` responden 404 limpio.
+    - Menú de escritorio `menu-menu-es-ingles`: se auto-localizan 12 enlaces EN (`Home`, `About Us`, `Comfort and Tranquility`, `Transformative Experience`, `Birdwatching`, `Andean Cock of the Rock Lek`, `Coffee Experience`, `Photo Gallery`, `Activities`, `Tour Packages`, `Ecoterra Experience`, `Authentic Nature`), manteniendo la protección de las 3 páginas pendientes hacia el origen sin enlaces rotos 404 prematuros (`premature_en_cnt = 0`).
+    - Sitemaps nativos de Core: provider `page` pasa de 27 a **33** URLs (+6); total general consolidado pasa de 50 a **56** URLs únicas (0 francés, 0 duplicados, `blog_public = 0`).
+  - **Invarianza Absoluta de Producción (`cms_ect`):**
+    - La base de datos de producción `cms_ect` permanece 100% inalterada: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+  - **Gobernanza, Calidad y Verificación Reproducible:**
+    - Suite de pruebas PHPUnit: **691 pruebas unitarias / 2.558 aserciones (100% PASS, 0 fallos, 0 errores, 1 omitida intencional)**.
+    - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)**.
+    - Verificador reproducible `scratch/verify_fase_3_52.php` certificado con **10/10 controles PASS (0 FAIL)**.
+    - Artefactos visuales de alta resolución generados en `/brain/`: `fase_3_52_admin_migration_history.png`, `fase_3_52_admin_migration_retained.png` y `fase_3_52_admin_migration_next_batch.png`.
+
 
 
 

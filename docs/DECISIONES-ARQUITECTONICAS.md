@@ -2255,6 +2255,63 @@
 - **JUSTIFICACIÓN:** Migrar transaccionalmente las páginas raíz Confort y Tranquilidad y Experiencia Transformadora, ampliando el catálogo multilingüe y habilitando el desbloqueo jerárquico de sus 4 páginas hijas para lotes subsiguientes.
 - **CONSECUENCIAS:** Verificador reproducible `scratch/verify_fase_3_51.php` certificado con **10/10 controles PASS (0 FAIL)**, 691 pruebas PHPUnit superadas al 100% (1 omitida intencional), PHPCS 100% limpio en todo el proyecto y 2 capturas de pantalla de alta definición en `/brain/` (`fase_3_51_admin_migration_history.png` y `fase_3_51_admin_migration_retained.png`).
 
+---
+
+### ADR-080: Culminación Integral de la Familia Experiencia Transformadora y Preservación de Borradores (Fase 3.52 / DT-TFML-085-R1)
+
+- **TÍTULO:** Culminación Integral de la Familia Experiencia Transformadora y Preservación de Borradores (Fase 3.52 / DT-TFML-085-R1)
+- **FECHA:** 2026-10-20
+- **AUTOR:** Antigravity AI
+- **DECISIÓN:**
+  1. **Aislamiento y Preflight Riguroso:**
+     - Centinela WPML en producción `cms_ect`: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+     - Centinela WPML en laboratorio `cms_ect_lab`: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10`.
+     - Baseline inicial de TFML en `cms_ect_lab`: 133 grupos, 159 elementos, 13 FR retenidas, 18 manifiestos, checkpoint `completed`, lock libre.
+     - Respaldo físico SQL completo generado fuera de webroot: `D:/laragon/backup/tfml_staging/cms_ect_lab_pre_fase_3_52_pilot_trids_34660_34776_34791_20261020_044707.sql` (18.057.779 bytes, SHA-256 `0f6f35e6cfa370bb301ccbdc97016dc33d6e308dc6021e1420964ab28bab66f0`).
+  2. **Certificación en Base de Datos Desechable (`cms_ect_lab_restore_verify`):**
+     - Restauración en BD efímera en 5,23s confirmando baseline exacto (133/159/13/18).
+     - Ejecución de prueba con `WpmlMigrationExecutor`: grupos 133 -> 136, elementos 159 -> 165, retenidas 13 -> 16, manifiestos 18 -> 19.
+     - Prueba de idempotencia estricta en segunda pasada: 3 grupos saltados legítimamente (`idempotent_skipped`) con 0 duplicidades.
+     - Prueba de reversión selectiva mediante `WpmlMigrationRollbackService::rollback_groups()`: retorno exacto y limpio al estado 133/159/13.
+     - Destrucción segura de la base efímera (`DROP DATABASE`) y metadatos inmutables en `.meta.json`.
+  3. **Ejecución Transaccional Atómica Única en `cms_ect_lab`:**
+     - Fingerprints canónicos:
+       * Plan maestro: `4faadfe3fcddfe60ed6c058fd6cf540f44067f85d40f7c2793d56093bc48864c`.
+       * Plan piloto: `1eec9800e20fee259ac91fb67409c04a2f1f961d8e7f63d0c2f090174f67bd86`.
+     - Ejecución atómica mediante `WpmlMigrationExecutor::execute_batch()` en 0,0485s:
+       * **TRID 34660** -> Asignado a **Grupo TFML #600** (Canónico Post `#9248` Avistamiento de Aves [ES], Miembro Post `#9249` Birdwatching [EN], Retenida Post `#9250` Qui somme nous? en `RetainedTranslationRegistry`).
+       * **TRID 34776** -> Asignado a **Grupo TFML #601** (Canónico Post `#9614` Lek de Gallito de las Rocas [ES], Miembro Post `#9615` Andean Cock of the Rock Lek [EN], Retenida Post `#9616` Qui somme nous? en `RetainedTranslationRegistry`).
+       * **TRID 34791** -> Asignado a **Grupo TFML #602** (Canónico Post `#9666` Experiencia De Café [ES], Miembro Post `#9667` Coffee Experience [EN], Retenida Post `#9668` Qui somme nous? en `RetainedTranslationRegistry`).
+     - Manifiesto inmutable `tfml_migration_manifest_pilot-transformative-3-trids-34660-34776-34791` persistido, checkpoint actualizado a `completed` y lock libre.
+  4. **Preservación Jerárquica y Exclusión de Borrador:**
+     - Las 3 parejas ES/EN preservan estrictamente su subordinación a Experiencia Transformadora (Grupo TFML #599):
+       * Posts `#9248`, `#9614`, `#9666` apuntan a `post_parent = 9218` (ES).
+       * Posts `#9249`, `#9615`, `#9667` apuntan a `post_parent = 9219` (EN).
+       * Posts `#9250`, `#9616`, `#9668` apuntan a `post_parent = 9220` (FR en custodia).
+     - El borrador TRID 34790 (Posts `#9662`, `#9663`, `#9664`) permanece intacto con `post_status = 'draft'`, sin publicar y con 0 registros en TFML.
+     - Métricas consolidadas en `cms_ect_lab`:
+       * Grupos TFML: de 133 a **136**.
+       * Elementos Activos: de 159 a **165**.
+       * Traducciones Retenidas FR: de 13 a **16**.
+       * Manifiestos de Migración: de 18 a **19**.
+       * Cero elementos en francés activos (`fr_active = 0`) y cero duplicidades relacionales.
+       * Reconciliación global con 0 discrepancias (`reconcile()`).
+  5. **Certificación Funcional HTTP, Menús y Sitemaps:**
+     - HTTP 200 OK con lang exacto, canonical localizado y hreflang simétrico en:
+       * `/experiencia-transformadora/avistamiento-de-aves/` (ES) y `/en/transformative-experience/birdwatching/` (EN)
+       * `/experiencia-transformadora/lek-de-gallito-de-las-rocas/` (ES) y `/en/transformative-experience/andean-cock-of-the-rock-lek/` (EN)
+       * `/experiencia-transformadora/experiencia-de-cafe/` (ES) y `/en/transformative-experience/coffee-experience/` (EN)
+       * No regresión en las 26 rutas históricas previas (32 rutas certificadas en total).
+       * `/fr/` y `/pt/` responden 404 limpio.
+     - Menú de escritorio `menu-menu-es-ingles`: se auto-localizan 12 enlaces EN (`Home`, `About Us`, `Comfort and Tranquility`, `Transformative Experience`, `Birdwatching`, `Andean Cock of the Rock Lek`, `Coffee Experience`, `Photo Gallery`, `Activities`, `Tour Packages`, `Ecoterra Experience`, `Authentic Nature`). Las 3 páginas aún no migradas se mantienen protegidas hacia el origen sin 404 prematuros (`premature_en_cnt = 0`).
+     - Sitemaps nativos: provider `page` se expande de 27 a **33** URLs (+6). Total consolidado del sitemap pasa de 50 a **56** URLs únicas (0 francés, 0 duplicados, `blog_public = 0`).
+  6. **Invarianza Absoluta de Producción (`cms_ect`):**
+     - La base de datos de producción `cms_ect` permanece 100% inalterada: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.52 / Directiva DT-TFML-085-R1 — Culminación integral de la familia Experiencia Transformadora.
+- **JUSTIFICACIÓN:** Aplicar la Directiva Maestra de las 10 Reglas de Oro para cerrar un incremento funcional completo en un único ciclo, culminando todas las páginas públicas de la familia Experiencia Transformadora sin fragmentaciones innecesarias y preservando en custodia los borradores y las traducciones francesas.
+- **CONSECUENCIAS:** Verificador reproducible `scratch/verify_fase_3_52.php` certificado con **10/10 controles PASS (0 FAIL)**, 691 pruebas PHPUnit superadas al 100% (1 omitida intencional), PHPCS 100% limpio en todo el proyecto y 3 capturas de pantalla de alta definición en `/brain/` (`fase_3_52_admin_migration_history.png`, `fase_3_52_admin_migration_retained.png` y `fase_3_52_admin_migration_next_batch.png`).
+
 
 
 
