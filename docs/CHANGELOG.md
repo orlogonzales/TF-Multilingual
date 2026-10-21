@@ -2318,6 +2318,37 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)** en todo el repositorio.
     - Verificador reproducible `scratch/verify_fase_3_55.php` certificado con **10/10 controles PASS (0 FAIL)**.
 
+- **Habilitación de Entorno UAT Aislado y Entrega para Aceptación Funcional (Fase 3.56 / Directiva DT-TFML-089 — ADR-084):**
+  - **Aplicación Integral de las 10 Reglas de Oro:**
+    - Despliegue, configuración y certificación del entorno UAT en un único ciclo consolidado con autonomía técnica, sin solicitar autorizaciones redundantes por archivo ni estancar el proceso.
+  - **Aprovisionamiento de Infraestructura UAT Aislada (`cms_ect_uat`):**
+    - Base de datos independiente `cms_ect_uat` clonada con paridad exacta al 100% desde `cms_ect_lab`: 141 grupos TFML, 175 elementos activos, 21 traducciones francesas en custodia (`RetainedTranslationRegistry`) y 20 manifiestos de ejecución inmutables.
+    - Webroot dedicado `D:/laragon/www/uat.ecoterra` con código de plugin completamente sincronizado y `wp-config.php` configurado apuntando a `cms_ect_uat`.
+    - VirtualHost Apache configurado en `D:/laragon/etc/apache2/sites-enabled/02-uat.ecoterra.conf` en puerto dedicado **8089** (`http://localhost:8089/`), permitiendo acceso web inmediato sin requerir elevación de privilegios en el archivo `hosts` de Windows.
+  - **Segregación de Credenciales Administrativas y Puerta Perimetral (`/punko`):**
+    - Usuario UAT dedicado: `admin_uat` (ID: 2, rol: `administrator`, nivel: 10, email: `admin_uat@uat.ecoterra.test`) con contraseña `UatStaging2026!`.
+    - Usuario secundario: `admin_lab` (ID: 1, rol: `administrator`) con contraseña `LabStaging2026!`.
+    - Segregación total: 0 usuarios de UAT presentes en producción (`cms_ect`) ni en laboratorio (`cms_ect_lab`).
+    - Puerta perimetral funcional: acceso a través de `http://localhost:8089/punko` emitiendo automáticamente la cookie `wpa_login_token` para inicio de sesión en `wp-login.php`.
+  - **Certificación de Aislamiento Bidireccional (Prueba de Mutación):**
+    - Ejecución de mutación editorial controlada en UAT (141->142 grupos, 175->176 elementos) constatando delta cero absoluto en `cms_ect_lab` (141 grp, 175 elm) y en `cms_ect` (3.403 filas).
+    - Limpieza automática del fixture de prueba restituyendo el estado base a 141 grupos y 175 elementos.
+  - **Protección de Traducciones en Custodia y Borradores:**
+    - Las 21 traducciones en francés permanecen estrictamente retenidas en `tfml_retained_translations` (0 activadas en catálogo, 0 polución).
+    - Borrador TRID 34790 conservado estrictamente en `post_status = 'draft'` con 0 filas en `tfml_group_elements` y respuesta HTTP 404 a solicitudes no autenticadas.
+    - Rutas `/fr/` responden HTTP 404 Not Found limpio.
+  - **Auditoría y Renderizado E2E de Interfaces Administrativas en UAT:**
+    - Renderizado exitoso de 10 interfaces críticas del panel de administración en UAT sin errores PHP y con HTML completo.
+  - **Matriz Frontend y Sitemaps Nativos en UAT:**
+    - Verificación HTTP 200 OK en rutas públicas bilingües (`/`, `/en/`, `/nosotros/`, `/en/about-us/`, `/blog/`, `/en/blog/`).
+    - Sitemaps Core nativos con 43 URLs bilingües válidas (0 francés, 0 borradores).
+  - **Invarianza Absoluta de Producción (`cms_ect`):**
+    - La base de datos de producción `cms_ect` permanece 100% inalterada: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+  - **Gobernanza, Calidad y Verificación Reproducible:**
+    - Suite de pruebas PHPUnit: **698 pruebas unitarias / 2.596 aserciones (100% PASS, 0 fallos, 0 errores, 1 omitida intencional)**.
+    - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)** en todo el repositorio.
+    - Verificador reproducible `scratch/verify_fase_3_56.php` certificado con **10/10 controles PASS (0 FAIL)**.
+
 
 
 

@@ -2444,6 +2444,41 @@
 - **JUSTIFICACIÓN:** Ejecutar bajo las 10 Reglas de Oro la aceptación funcional integral, certificar los 4 escenarios críticos de eliminación, documentar la trazabilidad forense de `#10151`, corregir autónomamente los defectos encontrados y preparar el entorno de laboratorio para la sesión de aceptación humana del propietario.
 - **CONSECUENCIAS:** Entorno de laboratorio `http://lab.ecoterra.test` completamente listo y certificado para la revisión personal del propietario, con 0 errores, guías operativas claras y blindaje total de datos protegidos.
 
+---
+
+### ADR-084: Habilitación de Entorno UAT Aislado y Entrega para Aceptación Funcional (Fase 3.56 / Directiva DT-TFML-089)
+- **FECHA:** 2026-10-21
+- **DECISIÓN:**
+  1. **Aprovisionamiento de Infraestructura UAT Aislada (`cms_ect_uat`):**
+     - Se creó y desplegó un entorno UAT completamente desacoplado e independiente física y relacionalmente del laboratorio consolidado (`cms_ect_lab`) y de la producción sentinel (`cms_ect`):
+       * **Base de Datos Dedicada:** `cms_ect_uat` (MySQL InnoDB, utf8mb4_unicode_ci), clonada con paridad exacta al 100% de la línea base de laboratorio de Fase 3.55: 141 grupos TFML, 175 elementos activos, 21 traducciones francesas en custodia (`RetainedTranslationRegistry`) y 20 manifiestos de ejecución inmutables.
+       * **Webroot Dedicado:** `D:/laragon/www/uat.ecoterra`, replicado físicamente desde `lab.ecoterra` excluyendo respaldos y transitorios, con el plugin `tf-multilingual` completamente sincronizado desde el espacio de trabajo.
+       * **Configuración de Acceso y Puerto:** Apache configurado en `D:/laragon/etc/apache2/sites-enabled/02-uat.ecoterra.conf` escuchando en puerto dedicado **8089** (`Listen 8089`, `<VirtualHost *:8089>`) y puerto 80 (`<VirtualHost *:80>` para `uat.ecoterra.test`). El uso del puerto 8089 garantiza acceso instantáneo y sin fricción mediante `http://localhost:8089/`, `http://127.0.0.1:8089/` y `http://lab.ecoterra.test:8089/` sin requerir permisos de administrador de Windows para alterar el archivo `hosts`.
+  2. **Segregación de Credenciales y Puerta de Seguridad Perimetral (`/punko`):**
+     - Se crearon y certificaron credenciales administrativas dedicadas para UAT:
+       * Usuario UAT primario: `admin_uat` (ID: 2, rol: `administrator`, nivel: 10, email: `admin_uat@uat.ecoterra.test`), con contraseña `UatStaging2026!`.
+       * Usuario Lab secundario: `admin_lab` (ID: 1, rol: `administrator`, contraseña: `LabStaging2026!`).
+       * Se comprobó la segregación total: los usuarios de UAT tienen 0 presencia en `cms_ect` y en `cms_ect_lab`.
+       * Se verificó la puerta de enlace perimetral del tema `ecoCMS` (`/punko`): una visita a `http://localhost:8089/punko` emite de manera transparente la cookie HTTP `wpa_login_token` y redirige a `wp-login.php`, permitiendo el inicio de sesión fluido en el navegador del usuario y bloqueando accesos anónimos o ataques de fuerza bruta.
+  3. **Demostración de Aislamiento Bidireccional Estricto (Prueba de Mutación):**
+     - Se ejecutó una prueba transaccional de mutación en `cms_ect_uat` creando un post sintético y un nuevo grupo TFML (incrementando a 142 grupos y 176 elementos).
+     - Se constató en tiempo real que `cms_ect_lab` **permaneció absolutamente intacto** en sus 141 grupos y 175 elementos, y `cms_ect` en sus 3.403 filas.
+     - Se limpió el dato de prueba en UAT, restituyendo el estado base de 141 grupos y 175 elementos.
+  4. **Protección de Custodia Histórica y Borradores en UAT:**
+     - En `cms_ect_uat`, las 21 traducciones en francés permanecen estrictamente retenidas en `tfml_retained_translations` (0 activadas, 0 polución en el catálogo).
+     - El borrador TRID 34790 (posts `#9662`, `#9663`, `#9664`) se preserva estrictamente en `post_status = 'draft'` con 0 filas en `tfml_group_elements` y devuelve HTTP 404 a solicitudes no autenticadas.
+     - Rutas `/fr/` responden HTTP 404 Not Found limpio.
+  5. **Verificación Determinista y Gates de Calidad:**
+     - Verificador reproducible `scratch/verify_fase_3_56.php` ejecutado con **10/10 controles PASS (0 FAIL)**.
+     - Suite PHPUnit: **698 pruebas / 2.596 aserciones (100% PASS, 0 fallos, 1 omitida)**.
+     - PHPCS: **187/187 archivos 100% PASS (0 errores, 0 avisos)**.
+     - Invarianza absoluta de producción `cms_ect`: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10`.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.56 / Directiva DT-TFML-089 — Habilitación de UAT Aislada y Entrega para Aceptación Funcional.
+- **JUSTIFICACIÓN:** Permitir al propietario del sitio realizar pruebas de aceptación humana y editorial desde su navegador en un entorno idéntico a producción pero 100% aislado, donde puede crear, modificar, vincular o eliminar contenidos sin riesgo para el laboratorio consolidado ni para la producción sentinel.
+- **CONSECUENCIAS:** Entorno UAT listo, verificado y activo en `http://localhost:8089/`, con credenciales documentadas y guías de recorrido de prueba completas para el propietario.
+
+
 
 
 
