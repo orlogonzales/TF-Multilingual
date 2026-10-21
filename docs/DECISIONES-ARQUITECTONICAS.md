@@ -2414,6 +2414,36 @@
 - **JUSTIFICACIÓN:** Ejecutar en un único ciclo consolidado bajo la Directiva Maestra de las 10 Reglas de Oro la certificación integral de todos los subsistemas de TF Multilingual, corregir autónomamente los defectos y brechas de persistencia y ciclo de vida identificados, y certificar el reemplazo completo, soberano y autónomo de WPML.
 - **CONSECUENCIAS:** Plugin TF Multilingual plenamente certificado para operación autónoma como sustituto de WPML en `lab.ecoterra.test`. Se cierran formalmente los 14 bloques funcionales con cero regresiones en producción y laboratorio.
 
+---
+
+### ADR-083: UAT Integral, Regresiones Críticas de Ciclo de Vida y Corrección de Vinculación de Taxonomías (Fase 3.55 / Directiva DT-TFML-088)
+- **FECHA:** 2026-10-21
+- **DECISIÓN:**
+  1. **Regresión Crítica de Ciclo de Vida y Eliminación en Aislamiento (4 Escenarios de Integridad):**
+     - Se verificó y certificó el comportamiento del ciclo de vida editorial y de los hooks `deleted_post` y `delete_term` en 4 escenarios deterministas sobre fixtures aislados:
+       * **Escenario A (Eliminación de Miembro Secundario):** Se elimina el elemento secundario no canónico. La relación es purgada de `tfml_group_elements`, el canónico permanece inalterado y el grupo sigue existiendo con los miembros restantes.
+       * **Escenario B (Eliminación de Elemento Canónico):** Se elimina el elemento canónico. El puntero `canonical_element_id` en `tfml_groups` se reasigna automáticamente a uno de los miembros activos restantes, preservando la validez relacional del grupo.
+       * **Escenario C (Eliminación del Último Miembro Activo sin Traducciones Retenidas):** Al eliminarse el último miembro de un grupo estándar, el grupo huérfano se purga de manera limpia y completa en `tfml_groups` (`purge_empty_group = true`).
+       * **Escenario D (Eliminación del Último Miembro Activo con Traducciones Retenidas en Custodia):** Al eliminarse el último miembro activo de un grupo que posee traducciones retenidas en `RetainedTranslationRegistry` (e.g. francés inactivo), el registro del grupo en `tfml_groups` **SE PRESERVA ESTRICTAMENTE** con `canonical_element_id = null` (`purge_empty_group = false`), manteniendo la integridad referencial y permitiendo la reconexión automática (`promote_retained_translation()`) en el momento en que dicho idioma sea activado en el futuro.
+  2. **Corrección Autónoma de Brecha en Vinculación de Términos de Taxonomía:**
+     - Se identificó un error en `TranslationEditorialService::link_translation()` que intentaba invocar el método protegido `WordPressElementValidator::validate_term()`. Se corrigió para invocar `find_term( $id, '' )`, extrayendo de manera segura y tipada el subtipo de taxonomía de los objetos `WP_Term`.
+     - Se incorporaron 5 nuevas pruebas unitarias exhaustivas en `TranslationEditorialServiceTest`, elevando la cobertura a **698 pruebas / 2.596 aserciones (100% PASS, 0 fallos, 1 omitida)**.
+  3. **Inspección Forense y Clarificación Documental del Huérfano #10151:**
+     - Se acreditó que el ítem `#10151` es un post nativo de WordPress (`post_type = 'nav_menu_item'`, `post_status = 'draft'`) que forma parte legítima del Grupo TFML #578 (TRID WPML 34832) migrado en el Lote 10.
+     - En fases anteriores, el post fue inadvertidamente omitido en `etk_t_posts` del laboratorio aunque sus metadatos y registros en `etk_t_tfml_group_elements` (`id = 664`) e `etk_t_icl_translations` existían. La restitución efectuada en Fase 3.54 restauró la paridad 100% idéntica con producción (`cms_ect`), resolviendo la advertencia en `DiagnosticService` sin alterar ningún manifiesto, grupo ni vínculo histórico.
+  4. **Auditoría E2E de Pantallas Administrativas y Pruebas Reales de Aceptación:**
+     - Se auditaron y renderizaron con éxito las 13 pantallas del panel de administración (Idiomas, Traducciones, Cadenas, Migración [Plan, Historial, Retenidas, Siguiente Lote], Diagnóstico, Campos Personalizados, Menús, Metaboxes ES/EN y Edición de Taxonomías) con 0 errores PHP y HTML completo.
+     - Se verificó la seguridad de endpoints REST: bloqueo de peticiones anónimas (HTTP 401/403), validación de parámetros (HTTP 400) y acceso autorizado de administrador (HTTP 200).
+  5. **Invarianza Absoluta de Producción (`cms_ect`) y Calidad Verificable:**
+     - Producción `cms_ect`: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+     - Laboratorio `cms_ect_lab`: 141 grupos, 175 elementos, 21 retenidas FR, 20 manifiestos, checkpoint `completed`, lock libre. Borrador TRID 34790 intacto en `post_status = 'draft'` (0 en TFML).
+     - Verificador reproducible `scratch/verify_fase_3_55.php` con **10/10 controles PASS (0 FAIL)**.
+     - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 advertencias)**.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Fase 3.55 / Directiva DT-TFML-088 — UAT Integral, Regresiones Críticas y Cierre de Brechas Funcionales.
+- **JUSTIFICACIÓN:** Ejecutar bajo las 10 Reglas de Oro la aceptación funcional integral, certificar los 4 escenarios críticos de eliminación, documentar la trazabilidad forense de `#10151`, corregir autónomamente los defectos encontrados y preparar el entorno de laboratorio para la sesión de aceptación humana del propietario.
+- **CONSECUENCIAS:** Entorno de laboratorio `http://lab.ecoterra.test` completamente listo y certificado para la revisión personal del propietario, con 0 errores, guías operativas claras y blindaje total de datos protegidos.
+
 
 
 

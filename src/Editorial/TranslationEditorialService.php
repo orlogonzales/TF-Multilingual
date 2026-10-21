@@ -914,8 +914,8 @@ class TranslationEditorialService {
 			$source_subtype = $source_post->post_type;
 			$target_subtype = $target_post->post_type;
 		} elseif ( 'term' === $element_type ) {
-			$source_term = $this->element_validator->validate_term( $source_id );
-			$target_term = $this->element_validator->validate_term( $target_id );
+			$source_term = $this->find_term( $source_id, '' );
+			$target_term = $this->find_term( $target_id, '' );
 
 			if ( null === $source_term || null === $target_term ) {
 				throw new EditorialValidationException(
@@ -923,8 +923,8 @@ class TranslationEditorialService {
 				);
 			}
 
-			$source_subtype = $source_term['taxonomy'] ?? '';
-			$target_subtype = $target_term['taxonomy'] ?? '';
+			$source_subtype = $source_term->taxonomy ?? '';
+			$target_subtype = $target_term->taxonomy ?? '';
 		}
 
 		if ( '' === $source_subtype || $source_subtype !== $target_subtype ) {
@@ -1188,9 +1188,9 @@ class TranslationEditorialService {
 	 * @param string $taxonomy Taxonomy name.
 	 * @return WP_Term|null
 	 */
-	protected function find_term( int $term_id, string $taxonomy ): ?WP_Term {
+	protected function find_term( int $term_id, string $taxonomy = '' ): ?WP_Term {
 		if ( function_exists( 'get_term' ) ) {
-			$term = get_term( $term_id, $taxonomy );
+			$term = '' !== $taxonomy ? get_term( $term_id, $taxonomy ) : get_term( $term_id );
 			return $term instanceof WP_Term ? $term : null;
 		}
 		return $GLOBALS['wp_test_terms'][ $term_id ] ?? null;

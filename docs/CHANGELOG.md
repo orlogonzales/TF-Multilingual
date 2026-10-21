@@ -2293,6 +2293,31 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)** en todo el repositorio.
     - Verificador reproducible `scratch/verify_fase_3_54.php` certificado con **10/10 controles PASS (0 FAIL)**.
 
+- **UAT Integral, Regresiones Críticas y Cierre de Brechas Funcionales (Fase 3.55 / Directiva DT-TFML-088):**
+  - **Aplicación de las 10 Reglas de Oro:**
+    - Ejecución de pruebas funcionales y de aceptación completas en un único ciclo consolidado, con correcciones autónomas inmediatas sin crear micro-fases.
+  - **Regresiones Críticas de Ciclo de Vida y Eliminación en Aislamiento (4 Escenarios de Integridad):**
+    - Verificación y certificación determinista de los 4 escenarios obligatorios de eliminación:
+      1. Eliminación de elemento normal (no canónico): remoción de la relación en `tfml_group_elements`, conservación intacta del elemento canónico y del grupo.
+      2. Eliminación de elemento canónico: reasignación automática determinista del puntero canónico al miembro activo restante en `tfml_groups`.
+      3. Eliminación del último miembro de un grupo estándar: purga automática y completa del grupo huérfano en `tfml_groups` (`purge_empty_group = true`).
+      4. Eliminación del último miembro de un grupo con traducciones francesas en custodia: **PRESERVACIÓN ESTRICTA DEL GRUPO** en `tfml_groups` con `canonical_element_id = null`, manteniendo intacta la clave foránea conceptual y la trazabilidad de `RetainedTranslationRegistry`.
+  - **Corrección Autónoma de Brechas Funcionales:**
+    - Corrección en `TranslationEditorialService::link_translation()`: reemplazo de la invocación de método protegido `WordPressElementValidator::validate_term()` por `find_term( $id, '' )`, resolviendo de manera segura la validación de taxonomías para vinculación de términos.
+    - Ampliación de la suite de pruebas unitarias en `TranslationEditorialServiceTest` con 5 nuevas pruebas cubriendo todos los casos de eliminación y hooks.
+  - **Inspección Forense y Clarificación Documental de #10151:**
+    - Documentación detallada de la naturaleza del post `#10151` (`nav_menu_item`, `draft`, Grupo TFML #578, TRID 34832), confirmando paridad 100% idéntica con producción `cms_ect` y preservación íntegra de manifiestos y relaciones.
+  - **Auditoría y Renderizado E2E de Pantallas Administrativas (13 Pantallas / 0 Errores PHP):**
+    - Verificación y renderizado HTML completo de: Idiomas, Traducciones, Cadenas, Migración (Plan, Historial, Retenidas, Siguiente Lote), Diagnóstico, Campos Personalizados, Menús de Navegación, Metaboxes ES y EN, y Formulario de Taxonomías.
+  - **Seguridad y Contratos de la API REST:**
+    - Verificación de respuestas 200 en endpoints públicos y autenticados, 401/403 ante peticiones no autorizadas y 400 ante parámetros inválidos.
+  - **Invarianza Absoluta de Producción (`cms_ect`):**
+    - La base de datos de producción `cms_ect` permanece 100% inalterada: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero absoluto).
+  - **Gobernanza, Calidad y Verificación Reproducible:**
+    - Suite de pruebas PHPUnit ampliada a **698 pruebas unitarias / 2.596 aserciones (100% PASS, 0 fallos, 0 errores, 1 omitida intencional)**.
+    - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)** en todo el repositorio.
+    - Verificador reproducible `scratch/verify_fase_3_55.php` certificado con **10/10 controles PASS (0 FAIL)**.
+
 
 
 

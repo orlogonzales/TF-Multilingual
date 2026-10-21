@@ -1026,4 +1026,144 @@ class TranslationEditorialServiceTest extends TestCase {
 		$this->assertSame( 802, $final_group->get_canonical_element_id() );
 		$this->assertCount( 1, $final_group->get_elements() );
 	}
+
+	/**
+	 * Tests cleanup_deleted_element removes a normal (non-canonical) element and keeps canonical intact.
+	 */
+	public function test_cleanup_deleted_element_normal_member(): void {
+		$this->create_test_post( 1101, 'post', 'publish', 'Post ES' );
+		$this->create_test_post( 1102, 'post', 'publish', 'Post EN' );
+
+		$group    = $this->service->link_translation( 'post', 1101, 1102, 'en', 'es' );
+		$group_id = (int) $group->get_id();
+
+		$this->assertSame( 1101, $group->get_canonical_element_id() );
+		$this->assertCount( 2, $group->get_elements() );
+
+		// Simulate deletion of non-canonical element 1102.
+		$this->service->cleanup_deleted_element( 'post', 1102 );
+
+		$reloaded = $this->group_repo->find( $group_id );
+		$this->assertNotNull( $reloaded );
+		$this->assertSame( 1101, $reloaded->get_canonical_element_id() );
+		$this->assertCount( 1, $reloaded->get_elements() );
+		$this->assertNull( $this->group_repo->find_element( 'post', 1102 ) );
+		$this->assertNotNull( $this->group_repo->find_element( 'post', 1101 ) );
+	}
+
+	/**
+	 * Tests cleanup_deleted_element reassigns canonical when canonical element is deleted.
+	 */
+	public function test_cleanup_deleted_element_canonical_reassigned(): void {
+		$this->create_test_post( 1201, 'post', 'publish', 'Post ES' );
+		$this->create_test_post( 1202, 'post', 'publish', 'Post EN' );
+
+		$group    = $this->service->link_translation( 'post', 1201, 1202, 'en', 'es' );
+		$group_id = (int) $group->get_id();
+
+		$this->assertSame( 1201, $group->get_canonical_element_id() );
+
+		// Simulate deletion of canonical element 1201.
+		$this->service->cleanup_deleted_element( 'post', 1201 );
+
+		$reloaded = $this->group_repo->find( $group_id );
+		$this->assertNotNull( $reloaded );
+		// Canonical must be reassigned to remaining element 1202.
+		$this->assertSame( 1202, $reloaded->get_canonical_element_id() );
+		$this->assertCount( 1, $reloaded->get_elements() );
+		$this->assertNull( $this->group_repo->find_element( 'post', 1201 ) );
+	}
+
+	/**
+	 * Tests cleanup_deleted_element purges group completely when the last member is deleted and no retained exist.
+	 */
+	public function test_cleanup_deleted_element_last_member_purges_group_without_retained(): void {
+		$this->create_test_post( 1301, 'post', 'publish', 'Sole Post ES' );
+
+		$group    = $this->service->assign_initial_language( 'post', 1301, 'post', 'es' );
+		$group_id = (int) $group->get_id();
+
+		// Cleanup sole member.
+		$this->service->cleanup_deleted_element( 'post', 1301 );
+
+		// Group should be completely purged.
+		$this->assertNull( $this->group_repo->find( $group_id ) );
+		$this->assertNull( $this->group_repo->find_element( 'post', 1301 ) );
+	}
+
+	/**
+	 * Tests cleanup_deleted_element preserves group row when retained translations exist in RetainedTranslationRegistry.
+	 */
+	public function test_cleanup_deleted_element_last_member_preserves_group_with_retained(): void {
+		$this->create_test_post( 1401, 'page', 'publish', 'Active Post ES' );
+		$this->create_test_post( 1402, 'page', 'publish', 'Retained Post FR' );
+
+		$group    = $this->service->assign_initial_language( 'post', 1401, 'page', 'es' );
+		$group_id = (int) $group->get_id();
+
+		// Register retained French translation.
+		$this->retained_registry->register(
+			'wpml',
+			9999,
+			$group_id,
+			'post',
+			'page',
+			array( 'fr' => 1402 )
+		);
+
+		$this->assertTrue( $this->retained_registry->has_retained_element( 'post', 1402 ) );
+
+		// Cleanup sole active member 1401.
+		$this->service->cleanup_deleted_element( 'post', 1401 );
+
+		// Group row MUST be preserved to maintain retained translation linkage.
+		$preserved = $this->group_repo->find( $group_id );
+		$this->assertNotNull( $preserved );
+		$this->assertSame( $group_id, (int) $preserved->get_id() );
+		$this->assertNull( $preserved->get_canonical_element_id() );
+		$this->assertEmpty( $preserved->get_elements() );
+
+		// Retained registry record remains intact.
+		$retained_rec = $this->retained_registry->get_by_group_id( $group_id );
+		$this->assertNotNull( $retained_rec );
+		$this->assertSame( 9999, (int) $retained_rec['trid'] );
+	}
+
+	/**
+	 * Tests on_deleted_post and on_delete_term hook callbacks invoke cleanup_deleted_element.
+	 */
+	public function test_lifecycle_hooks_invoke_cleanup(): void {
+		$this->create_test_post( 1501, 'post', 'publish', 'Hook Post ES' );
+		$this->create_test_post( 1502, 'post', 'publish', 'Hook Post EN' );
+
+		$group    = $this->service->link_translation( 'post', 1501, 1502, 'en', 'es' );
+		$group_id = (int) $group->get_id();
+
+		$this->service->init_hooks();
+
+		// Trigger deleted_post hook.
+		do_action( 'deleted_post', 1502 );
+
+		$reloaded = $this->group_repo->find( $group_id );
+		$this->assertNotNull( $reloaded );
+		$this->assertCount( 1, $reloaded->get_elements() );
+		$this->assertNull( $this->group_repo->find_element( 'post', 1502 ) );
+
+		// Test taxonomy term deletion.
+		$this->create_test_term( 2501, 'category', 'Term ES' );
+		$this->create_test_term( 2502, 'category', 'Term EN' );
+
+		$term_group    = $this->service->link_translation( 'term', 2501, 2502, 'en', 'es' );
+		$term_group_id = (int) $term_group->get_id();
+
+		// Trigger delete_term hook.
+		do_action( 'delete_term', 2502, 2502, 'category' );
+
+		$reloaded_term = $this->group_repo->find( $term_group_id );
+		$this->assertNotNull( $reloaded_term );
+		$this->assertCount( 1, $reloaded_term->get_elements() );
+		$this->assertNull( $this->group_repo->find_element( 'term', 2502 ) );
+
+		$this->service->remove_hooks();
+	}
 }
