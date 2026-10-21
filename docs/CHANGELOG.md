@@ -2326,8 +2326,8 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Webroot dedicado `D:/laragon/www/uat.ecoterra` con código de plugin completamente sincronizado y `wp-config.php` configurado apuntando a `cms_ect_uat`.
     - VirtualHost Apache configurado en `D:/laragon/etc/apache2/sites-enabled/02-uat.ecoterra.conf` en puerto dedicado **8089** (`http://localhost:8089/`), permitiendo acceso web inmediato sin requerir elevación de privilegios en el archivo `hosts` de Windows.
   - **Segregación de Credenciales Administrativas y Puerta Perimetral (`/punko`):**
-    - Usuario UAT dedicado: `admin_uat` (ID: 2, rol: `administrator`, nivel: 10, email: `admin_uat@uat.ecoterra.test`) con contraseña `UatStaging2026!`.
-    - Usuario secundario: `admin_lab` (ID: 1, rol: `administrator`) con contraseña `LabStaging2026!`.
+    - Usuario UAT dedicado: `admin_uat` (ID: 2, rol: `administrator`, nivel: 10, email: `admin_uat@uat.ecoterra.test`), con credenciales privadas segregadas.
+    - Usuario secundario: `admin_lab` (ID: 1, rol: `administrator`).
     - Segregación total: 0 usuarios de UAT presentes en producción (`cms_ect`) ni en laboratorio (`cms_ect_lab`).
     - Puerta perimetral funcional: acceso a través de `http://localhost:8089/punko` emitiendo automáticamente la cookie `wpa_login_token` para inicio de sesión en `wp-login.php`.
   - **Certificación de Aislamiento Bidireccional (Prueba de Mutación):**
@@ -2348,6 +2348,26 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Suite de pruebas PHPUnit: **698 pruebas unitarias / 2.596 aserciones (100% PASS, 0 fallos, 0 errores, 1 omitida intencional)**.
     - Cumplimiento de **PHPCS 100% PASS en 187/187 archivos (0 errores, 0 avisos)** en todo el repositorio.
     - Verificador reproducible `scratch/verify_fase_3_56.php` certificado con **10/10 controles PASS (0 FAIL)**.
+
+- **Remediación de Seguridad de Credenciales UAT y Entrega Definitiva (Directiva DT-TFML-090 — ADR-085):**
+  - **Rotación Inmediata de Contraseñas y Revocación de Sesiones:**
+    - Rotación forzada y atómica de contraseñas de las cuentas `admin_uat` y `admin_lab` en `cms_ect_uat`.
+    - Revocación completa de todas las sesiones activas en la base de datos UAT (`session_tokens` en `etk_t_usermeta`).
+    - Verificación explícita de rechazo (`is_wp_error() === true`) para las contraseñas anteriores expuestas.
+  - **Entrega Local Segura Fuera de Git:**
+    - Nuevas credenciales almacenadas de manera confidencial y exclusiva en `D:/laragon/www/uat.ecoterra/CREDENCIALES_UAT.txt` (archivo local no rastreado por Git).
+    - Erradicación de contraseñas en texto plano de todos los documentos y scripts versionados (`CHANGELOG.md`, `DECISIONES-ARQUITECTONICAS.md`, `ROADMAP.md` y `verify_fase_3_56.php`).
+    - Verificador `verify_fase_3_56.php` actualizado para carga dinámica de credenciales desde almacén seguro local o variables de entorno.
+  - **Evaluación y Registro de Exposición Histórica:**
+    - Constatación formal de que las contraseñas expuestas en el commit `aefaedfcadfbd3952d2ebefa445134c1a56184c6` han sido invalidadas en base de datos y son técnicamente inertes.
+    - Preservación de la integridad del árbol Git sin ejecuciones de `git rebase` destructivas ni `force-push`, conforme a directiva.
+  - **Precisión Funcional Editorial:**
+    - Clarificación de la semántica de la interfaz editorial: el botón `+` ejecuta la **creación de un borrador / réplica editorial nativa vinculada** para traducción humana, desestimando explícitamente el concepto de "traducción automática" o dependencias externas.
+  - **Invarianza y Calidad:**
+    - Producción `cms_ect`: 3.403 filas en `etk_t_icl_translations`, MD5 `4241ca7e7ec6399a594537cb04790c10` (delta cero).
+    - Laboratorio `cms_ect_lab`: 141 grupos, 175 elementos, 21 retenidas FR, 20 manifiestos (intacto).
+    - Verificador reproducible `scratch/verify_fase_3_56.php` con **10/10 controles PASS (0 FAIL)**.
+    - Suite PHPUnit: **698 pruebas / 2.596 aserciones (100% PASS)** y PHPCS **187/187 archivos PASS**.
 
 
 

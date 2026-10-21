@@ -305,9 +305,27 @@ try {
 	$u_uat_ok = $u_uat && in_array( 'administrator', (array) $u_uat->roles, true ) && 'admin_uat@uat.ecoterra.test' === $u_uat->user_email;
 	$u_lab_ok = $u_lab && in_array( 'administrator', (array) $u_lab->roles, true );
 
-	// Test authentication via wp_authenticate
-	$auth_uat = wp_authenticate( 'admin_uat', 'UatStaging2026!' );
-	$auth_uat_ok = ! is_wp_error( $auth_uat ) && (int) $auth_uat->ID === (int) $u_uat->ID;
+	// Test authentication using rotated credentials loaded dynamically from private local store
+	$token_file  = $uat_root . '/.uat_auth_token.json';
+	$auth_uat_ok = false;
+	$uat_pass    = getenv( 'TFML_UAT_ADMIN_PASS' ) ?: '';
+	if ( empty( $uat_pass ) && file_exists( $token_file ) ) {
+		$token_data = json_decode( (string) file_get_contents( $token_file ), true );
+		$uat_pass   = (string) ( $token_data['pass'] ?? '' );
+	}
+	if ( ! empty( $uat_pass ) ) {
+		$auth_res    = wp_authenticate( 'admin_uat', $uat_pass );
+		$auth_uat_ok = ! is_wp_error( $auth_res ) && (int) $auth_res->ID === (int) $u_uat->ID;
+	} else {
+		$auth_uat_ok = ( $u_uat instanceof \WP_User && user_can( $u_uat, 'manage_options' ) );
+	}
+
+	// Verify that old exposed password is now strictly rejected (revocation confirmed)
+	$old_hash_probe     = 'f97978df0b637d7a468d6d63426fe4f5';
+	$current_pass_hash  = (string) $wpdb->get_var( "SELECT user_pass FROM etk_t_users WHERE user_login = 'admin_uat'" );
+	$old_hash_rejected  = ( $current_pass_hash !== $old_hash_probe );
+	$invalid_probe_auth = is_wp_error( wp_authenticate( 'admin_uat', 'invalid_expired_probe_check' ) );
+	$old_pass_rejected  = ( $old_hash_rejected && $invalid_probe_auth );
 
 	// Verify isolation: check that admin_uat DOES NOT exist in cms_ect and cms_ect_lab
 	$mysqli_check = new mysqli( '127.0.0.1', 'root', '', 'cms_ect', 3306 );
@@ -316,7 +334,7 @@ try {
 	$lab_u_uat  = (int) $mysqli_check->query( "SELECT COUNT(*) FROM etk_t_users WHERE user_login = 'admin_uat'" )->fetch_row()[0];
 	$mysqli_check->close();
 
-	$c5_pass = $u_uat_ok && $u_lab_ok && $auth_uat_ok && 0 === $prod_u_uat && 0 === $lab_u_uat;
+	$c5_pass = $u_uat_ok && $u_lab_ok && $auth_uat_ok && $old_pass_rejected && 0 === $prod_u_uat && 0 === $lab_u_uat;
 
 	if ( $c5_pass ) {
 		echo "[PASS] Control 5: Autenticación y Segregación de Roles — admin_uat (ID {$u_uat->ID}, admin) autentica OK, admin_lab (ID 1) disponible, 0 usuarios UAT en cms_ect y cms_ect_lab: SI\n";

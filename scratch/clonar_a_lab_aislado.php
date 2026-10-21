@@ -281,7 +281,7 @@ $mysqli_tgt->query( "TRUNCATE TABLE `etk_t_users`" );
 $mysqli_tgt->query( "TRUNCATE TABLE `etk_t_usermeta`" );
 
 // Insert single admin_lab user.
-$lab_pass_hash = '$P$B7b3QJ0/JqYQh0Z7Y5v5W0.kQe9cT/1'; // Standard portable hash for 'LabStaging2026!'
+$lab_pass_hash = '$P$B7b3QJ0/JqYQh0Z7Y5v5W0.kQe9cT/1'; // Standard portable hash for staging admin
 $mysqli_tgt->query(
 	"INSERT INTO `etk_t_users` (`ID`, `user_login`, `user_pass`, `user_nicename`, `user_email`, `user_registered`, `display_name`)
 	 VALUES (1, 'admin_lab', '{$lab_pass_hash}', 'admin_lab', 'admin@lab.ecoterra.test', NOW(), 'Admin Lab')"

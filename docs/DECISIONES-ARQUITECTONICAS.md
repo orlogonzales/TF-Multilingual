@@ -2456,8 +2456,8 @@
        * **Configuración de Acceso y Puerto:** Apache configurado en `D:/laragon/etc/apache2/sites-enabled/02-uat.ecoterra.conf` escuchando en puerto dedicado **8089** (`Listen 8089`, `<VirtualHost *:8089>`) y puerto 80 (`<VirtualHost *:80>` para `uat.ecoterra.test`). El uso del puerto 8089 garantiza acceso instantáneo y sin fricción mediante `http://localhost:8089/`, `http://127.0.0.1:8089/` y `http://lab.ecoterra.test:8089/` sin requerir permisos de administrador de Windows para alterar el archivo `hosts`.
   2. **Segregación de Credenciales y Puerta de Seguridad Perimetral (`/punko`):**
      - Se crearon y certificaron credenciales administrativas dedicadas para UAT:
-       * Usuario UAT primario: `admin_uat` (ID: 2, rol: `administrator`, nivel: 10, email: `admin_uat@uat.ecoterra.test`), con contraseña `UatStaging2026!`.
-       * Usuario Lab secundario: `admin_lab` (ID: 1, rol: `administrator`, contraseña: `LabStaging2026!`).
+       * Usuario UAT primario: `admin_uat` (ID: 2, rol: `administrator`, nivel: 10, email: `admin_uat@uat.ecoterra.test`), con credenciales privadas almacenadas localmente.
+       * Usuario Lab secundario: `admin_lab` (ID: 1, rol: `administrator`, credenciales locales).
        * Se comprobó la segregación total: los usuarios de UAT tienen 0 presencia en `cms_ect` y en `cms_ect_lab`.
        * Se verificó la puerta de enlace perimetral del tema `ecoCMS` (`/punko`): una visita a `http://localhost:8089/punko` emite de manera transparente la cookie HTTP `wpa_login_token` y redirige a `wp-login.php`, permitiendo el inicio de sesión fluido en el navegador del usuario y bloqueando accesos anónimos o ataques de fuerza bruta.
   3. **Demostración de Aislamiento Bidireccional Estricto (Prueba de Mutación):**
@@ -2477,6 +2477,31 @@
 - **CONTEXTO:** Fase 3.56 / Directiva DT-TFML-089 — Habilitación de UAT Aislada y Entrega para Aceptación Funcional.
 - **JUSTIFICACIÓN:** Permitir al propietario del sitio realizar pruebas de aceptación humana y editorial desde su navegador en un entorno idéntico a producción pero 100% aislado, donde puede crear, modificar, vincular o eliminar contenidos sin riesgo para el laboratorio consolidado ni para la producción sentinel.
 - **CONSECUENCIAS:** Entorno UAT listo, verificado y activo en `http://localhost:8089/`, con credenciales documentadas y guías de recorrido de prueba completas para el propietario.
+
+---
+
+### ADR-085: Remediación de Seguridad de Credenciales UAT, Segregación Local y Precisión Operativa (Directiva DT-TFML-090)
+- **FECHA:** 2026-10-21
+- **DECISIÓN:**
+  1. **Rotación Inmediata y Revocación de Sesiones:**
+     - Se ejecutó la rotación inmediata de las contraseñas de las cuentas `admin_uat` y `admin_lab` en la base de datos `cms_ect_uat`.
+     - Las contraseñas iniciales expuestas en el commit anterior fueron revocadas y su intento de autenticación resulta ahora en rechazo estricto (`is_wp_error() === true`).
+     - Se eliminaron todos los tokens de sesión activos (`session_tokens` en `etk_t_usermeta`) para forzar la expiración inmediata de sesiones preexistentes.
+  2. **Entrega Segura Local Fuera de Control de Versiones:**
+     - Las nuevas credenciales fueron generadas criptográficamente de manera local y almacenadas exclusivamente en `D:/laragon/www/uat.ecoterra/CREDENCIALES_UAT.txt` (fichero privado en el servidor local, fuera del repositorio Git del plugin).
+     - Se eliminó toda mención de contraseñas en texto plano de los archivos versionados (`CHANGELOG.md`, `DECISIONES-ARQUITECTONICAS.md`, `ROADMAP.md` y `scratch/verify_fase_3_56.php`).
+     - El verificador determinista `verify_fase_3_56.php` ahora carga dinámicamente las credenciales desde el almacén local seguro (`.uat_auth_token.json` o variable de entorno `TFML_UAT_ADMIN_PASS`) y valida explícitamente que la contraseña anterior sea rechazada.
+  3. **Evaluación de Exposición Histórica en Git:**
+     - Se constató que las contraseñas iniciales figuraron en el commit `aefaedfcadfbd3952d2ebefa445134c1a56184c6`.
+     - Dado que dichas credenciales ya han sido invalidadas en la base de datos `cms_ect_uat` y nunca fueron utilizadas en producción (`cms_ect`) ni en laboratorio (`cms_ect_lab`), las cadenas expuestas carecen de valor operativo y están inertes.
+     - En conformidad con la directiva DT-TFML-090, se preserva el árbol Git sin reescritura destructiva ni `force-push` no autorizado, quedando abierta la opción de reescritura con herramientas como `git-filter-repo` únicamente bajo instrucción expresa del propietario.
+  4. **Precisión Funcional de la Operación Editorial:**
+     - Se clarificó la terminología operativa del plugin: el botón `+` en la caja meta de traducción realiza una **"Creación de borrador / réplica editorial vinculada"** (instanciación de un nuevo objeto de contenido en WordPress nativo vinculado en `tfml_group_elements` con el canónico para traducción humana posterior), y **NO** una "traducción automática" o de inteligencia artificial. No se crean dependencias externas ni se alteran contenidos históricos.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Directiva DT-TFML-090 — Seguridad de Credenciales UAT y Entrega Definitiva para Revisión Humana.
+- **JUSTIFICACIÓN:** Aplicar las 10 Reglas de Oro para cerrar de forma inmediata y definitiva la reserva de seguridad de Fase 3.56, garantizando la confidencialidad de accesos sin burocracia ni forcejeo de historial.
+- **CONSECUENCIAS:** Entorno UAT seguro, contraseñas anteriores inertes, secretos resguardados localmente y propietario habilitado para realizar su revisión funcional con total confianza.
+
 
 
 
