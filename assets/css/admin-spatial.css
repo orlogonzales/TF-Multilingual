@@ -56,11 +56,13 @@
 }
 
 /* ==========================================================================
-   Root Container
+   Root Container (Full-width Spatial Dashboard)
    ========================================================================== */
 .tfml-spatial-wrap {
-	margin: 20px 20px 40px 2px;
-	max-width: 1480px;
+	margin: 16px 20px 40px 0;
+	width: auto;
+	max-width: none;
+	box-sizing: border-box;
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
 	color: var(--tfml-text-main);
 	-webkit-font-smoothing: antialiased;
@@ -261,22 +263,29 @@
 }
 
 /* ==========================================================================
-   KPI Grid
+   KPI Grid (Full-width Fluid Distribution)
    ========================================================================== */
 .tfml-kpi-grid {
 	display: grid;
-	grid-template-columns: repeat(5, 1fr);
+	grid-template-columns: repeat(5, minmax(0, 1fr));
 	gap: 16px;
 	margin-bottom: 24px;
+	width: 100%;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1400px) {
 	.tfml-kpi-grid {
-		grid-template-columns: repeat(3, 1fr);
+		grid-template-columns: repeat(3, minmax(0, 1fr));
 	}
 }
 
-@media (max-width: 782px) {
+@media (max-width: 900px) {
+	.tfml-kpi-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 600px) {
 	.tfml-kpi-grid {
 		grid-template-columns: 1fr;
 	}
@@ -430,12 +439,13 @@
 
 .tfml-action-cards-grid {
 	display: grid;
-	grid-template-columns: repeat(3, 1fr);
+	grid-template-columns: repeat(3, minmax(0, 1fr));
 	gap: 16px;
 	margin-bottom: 24px;
+	width: 100%;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1000px) {
 	.tfml-action-cards-grid {
 		grid-template-columns: 1fr;
 	}
@@ -532,16 +542,17 @@
 }
 
 /* ==========================================================================
-   3-Column Middle Dashboard Layout
+   3-Column Middle Dashboard Layout (Full-width Fluid Distribution)
    ========================================================================== */
 .tfml-dashboard-columns {
 	display: grid;
-	grid-template-columns: repeat(3, 1fr);
+	grid-template-columns: repeat(3, minmax(0, 1fr));
 	gap: 16px;
 	margin-bottom: 24px;
+	width: 100%;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1200px) {
 	.tfml-dashboard-columns {
 		grid-template-columns: 1fr;
 	}
@@ -800,15 +811,16 @@
 }
 
 /* ==========================================================================
-   Bottom Grid (Languages & Help)
+   Bottom Grid (Languages & Help - Full-width)
    ========================================================================== */
 .tfml-bottom-grid {
 	display: grid;
 	grid-template-columns: 2fr 1fr;
 	gap: 16px;
+	width: 100%;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1000px) {
 	.tfml-bottom-grid {
 		grid-template-columns: 1fr;
 	}
