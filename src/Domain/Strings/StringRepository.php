@@ -726,6 +726,56 @@ class StringRepository {
 	}
 
 	/**
+	 * Obtiene pares asociativos [texto_original => texto_traducido] para un idioma y dominios dados.
+	 *
+	 * Permite a los filtros de frontend localizar cadenas compartidas e interfaces de temas de forma O(1).
+	 *
+	 * @param string        $language_code Código de idioma destino (ej. 'en').
+	 * @param array<string> $domains       Lista de dominios permitidos (ej. ['ecoCMS', 'theme', 'default']).
+	 * @return array<string, string> Pares asociativos [texto_original => texto_traducido].
+	 */
+	public function get_translation_pairs_by_language( string $language_code, array $domains = array() ): array {
+		$lang = trim( $language_code );
+		if ( '' === $lang ) {
+			return array();
+		}
+
+		$where_domains = '';
+		$params        = array( $lang );
+
+		if ( ! empty( $domains ) ) {
+			$placeholders  = implode( ', ', array_fill( 0, count( $domains ), '%s' ) );
+			$where_domains = " AND s.domain IN ($placeholders)";
+			foreach ( $domains as $d ) {
+				$params[] = trim( $d );
+			}
+		}
+
+		$sql = "SELECT s.original_value, t.translated_value 
+			FROM {$this->table_translations} t 
+			INNER JOIN {$this->table_strings} s ON t.string_id = s.id 
+			WHERE t.language_code = %s {$where_domains} 
+			AND t.translated_value IS NOT NULL AND t.translated_value != ''";
+
+		$rows = $this->db->get_results(
+			$this->db->prepare( $sql, ...$params ) // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		);
+
+		$pairs = array();
+		if ( ! empty( $rows ) ) {
+			foreach ( $rows as $row ) {
+				$orig = (string) $row->original_value;
+				$tran = (string) $row->translated_value;
+				if ( '' !== $orig && '' !== $tran && $orig !== $tran ) {
+					$pairs[ $orig ] = $tran;
+				}
+			}
+		}
+
+		return $pairs;
+	}
+
+	/**
 	 * Caches a string entity in memory.
 	 *
 	 * @param TranslatableString $translatable_string Entity to cache.

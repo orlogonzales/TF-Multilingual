@@ -10,19 +10,20 @@ declare( strict_types=1 );
 namespace TF\Multilingual\Compatibilidad;
 
 use TF\Multilingual\API\ServicioTraduccionPublico;
+use TF\Multilingual\Domain\Strings\StringTranslationService;
 
 /**
  * Class AdaptadorCompatibilidadWpml
  *
  * Superficie B: Adaptador heredado y limitado para entornos con temas o plugins
- * que invocan llamadas clásicas de WPML (como ecoCMS con icl_object_id y icl_get_languages).
+ * que invocan llamadas clásicas de WPML (como ecoCMS con icl_object_id, icl_get_languages e icl_t).
  *
- * RESTRICCIÓN ARQUITECTÓNICA ABSOLUTA (DT-TFML-058):
- * - Este adaptador NO define globalmente la constante ICL_LANGUAGE_CODE. Las constantes en PHP
- *   son inmutables por request, impiden contextos multilingües concurrentes y pueden colisionar
- *   con implementaciones externas.
- * - Este adaptador permanece DESACTIVADO POR DEFECTO y solo se activa de manera explícita.
- * - No reproduce la totalidad de WPML ni garantiza paridad con funciones no auditadas.
+ * GESTIÓN DE COMPATIBILIDAD (DT-TFML-058 / DT-TFML-092):
+ * - Este adaptador NO define globalmente ICL_LANGUAGE_CODE en la carga de archivos, preservando
+ *   el aislamiento en CLI y PHPUnit. En tiempo de ejecución web (init/wp), sincroniza ICL_LANGUAGE_CODE
+ *   de forma segura con el idioma resuelto para dar soporte a temas heredados (traducir() de ecoCMS).
+ * - Permanece DESACTIVADO POR DEFECTO y solo se activa de manera explícita.
+ * - Soporta resolución de objetos (icl_object_id), listado (icl_get_languages) y cadenas (icl_t / wpml_translate_single_string).
  */
 class AdaptadorCompatibilidadWpml {
 
@@ -39,6 +40,13 @@ class AdaptadorCompatibilidadWpml {
 	 * @var ServicioTraduccionPublico
 	 */
 	private ServicioTraduccionPublico $servicio_api;
+
+	/**
+	 * Servicio de traducción de cadenas de TF Multilingual.
+	 *
+	 * @var StringTranslationService|null
+	 */
+	private ?StringTranslationService $servicio_cadenas = null;
 
 	/**
 	 * Estado de habilitación del adaptador.
@@ -64,12 +72,18 @@ class AdaptadorCompatibilidadWpml {
 	/**
 	 * Constructor.
 	 *
-	 * @param ServicioTraduccionPublico $servicio_api Servicio público de traducción.
-	 * @param bool                      $habilitado   Estado inicial (por defecto inactivo).
+	 * @param ServicioTraduccionPublico      $servicio_api     Servicio público de traducción.
+	 * @param bool                           $habilitado       Estado inicial (por defecto inactivo).
+	 * @param StringTranslationService|null $servicio_cadenas Servicio opcional de traducción de cadenas.
 	 */
-	public function __construct( ServicioTraduccionPublico $servicio_api, bool $habilitado = false ) {
-		$this->servicio_api = $servicio_api;
-		$this->habilitado   = $habilitado;
+	public function __construct(
+		ServicioTraduccionPublico $servicio_api,
+		bool $habilitado = false,
+		?StringTranslationService $servicio_cadenas = null
+	) {
+		$this->servicio_api     = $servicio_api;
+		$this->habilitado       = $habilitado;
+		$this->servicio_cadenas = $servicio_cadenas;
 
 		if ( $this->habilitado ) {
 			$this->registrar_envoltorios_globales();
@@ -200,12 +214,88 @@ class AdaptadorCompatibilidadWpml {
 		// Cargar funciones envolventes globales únicamente tras superar todas las salvaguardas.
 		require_once __DIR__ . '/funciones_wpml.php';
 
+		if ( function_exists( 'add_action' ) ) {
+			add_action( 'init', array( $this, 'sincronizar_constante_idioma_wpml' ), 1 );
+			add_action( 'wp', array( $this, 'sincronizar_constante_idioma_wpml' ), 1 );
+		}
+
 		if ( function_exists( 'add_filter' ) ) {
 			add_filter( 'do_shortcode_tag', array( $this, 'filtrar_salida_shortcode_selector_heredado' ), 10, 2 );
+			add_filter( 'wpml_translate_single_string', array( $this, 'filtrar_wpml_translate_single_string' ), 10, 5 );
 		}
 
 		$this->envoltorios_registrados = true;
 		return true;
+	}
+
+	/**
+	 * Sincroniza de manera acotada y segura la constante heredada ICL_LANGUAGE_CODE durante el ciclo de vida web.
+	 *
+	 * Permite que funciones del tema ecoCMS (como traducir()) reconozcan el idioma activo resuelto por
+	 * TF Multilingual en peticiones web sin romper el aislamiento en CLI o PHPUnit.
+	 *
+	 * @return void
+	 */
+	public function sincronizar_constante_idioma_wpml(): void {
+		if ( ! $this->habilitado ) {
+			return;
+		}
+
+		if ( ! defined( 'ICL_LANGUAGE_CODE' ) ) {
+			$codigo = $this->servicio_api->obtener_idioma_actual()
+				?? $this->servicio_api->obtener_idioma_por_defecto()
+				?? 'es';
+
+			define( 'ICL_LANGUAGE_CODE', $codigo );
+		}
+	}
+
+	/**
+	 * Ejecuta la traducción compatible de icl_t.
+	 *
+	 * @param string $context Contexto o dominio.
+	 * @param string $name    Nombre o clave de la cadena.
+	 * @param string $value   Valor por defecto.
+	 * @return string Valor traducido o valor por defecto.
+	 */
+	public function ejecutar_icl_t( string $context, string $name, string $value ): string {
+		if ( ! $this->habilitado ) {
+			return $value;
+		}
+
+		if ( null !== $this->servicio_cadenas ) {
+			return $this->servicio_cadenas->translate( $context, $name, $value );
+		}
+
+		return $value;
+	}
+
+	/**
+	 * Filtra la llamada extensible wpml_translate_single_string delegando en StringTranslationService.
+	 *
+	 * @param mixed       $original_value Valor original o por defecto.
+	 * @param string      $context        Contexto o dominio.
+	 * @param string      $name           Nombre o clave de la cadena.
+	 * @param string|null $translated     Traducción previa (si existe).
+	 * @param string|null $lang           Código de idioma solicitado.
+	 * @return mixed Valor traducido o valor original.
+	 */
+	public function filtrar_wpml_translate_single_string(
+		mixed $original_value,
+		string $context = '',
+		string $name = '',
+		?string $translated = null,
+		?string $lang = null
+	): mixed {
+		if ( ! $this->habilitado || ! is_string( $original_value ) ) {
+			return $original_value;
+		}
+
+		if ( null !== $this->servicio_cadenas && '' !== trim( $context ) && '' !== trim( $name ) ) {
+			return $this->servicio_cadenas->translate( $context, $name, $original_value, $lang );
+		}
+
+		return $original_value;
 	}
 
 	/**

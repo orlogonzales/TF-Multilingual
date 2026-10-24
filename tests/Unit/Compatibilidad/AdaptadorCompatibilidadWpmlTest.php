@@ -591,4 +591,57 @@ class AdaptadorCompatibilidadWpmlTest extends TestCase {
 		$this->assertStringContainsString( 'pt.svg', $salida_filtrada );
 		$this->assertStringContainsString( 'http://lab.ecoterra.test/pt/conforto/', $salida_filtrada );
 	}
+
+	/**
+	 * Test: ejecutar_icl_t y filtrar_wpml_translate_single_string delegan correctamente en StringTranslationService.
+	 *
+	 * @return void
+	 */
+	public function test_icl_t_y_wpml_translate_single_string_delegan_en_servicio(): void {
+		$servicio_cadenas = $this->createMock( \TF\Multilingual\Domain\Strings\StringTranslationService::class );
+		$servicio_cadenas->method( 'translate' )
+			->willReturnCallback(
+				function ( $context, $key, $default_val, $lang = null ) {
+					if ( 'ecoCMS' === $context && 'footer.contact_title' === $key ) {
+						return 'How to get in touch?';
+					}
+					return $default_val;
+				}
+			);
+
+		$adaptador = new AdaptadorCompatibilidadWpml( $this->servicio_api, true, $servicio_cadenas );
+
+		// Probar ejecutar_icl_t
+		$this->assertSame(
+			'How to get in touch?',
+			$adaptador->ejecutar_icl_t( 'ecoCMS', 'footer.contact_title', '¿Como ponerse en contaco?' )
+		);
+		$this->assertSame(
+			'Valor original',
+			$adaptador->ejecutar_icl_t( 'ecoCMS', 'otra.clave', 'Valor original' )
+		);
+
+		// Probar filtrar_wpml_translate_single_string
+		$this->assertSame(
+			'How to get in touch?',
+			$adaptador->filtrar_wpml_translate_single_string( '¿Como ponerse en contaco?', 'ecoCMS', 'footer.contact_title' )
+		);
+
+		// Probar función global icl_t()
+		$this->assertSame(
+			'How to get in touch?',
+			icl_t( 'ecoCMS', 'footer.contact_title', '¿Como ponerse en contaco?' )
+		);
+	}
+
+	/**
+	 * Test: sincronizar_constante_idioma_wpml no realiza acciones si el adaptador está deshabilitado.
+	 *
+	 * @return void
+	 */
+	public function test_sincronizar_constante_no_hace_nada_si_deshabilitado(): void {
+		$adaptador = new AdaptadorCompatibilidadWpml( $this->servicio_api, false );
+		$adaptador->sincronizar_constante_idioma_wpml();
+		$this->assertFalse( $adaptador->esta_habilitado() );
+	}
 }

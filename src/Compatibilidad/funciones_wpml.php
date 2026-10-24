@@ -63,3 +63,23 @@ if ( ! function_exists( 'icl_get_languages' ) ) {
 		return array();
 	}
 }
+
+if ( ! function_exists( 'icl_t' ) ) {
+	/**
+	 * Emulación acotada y segura de la función clásica icl_t().
+	 *
+	 * @param string $context Contexto o dominio de la cadena.
+	 * @param string $name    Nombre o clave de la cadena.
+	 * @param string $value   Valor original o por defecto.
+	 * @return string Cadena traducida o valor original.
+	 */
+	function icl_t( $context, $name, $value ) {
+		$adaptador = AdaptadorCompatibilidadWpml::obtener_instancia_activa();
+
+		if ( null !== $adaptador && $adaptador->esta_habilitado() ) {
+			return $adaptador->ejecutar_icl_t( (string) $context, (string) $name, (string) $value );
+		}
+
+		return (string) $value;
+	}
+}

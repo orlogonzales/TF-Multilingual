@@ -38,6 +38,7 @@ use TF\Multilingual\Domain\Seo\CanonicalUrlManager;
 use TF\Multilingual\Domain\Seo\CoreSitemapsFilter;
 use TF\Multilingual\Domain\Seo\HreflangGenerator;
 use TF\Multilingual\Domain\Seo\SeoFrontendFilter;
+use TF\Multilingual\Domain\Strings\StringFrontendFilter;
 use TF\Multilingual\Domain\Strings\StringRepository;
 use TF\Multilingual\Domain\Strings\StringTranslationService;
 use TF\Multilingual\Domain\Translation\ContentTranslationResolver;
@@ -273,6 +274,13 @@ class Plugin {
 	 * @var StringEditorialUi|null
 	 */
 	private ?StringEditorialUi $string_editorial_ui = null;
+
+	/**
+	 * String frontend localization filter.
+	 *
+	 * @var StringFrontendFilter|null
+	 */
+	private ?StringFrontendFilter $string_frontend_filter = null;
 
 	/**
 	 * Hreflang generator.
@@ -546,6 +554,11 @@ class Plugin {
 			$this->string_repository,
 			$this->language_registry
 		);
+		$this->string_frontend_filter           = new StringFrontendFilter(
+			$this->string_repository,
+			$this->language_registry,
+			$this->current_language_resolver
+		);
 		$this->hreflang_generator               = new HreflangGenerator(
 			$this->language_registry,
 			$group_repo,
@@ -630,7 +643,8 @@ class Plugin {
 			: $habilitar_por_defecto );
 		$this->adaptador_compatibilidad_wpml = new AdaptadorCompatibilidadWpml(
 			$this->servicio_traduccion_publico,
-			$habilitar_adaptador_wpml
+			$habilitar_adaptador_wpml,
+			$this->string_translation_service
 		);
 
 		$this->rewrite_manager->init_hooks();
@@ -653,6 +667,7 @@ class Plugin {
 		$this->language_editorial_ui->init_hooks();
 		$this->translations_overview_ui->init_hooks();
 		$this->string_editorial_ui->init_hooks();
+		$this->string_frontend_filter->init_hooks();
 		$this->seo_frontend_filter->init_hooks();
 		$this->rest_api_registrar->init_hooks();
 		$this->migration_ui->init_hooks();
@@ -1076,6 +1091,23 @@ class Plugin {
 		}
 
 		return $this->string_editorial_ui;
+	}
+
+	/**
+	 * Gets the string frontend filter instance.
+	 *
+	 * @return StringFrontendFilter
+	 */
+	public function get_string_frontend_filter(): StringFrontendFilter {
+		if ( null === $this->string_frontend_filter ) {
+			$this->string_frontend_filter = new StringFrontendFilter(
+				$this->get_string_repository(),
+				$this->get_language_registry(),
+				$this->get_current_language_resolver()
+			);
+		}
+
+		return $this->string_frontend_filter;
 	}
 
 	/**
