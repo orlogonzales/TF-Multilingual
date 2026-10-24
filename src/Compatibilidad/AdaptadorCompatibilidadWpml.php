@@ -211,9 +211,9 @@ class AdaptadorCompatibilidadWpml {
 	/**
 	 * Saneamiento no intrusivo de la salida de shortcodes heredados de selector de idiomas
 	 * (top-idiomas / top-header) cuando el adaptador está habilitado:
-	 * Convierte enlaces vacíos (<a href="">) correspondientes a idiomas activos sin traducción
-	 * disponible (missing=1, url='') en elementos HTML5 placeholder no navegables sin atributo href
-	 * (<a aria-disabled="true" data-tfml-missing="1">), evitando enlaces engañosos sin modificar el tema.
+	 * En la navegación pública, oculta opciones de idioma que no dispongan de una traducción válida
+	 * y publicada en el contexto actual (missing=1, url=''), eliminando la etiqueta de enlace vacía
+	 * y separadores adyacentes para prevenir la exposición de rutas o enlaces no operativos (DT-TFML-091).
 	 *
 	 * @param mixed  $salida Salida generada por el shortcode.
 	 * @param string $tag    Nombre del shortcode ejecutado.
@@ -228,9 +228,10 @@ class AdaptadorCompatibilidadWpml {
 			return $salida;
 		}
 
+		// DT-TFML-091: Ocultar selectores sin traducción válida eliminando enlaces vacíos o placeholders.
 		$saneada = preg_replace(
-			'/<a(\s+[^>]*)?\s+href=""([^>]*)>/i',
-			'<a$1 aria-disabled="true" data-tfml-missing="1"$2>',
+			'/(?:&nbsp;|\s)*<a(\s+[^>]*)?(?:href=""|data-tfml-missing="1"|aria-disabled="true")([^>]*)>.*?<\/a>(?:&nbsp;|\s)*/is',
+			'',
 			$salida
 		);
 

@@ -131,6 +131,15 @@ class ServicioTraduccionPublico {
 	}
 
 	/**
+	 * Purga las cachés en memoria del resolvedor de traducciones subyacente.
+	 *
+	 * @return void
+	 */
+	public function purgar_cache(): void {
+		$this->resolvedor_traducciones->flush_cache();
+	}
+
+	/**
 	 * Retorna el código ISO del idioma actual de la petición (ej. 'es', 'en').
 	 *
 	 * @return string|null Código de idioma o null si no se pudo determinar.

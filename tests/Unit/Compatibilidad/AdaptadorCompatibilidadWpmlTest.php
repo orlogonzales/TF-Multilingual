@@ -548,4 +548,47 @@ class AdaptadorCompatibilidadWpmlTest extends TestCase {
 
 		$this->servicio_api->establecer_contexto_evaluacion( null, null );
 	}
+
+	/**
+	 * Test: filtrar_salida_shortcode_selector_heredado oculta opciones sin traducción válida en navegación pública (DT-TFML-091).
+	 *
+	 * @return void
+	 */
+	public function test_filtrar_salida_shortcode_selector_heredado_oculta_idiomas_sin_traduccion(): void {
+		$adaptador = new AdaptadorCompatibilidadWpml( $this->servicio_api, true );
+
+		$salida_original = '<span class="idiomas_header"><a class="activo" href="http://lab.ecoterra.test/nosotros/quienes-somos/"><img src="http://lab.ecoterra.test/flags/es.svg"></a>&nbsp;&nbsp;&nbsp;<a href="http://lab.ecoterra.test/en/about-us/who-are-we/"><img src="http://lab.ecoterra.test/flags/en.svg"></a>&nbsp;&nbsp;&nbsp;<a href=""><img src="http://lab.ecoterra.test/flags/pt.svg"></a></span>';
+
+		$salida_filtrada = $adaptador->filtrar_salida_shortcode_selector_heredado( $salida_original, 'top-header' );
+
+		$this->assertStringContainsString( 'http://lab.ecoterra.test/nosotros/quienes-somos/', $salida_filtrada );
+		$this->assertStringContainsString( 'http://lab.ecoterra.test/en/about-us/who-are-we/', $salida_filtrada );
+		$this->assertStringNotContainsString( 'pt.svg', $salida_filtrada );
+		$this->assertStringNotContainsString( 'href=""', $salida_filtrada );
+
+		// También para placeholder aria-disabled
+		$salida_placeholder          = '<span class="idiomas_header"><a class="activo" href="http://lab.ecoterra.test/"><img src="es.svg"></a><a aria-disabled="true" data-tfml-missing="1"><img src="pt.svg"></a></span>';
+		$salida_filtrada_placeholder = $adaptador->filtrar_salida_shortcode_selector_heredado( $salida_placeholder, 'top-idiomas' );
+
+		$this->assertStringContainsString( 'es.svg', $salida_filtrada_placeholder );
+		$this->assertStringNotContainsString( 'pt.svg', $salida_filtrada_placeholder );
+	}
+
+	/**
+	 * Test: filtrar_salida_shortcode_selector_heredado conserva todas las opciones cuando existen traducciones publicadas para los 3 idiomas.
+	 *
+	 * @return void
+	 */
+	public function test_filtrar_salida_shortcode_selector_heredado_conserva_tres_idiomas_cuando_publicados(): void {
+		$adaptador = new AdaptadorCompatibilidadWpml( $this->servicio_api, true );
+
+		$salida_original = '<span class="idiomas_header"><a class="activo" href="http://lab.ecoterra.test/confort/"><img src="es.svg"></a>&nbsp;&nbsp;&nbsp;<a href="http://lab.ecoterra.test/en/comfort/"><img src="en.svg"></a>&nbsp;&nbsp;&nbsp;<a href="http://lab.ecoterra.test/pt/conforto/"><img src="pt.svg"></a></span>';
+
+		$salida_filtrada = $adaptador->filtrar_salida_shortcode_selector_heredado( $salida_original, 'top-header' );
+
+		$this->assertStringContainsString( 'es.svg', $salida_filtrada );
+		$this->assertStringContainsString( 'en.svg', $salida_filtrada );
+		$this->assertStringContainsString( 'pt.svg', $salida_filtrada );
+		$this->assertStringContainsString( 'http://lab.ecoterra.test/pt/conforto/', $salida_filtrada );
+	}
 }

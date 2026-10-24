@@ -69,6 +69,48 @@ class RewriteManager {
 		add_filter( 'rewrite_rules_array', array( $this, 'filter_rewrite_rules' ) );
 		add_filter( 'option_rewrite_rules', array( $this, 'filter_option_rewrite_rules' ) );
 		add_action( 'parse_request', array( $this, 'on_parse_request' ) );
+		add_action( 'template_redirect', array( $this, 'intercept_inactive_language_requests' ), 0 );
+	}
+
+	/**
+	 * Previene el fallback o redirección canónica espuria hacia contenidos en idioma por defecto
+	 * cuando la petición incluye un prefijo de idioma registrado pero inactivo (ej. /fr/...).
+	 * En dichos casos, el sistema impone un 404 estricto (DT-TFML-091).
+	 *
+	 * @return void
+	 */
+	public function intercept_inactive_language_requests(): void {
+		if ( function_exists( 'is_admin' ) && is_admin() ) {
+			return;
+		}
+
+		if ( ( function_exists( 'wp_doing_ajax' ) && wp_doing_ajax() ) || ( function_exists( 'wp_doing_cron' ) && wp_doing_cron() ) ) {
+			return;
+		}
+
+		$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) $_SERVER['REQUEST_URI'] : '';
+		if ( '' === $request_uri ) {
+			return;
+		}
+
+		$url_resolver = new UrlLanguageResolver( $this->language_registry );
+		$resolution   = $url_resolver->resolve( $request_uri );
+
+		if ( $resolution->is_inactive() ) {
+			global $wp_query;
+			if ( $wp_query instanceof \WP_Query ) {
+				$wp_query->set_404();
+			}
+			if ( function_exists( 'status_header' ) ) {
+				status_header( 404 );
+			}
+			if ( function_exists( 'nocache_headers' ) ) {
+				nocache_headers();
+			}
+			if ( function_exists( 'remove_action' ) ) {
+				remove_action( 'template_redirect', 'redirect_canonical' );
+			}
+		}
 	}
 
 	/**

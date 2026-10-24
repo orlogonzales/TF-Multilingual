@@ -52,9 +52,16 @@
 	box-shadow: 0 0 0 1.5px #2563eb, 0 1px 3px rgba(0, 0, 0, 0.2) !important;
 }
 
+/* DT-TFML-091: Ocultar selectores de idiomas sin traducción disponible en frontend */
 .idiomas_header a[aria-disabled="true"],
-.idiomas_header_bg a[aria-disabled="true"] {
-	opacity: 0.45;
-	cursor: not-allowed;
-	pointer-events: none;
+.idiomas_header_bg a[aria-disabled="true"],
+.idiomas_header a[data-tfml-missing="1"],
+.idiomas_header_bg a[data-tfml-missing="1"],
+.idiomas_header a[href=""],
+.idiomas_header_bg a[href=""],
+.idiomas_header a[href="#"],
+.idiomas_header_bg a[href="#"],
+.idiomas_header a:not([href]),
+.idiomas_header_bg a:not([href]) {
+	display: none !important;
 }
