@@ -670,12 +670,12 @@ class LanguageEditorialUi {
 				</div>
 			<?php endif; ?>
 
-			<div id="col-container" class="wp-clearfix" style="margin-top:20px;">
+			<div id="col-container" class="wp-clearfix tfml-languages-layout">
 
 				<!-- Columna Izquierda: Formulario Agregar / Editar -->
-				<div id="col-left" style="width:32%; float:left;">
+				<div id="col-left" class="tfml-languages-sidebar">
 					<div class="col-wrap">
-						<div class="form-wrap tfml-card-panel" style="padding:20px;">
+						<div class="form-wrap tfml-card-panel">
 							<?php if ( null !== $edit_lang ) : ?>
 								<h2><?php esc_html_e( 'Editar idioma', 'tf-multilingual' ); ?>: <?php echo esc_html( $edit_lang->get_name() ); ?></h2>
 								<form method="post" action="<?php echo esc_url( admin_url( 'admin.php?page=' . self::PARENT_SLUG ) ); ?>">
@@ -685,56 +685,60 @@ class LanguageEditorialUi {
 										<?php wp_nonce_field( self::NONCE_ACTION_UPDATE, self::NONCE_NAME ); ?>
 									<?php endif; ?>
 
-									<div class="form-field form-required">
-										<label for="edit_code_display"><?php esc_html_e( 'Código de idioma', 'tf-multilingual' ); ?></label>
-										<input type="text" id="edit_code_display" value="<?php echo esc_attr( $edit_lang->get_code() ); ?>" disabled style="background:#eee; width:100%;">
-										<p class="description"><?php esc_html_e( 'El código lingüístico es la clave canónica y no se puede modificar.', 'tf-multilingual' ); ?></p>
-									</div>
-
-									<div class="form-field form-required">
-										<label for="edit_name"><?php esc_html_e( 'Nombre internacional (Admin)', 'tf-multilingual' ); ?></label>
-										<input type="text" name="name" id="edit_name" value="<?php echo esc_attr( $edit_lang->get_name() ); ?>" required style="width:100%;">
-									</div>
-
-									<div class="form-field form-required">
-										<label for="edit_native_name"><?php esc_html_e( 'Nombre nativo / Endónimo', 'tf-multilingual' ); ?></label>
-										<input type="text" name="native_name" id="edit_native_name" value="<?php echo esc_attr( $edit_lang->get_native_name() ); ?>" required style="width:100%;">
-									</div>
-
-									<div class="form-field form-required">
-										<label for="edit_locale"><?php esc_html_e( 'Locale de WordPress', 'tf-multilingual' ); ?></label>
-										<input type="text" name="locale" id="edit_locale" value="<?php echo esc_attr( $edit_lang->get_locale() ); ?>" required style="width:100%;">
-									</div>
-
-									<div class="form-field">
-										<label for="edit_flag_code"><?php esc_html_e( 'Bandera visual', 'tf-multilingual' ); ?></label>
-										<div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
-											<span id="edit_flag_preview">
-												<?php echo $this->get_flag_html( $edit_lang->get_code(), $edit_lang->get_native_name(), $edit_lang->get_flag_code() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-											</span>
-											<select name="flag_code" id="edit_flag_code" style="flex:1;">
-												<option value="" <?php selected( empty( $edit_lang->get_flag_code() ) ); ?>>
-													<?php esc_html_e( '— Automática según código / locale —', 'tf-multilingual' ); ?>
-												</option>
-												<?php foreach ( LanguageFlagRenderer::get_available_flags() as $flag_id => $flag_label ) : ?>
-													<option value="<?php echo esc_attr( $flag_id ); ?>" <?php selected( $edit_lang->get_flag_code(), $flag_id ); ?>>
-														<?php echo esc_html( $flag_label ); ?>
-													</option>
-												<?php endforeach; ?>
-											</select>
+									<div class="tfml-form-grid">
+										<div class="form-field form-required">
+											<label for="edit_code_display"><?php esc_html_e( 'Código de idioma', 'tf-multilingual' ); ?></label>
+											<input type="text" id="edit_code_display" value="<?php echo esc_attr( $edit_lang->get_code() ); ?>" disabled style="background:#f1f5f9;">
+											<p class="description"><?php esc_html_e( 'Clave canónica no modificable.', 'tf-multilingual' ); ?></p>
 										</div>
-										<p class="description"><?php esc_html_e( 'Bandera nacional que representará a este idioma en el panel administrativo.', 'tf-multilingual' ); ?></p>
-									</div>
 
-									<div class="form-field">
-										<label for="edit_order"><?php esc_html_e( 'Orden de visualización', 'tf-multilingual' ); ?></label>
-										<input type="number" name="order" id="edit_order" value="<?php echo (int) $edit_lang->get_order(); ?>" style="width:100px;">
-									</div>
+										<div class="form-field form-required">
+											<label for="edit_locale"><?php esc_html_e( 'Locale de WordPress', 'tf-multilingual' ); ?></label>
+											<input type="text" name="locale" id="edit_locale" value="<?php echo esc_attr( $edit_lang->get_locale() ); ?>" required>
+											<p class="description"><?php esc_html_e( 'ej. es_ES, en_US', 'tf-multilingual' ); ?></p>
+										</div>
 
-									<p class="submit" style="display:flex; gap:10px; align-items:center;">
-										<input type="submit" class="button button-primary" value="<?php esc_attr_e( 'Actualizar idioma', 'tf-multilingual' ); ?>">
-										<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . self::PARENT_SLUG ) ); ?>" class="button button-secondary"><?php esc_html_e( 'Cancelar', 'tf-multilingual' ); ?></a>
-									</p>
+										<div class="form-field form-required">
+											<label for="edit_name"><?php esc_html_e( 'Nombre internacional (Admin)', 'tf-multilingual' ); ?></label>
+											<input type="text" name="name" id="edit_name" value="<?php echo esc_attr( $edit_lang->get_name() ); ?>" required>
+										</div>
+
+										<div class="form-field form-required">
+											<label for="edit_native_name"><?php esc_html_e( 'Nombre nativo / Endónimo', 'tf-multilingual' ); ?></label>
+											<input type="text" name="native_name" id="edit_native_name" value="<?php echo esc_attr( $edit_lang->get_native_name() ); ?>" required>
+										</div>
+
+										<div class="form-field">
+											<label for="edit_flag_code"><?php esc_html_e( 'Bandera visual', 'tf-multilingual' ); ?></label>
+											<div style="display:flex; align-items:center; gap:8px;">
+												<span id="edit_flag_preview">
+													<?php echo $this->get_flag_html( $edit_lang->get_code(), $edit_lang->get_native_name(), $edit_lang->get_flag_code() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+												</span>
+												<select name="flag_code" id="edit_flag_code" style="flex:1;">
+													<option value="" <?php selected( empty( $edit_lang->get_flag_code() ) ); ?>>
+														<?php esc_html_e( '— Automática —', 'tf-multilingual' ); ?>
+													</option>
+													<?php foreach ( LanguageFlagRenderer::get_available_flags() as $flag_id => $flag_label ) : ?>
+														<option value="<?php echo esc_attr( $flag_id ); ?>" <?php selected( $edit_lang->get_flag_code(), $flag_id ); ?>>
+															<?php echo esc_html( $flag_label ); ?>
+														</option>
+													<?php endforeach; ?>
+												</select>
+											</div>
+										</div>
+
+										<div class="form-field">
+											<label for="edit_order"><?php esc_html_e( 'Orden de visualización', 'tf-multilingual' ); ?></label>
+											<input type="number" name="order" id="edit_order" value="<?php echo (int) $edit_lang->get_order(); ?>">
+										</div>
+
+										<div class="form-field form-field-full" style="margin-top:8px;">
+											<p class="submit" style="display:flex; gap:10px; align-items:center; margin:0; padding:0;">
+												<input type="submit" class="button button-primary" value="<?php esc_attr_e( 'Actualizar idioma', 'tf-multilingual' ); ?>">
+												<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . self::PARENT_SLUG ) ); ?>" class="button button-secondary"><?php esc_html_e( 'Cancelar', 'tf-multilingual' ); ?></a>
+											</p>
+										</div>
+									</div>
 								</form>
 							<?php else : ?>
 								<h2><?php esc_html_e( 'Añadir nuevo idioma', 'tf-multilingual' ); ?></h2>
@@ -744,81 +748,83 @@ class LanguageEditorialUi {
 										<?php wp_nonce_field( self::NONCE_ACTION_ADD, self::NONCE_NAME ); ?>
 									<?php endif; ?>
 
-									<div class="form-field">
-										<label for="tfml_predefined_select"><?php esc_html_e( 'Elegir un idioma predefinido...', 'tf-multilingual' ); ?></label>
-										<select id="tfml_predefined_select" style="width:100%;">
-											<option value=""><?php esc_html_e( '— Seleccione para autocompletar —', 'tf-multilingual' ); ?></option>
-											<?php foreach ( $predefined as $p_code => $p_data ) : ?>
-												<?php $is_already = isset( $all_languages[ $p_code ] ); ?>
-												<option value="<?php echo esc_attr( $p_code ); ?>"
-													data-name="<?php echo esc_attr( $p_data['name'] ); ?>"
-													data-native="<?php echo esc_attr( $p_data['native_name'] ); ?>"
-													data-locale="<?php echo esc_attr( $p_data['locale'] ); ?>"
-													data-flag="<?php echo esc_attr( $p_data['flag'] ?? '' ); ?>"
-													<?php echo $is_already ? 'disabled' : ''; ?>>
-													<?php echo esc_html( $p_data['native_name'] . ' (' . $p_data['name'] . ') [' . $p_code . ']' . ( $is_already ? ' — ' . __( 'Registrado', 'tf-multilingual' ) : '' ) ); ?>
-												</option>
-											<?php endforeach; ?>
-										</select>
-										<p class="description"><?php esc_html_e( 'Seleccione un idioma común o ingrese los valores manualmente debajo.', 'tf-multilingual' ); ?></p>
-									</div>
+									<div class="tfml-form-grid">
+										<div class="form-field form-field-full">
+											<label for="tfml_predefined_select"><?php esc_html_e( 'Elegir un idioma predefinido...', 'tf-multilingual' ); ?></label>
+											<select id="tfml_predefined_select" style="width:100%;">
+												<option value=""><?php esc_html_e( '— Seleccione para autocompletar —', 'tf-multilingual' ); ?></option>
+												<?php foreach ( $predefined as $p_code => $p_data ) : ?>
+													<?php $is_already = isset( $all_languages[ $p_code ] ); ?>
+													<option value="<?php echo esc_attr( $p_code ); ?>"
+														data-name="<?php echo esc_attr( $p_data['name'] ); ?>"
+														data-native="<?php echo esc_attr( $p_data['native_name'] ); ?>"
+														data-locale="<?php echo esc_attr( $p_data['locale'] ); ?>"
+														data-flag="<?php echo esc_attr( $p_data['flag'] ?? '' ); ?>"
+														<?php echo $is_already ? 'disabled' : ''; ?>>
+														<?php echo esc_html( $p_data['native_name'] . ' (' . $p_data['name'] . ') [' . $p_code . ']' . ( $is_already ? ' — ' . __( 'Registrado', 'tf-multilingual' ) : '' ) ); ?>
+													</option>
+												<?php endforeach; ?>
+											</select>
+											<p class="description"><?php esc_html_e( 'Autocompleta los campos o configúrelos manualmente.', 'tf-multilingual' ); ?></p>
+										</div>
 
-									<div class="form-field form-required">
-										<label for="tfml_code"><?php esc_html_e( 'Código de idioma (Slug)', 'tf-multilingual' ); ?> <span class="description">(<?php esc_html_e( 'requerido', 'tf-multilingual' ); ?>)</span></label>
-										<input type="text" name="code" id="tfml_code" placeholder="ej. fr, de, it" required style="width:100%;">
-										<p class="description"><?php esc_html_e( 'Prefijo de 2 o 3 caracteres que figurará en las URLs (/fr/, /de/).', 'tf-multilingual' ); ?></p>
-									</div>
+										<div class="form-field form-required">
+											<label for="tfml_code"><?php esc_html_e( 'Código (Slug)', 'tf-multilingual' ); ?> <span class="description">(<?php esc_html_e( 'requerido', 'tf-multilingual' ); ?>)</span></label>
+											<input type="text" name="code" id="tfml_code" placeholder="ej. fr, de" required>
+											<p class="description"><?php esc_html_e( 'Prefijo para URL (/fr/).', 'tf-multilingual' ); ?></p>
+										</div>
 
-									<div class="form-field form-required">
-										<label for="tfml_name"><?php esc_html_e( 'Nombre internacional', 'tf-multilingual' ); ?> <span class="description">(<?php esc_html_e( 'requerido', 'tf-multilingual' ); ?>)</span></label>
-										<input type="text" name="name" id="tfml_name" placeholder="ej. French, German" required style="width:100%;">
-									</div>
+										<div class="form-field form-required">
+											<label for="tfml_locale"><?php esc_html_e( 'Locale de WordPress', 'tf-multilingual' ); ?> <span class="description">(<?php esc_html_e( 'requerido', 'tf-multilingual' ); ?>)</span></label>
+											<input type="text" name="locale" id="tfml_locale" placeholder="ej. fr_FR" required>
+											<p class="description"><?php esc_html_e( 'Configuración regional.', 'tf-multilingual' ); ?></p>
+										</div>
 
-									<div class="form-field form-required">
-										<label for="tfml_native_name"><?php esc_html_e( 'Nombre nativo / Endónimo', 'tf-multilingual' ); ?> <span class="description">(<?php esc_html_e( 'requerido', 'tf-multilingual' ); ?>)</span></label>
-										<input type="text" name="native_name" id="tfml_native_name" placeholder="ej. Français, Deutsch" required style="width:100%;">
-										<p class="description"><?php esc_html_e( 'Nombre en su propio idioma tal como aparecerá en el conmutador de navegación.', 'tf-multilingual' ); ?></p>
-									</div>
+										<div class="form-field form-required">
+											<label for="tfml_name"><?php esc_html_e( 'Nombre internacional', 'tf-multilingual' ); ?> <span class="description">(<?php esc_html_e( 'requerido', 'tf-multilingual' ); ?>)</span></label>
+											<input type="text" name="name" id="tfml_name" placeholder="ej. French" required>
+										</div>
 
-									<div class="form-field form-required">
-										<label for="tfml_locale"><?php esc_html_e( 'Locale de WordPress', 'tf-multilingual' ); ?> <span class="description">(<?php esc_html_e( 'requerido', 'tf-multilingual' ); ?>)</span></label>
-										<input type="text" name="locale" id="tfml_locale" placeholder="ej. fr_FR, de_DE" required style="width:100%;">
-										<p class="description"><?php esc_html_e( 'Código de configuración regional utilizado por WordPress para traducciones gettext.', 'tf-multilingual' ); ?></p>
-									</div>
+										<div class="form-field form-required">
+											<label for="tfml_native_name"><?php esc_html_e( 'Nombre nativo / Endónimo', 'tf-multilingual' ); ?> <span class="description">(<?php esc_html_e( 'requerido', 'tf-multilingual' ); ?>)</span></label>
+											<input type="text" name="native_name" id="tfml_native_name" placeholder="ej. Français" required>
+										</div>
 
-									<div class="form-field">
-										<label for="tfml_flag_code"><?php esc_html_e( 'Bandera visual', 'tf-multilingual' ); ?></label>
-										<select name="flag_code" id="tfml_flag_code" style="width:100%;">
-											<option value=""><?php esc_html_e( '— Automática según código / locale —', 'tf-multilingual' ); ?></option>
-											<?php foreach ( LanguageFlagRenderer::get_available_flags() as $flag_id => $flag_label ) : ?>
-												<option value="<?php echo esc_attr( $flag_id ); ?>"><?php echo esc_html( $flag_label ); ?></option>
-											<?php endforeach; ?>
-										</select>
-										<p class="description"><?php esc_html_e( 'Seleccione la bandera nacional que representará a este idioma en el panel administrativo.', 'tf-multilingual' ); ?></p>
-									</div>
+										<div class="form-field">
+											<label for="tfml_flag_code"><?php esc_html_e( 'Bandera visual', 'tf-multilingual' ); ?></label>
+											<select name="flag_code" id="tfml_flag_code">
+												<option value=""><?php esc_html_e( '— Automática —', 'tf-multilingual' ); ?></option>
+												<?php foreach ( LanguageFlagRenderer::get_available_flags() as $flag_id => $flag_label ) : ?>
+													<option value="<?php echo esc_attr( $flag_id ); ?>"><?php echo esc_html( $flag_label ); ?></option>
+												<?php endforeach; ?>
+											</select>
+										</div>
 
-									<div class="form-field">
-										<label for="tfml_order"><?php esc_html_e( 'Orden de visualización', 'tf-multilingual' ); ?></label>
-										<input type="number" name="order" id="tfml_order" value="<?php echo count( $all_languages ) * 10 + 10; ?>" style="width:100px;">
-									</div>
+										<div class="form-field">
+											<label for="tfml_order"><?php esc_html_e( 'Orden de visualización', 'tf-multilingual' ); ?></label>
+											<input type="number" name="order" id="tfml_order" value="<?php echo count( $all_languages ) * 10 + 10; ?>">
+										</div>
 
-									<div class="form-field" style="margin-top:15px;">
-										<label>
-											<input type="checkbox" name="active" value="1" checked>
-											<strong><?php esc_html_e( 'Activar inmediatamente para navegación pública', 'tf-multilingual' ); ?></strong>
-										</label>
-									</div>
+										<div class="form-field form-field-full" style="margin-top:6px;">
+											<label style="display:flex; align-items:center; gap:8px; font-weight:normal; cursor:pointer;">
+												<input type="checkbox" name="active" value="1" checked style="margin:0;">
+												<strong><?php esc_html_e( 'Activar inmediatamente para navegación pública', 'tf-multilingual' ); ?></strong>
+											</label>
+										</div>
 
-									<div class="form-field" style="margin-top:10px;">
-										<label>
-											<input type="checkbox" name="is_default" value="1">
-											<?php esc_html_e( 'Establecer como idioma predeterminado soberano', 'tf-multilingual' ); ?>
-										</label>
-									</div>
+										<div class="form-field form-field-full" style="margin-top:2px;">
+											<label style="display:flex; align-items:center; gap:8px; font-weight:normal; cursor:pointer;">
+												<input type="checkbox" name="is_default" value="1" style="margin:0;">
+												<?php esc_html_e( 'Establecer como idioma predeterminado soberano', 'tf-multilingual' ); ?>
+											</label>
+										</div>
 
-									<p class="submit">
-										<input type="submit" class="button button-primary" value="<?php esc_attr_e( 'Añadir nuevo idioma', 'tf-multilingual' ); ?>">
-									</p>
+										<div class="form-field form-field-full" style="margin-top:10px;">
+											<p class="submit" style="margin:0; padding:0;">
+												<input type="submit" class="button button-primary" value="<?php esc_attr_e( 'Añadir nuevo idioma', 'tf-multilingual' ); ?>">
+											</p>
+										</div>
+									</div>
 								</form>
 
 								<script>
@@ -845,191 +851,146 @@ class LanguageEditorialUi {
 				</div>
 
 				<!-- Columna Derecha: Tabla de Idiomas Configurados -->
-				<div id="col-right" style="width:66%; float:right;">
+				<div id="col-right" class="tfml-languages-main">
 					<div class="col-wrap">
-						<table class="wp-list-table widefat striped tfml-languages-table" style="table-layout:auto;">
-							<thead>
-								<tr>
-									<th scope="col" style="width:52px; text-align:center;"><?php esc_html_e( 'Bandera', 'tf-multilingual' ); ?></th>
-									<th scope="col" style="min-width:140px; white-space:nowrap;"><?php esc_html_e( 'Idioma / Endónimo', 'tf-multilingual' ); ?></th>
-									<th scope="col" style="width:65px; white-space:nowrap;"><?php esc_html_e( 'Código', 'tf-multilingual' ); ?></th>
-									<th scope="col" style="width:85px; white-space:nowrap;"><?php esc_html_e( 'Locale', 'tf-multilingual' ); ?></th>
-									<th scope="col" style="width:60px; text-align:center; white-space:nowrap;"><?php esc_html_e( 'Orden', 'tf-multilingual' ); ?></th>
-									<th scope="col" style="width:130px; text-align:center; white-space:nowrap;"><?php esc_html_e( 'Predeterminado', 'tf-multilingual' ); ?></th>
-									<th scope="col" style="width:85px; text-align:center; white-space:nowrap;"><?php esc_html_e( 'Estado', 'tf-multilingual' ); ?></th>
-									<th scope="col" style="width:170px; text-align:right; white-space:nowrap;"><?php esc_html_e( 'Acciones', 'tf-multilingual' ); ?></th>
-								</tr>
-							</thead>
-							<tbody>
-								<?php if ( empty( $all_languages ) ) : ?>
-									<tr>
-										<td colspan="8" style="text-align:center; padding:20px;">
-											<em><?php esc_html_e( 'No hay idiomas configurados en el catálogo.', 'tf-multilingual' ); ?></em>
-										</td>
-									</tr>
-								<?php else : ?>
-									<?php foreach ( $all_languages as $lang ) : ?>
-										<?php
-										$code       = $lang->get_code();
-										$is_default = ( $code === $default_code );
-										$is_active  = $lang->is_active();
-
-										$toggle_url = function_exists( 'wp_nonce_url' )
-											? wp_nonce_url(
-												admin_url( 'admin.php?page=' . self::PARENT_SLUG . '&tfml_action=toggle_active&code=' . urlencode( $code ) ),
-												self::NONCE_ACTION_TOGGLE . '_' . $code,
-												self::NONCE_NAME
-											)
-											: '#';
-
-										$default_url = function_exists( 'wp_nonce_url' )
-											? wp_nonce_url(
-												admin_url( 'admin.php?page=' . self::PARENT_SLUG . '&tfml_action=set_default&code=' . urlencode( $code ) ),
-												self::NONCE_ACTION_DEFAULT . '_' . $code,
-												self::NONCE_NAME
-											)
-											: '#';
-
-										$delete_url = function_exists( 'wp_nonce_url' )
-											? wp_nonce_url(
-												admin_url( 'admin.php?page=' . self::PARENT_SLUG . '&tfml_action=delete_language&code=' . urlencode( $code ) ),
-												self::NONCE_ACTION_DELETE . '_' . $code,
-												self::NONCE_NAME
-											)
-											: '#';
-
-										$edit_url = admin_url( 'admin.php?page=' . self::PARENT_SLUG . '&edit=' . urlencode( $code ) );
-										?>
-										<tr>
-											<td style="text-align:center; vertical-align:middle; width:52px;">
-												<?php echo $this->get_flag_html( $code, $lang->get_native_name(), $lang->get_flag_code() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-											</td>
-											<td style="vertical-align:middle;">
-												<strong><?php echo esc_html( $lang->get_native_name() ); ?></strong>
-												<br>
-												<span style="color:#666; font-size:12px;"><?php echo esc_html( $lang->get_name() ); ?></span>
-											</td>
-											<td style="vertical-align:middle;">
-												<code><?php echo esc_html( $code ); ?></code>
-											</td>
-											<td style="vertical-align:middle;">
-												<code><?php echo esc_html( $lang->get_locale() ); ?></code>
-											</td>
-											<td style="text-align:center; vertical-align:middle;">
-												<?php echo (int) $lang->get_order(); ?>
-											</td>
-											<td style="text-align:center; vertical-align:middle;">
-												<?php if ( $is_default ) : ?>
-													<span class="badge" style="background:#1e3a2f; color:#ffffff; padding:4px 8px; border-radius:3px; font-weight:700; font-size:11px; display:inline-block;">
-														★ <?php esc_html_e( 'Predeterminado', 'tf-multilingual' ); ?>
-													</span>
-												<?php elseif ( $is_active ) : ?>
-													<a href="<?php echo esc_url( $default_url ); ?>" class="button button-small" title="<?php esc_attr_e( 'Hacer este idioma el predeterminado del sitio', 'tf-multilingual' ); ?>">
-														<?php esc_html_e( 'Hacer defecto', 'tf-multilingual' ); ?>
-													</a>
-												<?php else : ?>
-													<span style="color:#aaa; font-size:11px;"><em><?php esc_html_e( 'Inactivo', 'tf-multilingual' ); ?></em></span>
-												<?php endif; ?>
-											</td>
-											<td style="text-align:center; vertical-align:middle;">
-												<?php if ( $is_active ) : ?>
-													<span style="color:#46b450; font-weight:700; font-size:12px;">✔ <?php esc_html_e( 'Activo', 'tf-multilingual' ); ?></span>
-												<?php else : ?>
-													<span style="color:#999; font-weight:600; font-size:12px;">✖ <?php esc_html_e( 'Inactivo', 'tf-multilingual' ); ?></span>
-												<?php endif; ?>
-											</td>
-											<td style="text-align:right; vertical-align:middle;">
-												<div style="display:flex; justify-content:flex-end; gap:5px; align-items:center;">
-													<a href="<?php echo esc_url( $edit_url ); ?>" class="button button-small" title="<?php esc_attr_e( 'Editar propiedades del idioma', 'tf-multilingual' ); ?>">
-														<?php esc_html_e( 'Editar', 'tf-multilingual' ); ?>
-													</a>
-
-													<?php if ( ! $is_default ) : ?>
-														<a href="<?php echo esc_url( $toggle_url ); ?>" class="button button-small" title="<?php echo $is_active ? esc_attr__( 'Desactivar idioma', 'tf-multilingual' ) : esc_attr__( 'Activar idioma', 'tf-multilingual' ); ?>">
-															<?php echo $is_active ? esc_html__( 'Desactivar', 'tf-multilingual' ) : esc_html__( 'Activar', 'tf-multilingual' ); ?>
-														</a>
-														<a href="<?php echo esc_url( $delete_url ); ?>" class="button button-small button-link-delete" style="color:#dc3232;" onclick="return confirm('<?php echo esc_js( sprintf( /* translators: 1: language name, 2: language code */ __( '¿Está seguro de eliminar el idioma "%1$s" (%2$s)? Esta acción no puede deshacerse.', 'tf-multilingual' ), $lang->get_name(), $code ) ); ?>');">
-															<?php esc_html_e( 'Eliminar', 'tf-multilingual' ); ?>
-														</a>
-													<?php else : ?>
-														<span style="color:#888; font-size:11px; padding:0 4px;" title="<?php esc_attr_e( 'El idioma predeterminado no puede desactivarse ni eliminarse.', 'tf-multilingual' ); ?>">
-															🔒 <?php esc_html_e( 'Protegido', 'tf-multilingual' ); ?>
-														</span>
-													<?php endif; ?>
-												</div>
-											</td>
-										</tr>
-									<?php endforeach; ?>
-								<?php endif; ?>
-							</tbody>
-						</table>
-
-						<!-- Panel de Arquitectura de Módulos Futuros -->
-						<div class="card" style="max-width:100%; margin-top:25px; padding:15px; border-left:4px solid #1e3a2f;">
-							<h3 style="margin-top:0;"><?php esc_html_e( 'Matriz de Módulos & Estado Operativo de TF Multilingual', 'tf-multilingual' ); ?></h3>
-							<p style="margin-bottom:10px; color:#555;">
-								<?php esc_html_e( 'El sistema multilingüe se compone de servicios de dominio internos, endpoints REST soberanos e interfaces visuales de administración en WP-Admin.', 'tf-multilingual' ); ?>
-							</p>
-							<table class="widefat fixed striped" style="font-size:12px;">
+						<div class="tfml-table-card">
+							<table class="wp-list-table widefat striped tfml-languages-table" style="table-layout:auto;">
 								<thead>
 									<tr>
-										<th style="width:25%;"><?php esc_html_e( 'Módulo', 'tf-multilingual' ); ?></th>
-										<th style="width:25%;"><?php esc_html_e( 'Dominio / Servicio Interno', 'tf-multilingual' ); ?></th>
-										<th style="width:25%;"><?php esc_html_e( 'REST API / Sitemaps', 'tf-multilingual' ); ?></th>
-										<th style="width:25%;"><?php esc_html_e( 'Panel WP-Admin', 'tf-multilingual' ); ?></th>
+										<th scope="col" style="width:52px; text-align:center;"><?php esc_html_e( 'Bandera', 'tf-multilingual' ); ?></th>
+										<th scope="col" style="min-width:140px; white-space:nowrap;"><?php esc_html_e( 'Idioma / Endónimo', 'tf-multilingual' ); ?></th>
+										<th scope="col" style="width:65px; white-space:nowrap;"><?php esc_html_e( 'Código', 'tf-multilingual' ); ?></th>
+										<th scope="col" style="width:85px; white-space:nowrap;"><?php esc_html_e( 'Locale', 'tf-multilingual' ); ?></th>
+										<th scope="col" style="width:60px; text-align:center; white-space:nowrap;"><?php esc_html_e( 'Orden', 'tf-multilingual' ); ?></th>
+										<th scope="col" style="width:130px; text-align:center; white-space:nowrap;"><?php esc_html_e( 'Predeterminado', 'tf-multilingual' ); ?></th>
+										<th scope="col" style="width:85px; text-align:center; white-space:nowrap;"><?php esc_html_e( 'Estado', 'tf-multilingual' ); ?></th>
+										<th scope="col" style="width:170px; text-align:right; white-space:nowrap;"><?php esc_html_e( 'Acciones', 'tf-multilingual' ); ?></th>
 									</tr>
 								</thead>
 								<tbody>
-									<tr>
-										<td><strong><?php esc_html_e( 'Idiomas', 'tf-multilingual' ); ?></strong></td>
-										<td><code>LanguageRegistry</code> (✔ Activo)</td>
-										<td><code>/tf-multilingual/v1/languages</code></td>
-										<td><span style="color:#46b450; font-weight:700;">✔ <?php esc_html_e( 'Pantalla Completa (Fase 3.42)', 'tf-multilingual' ); ?></span></td>
-									</tr>
-									<tr>
-										<td><strong><?php esc_html_e( 'Cadenas de Texto', 'tf-multilingual' ); ?></strong></td>
-										<td><code>StringTranslationService</code> (✔ Activo)</td>
-										<td><code>/tf-multilingual/v1/strings</code></td>
-										<td><span style="color:#46b450; font-weight:700;">✔ <?php esc_html_e( 'Pantalla Operativa', 'tf-multilingual' ); ?></span></td>
-									</tr>
-									<tr>
-										<td><strong><?php esc_html_e( 'Diagnóstico', 'tf-multilingual' ); ?></strong></td>
-										<td><code>DiagnosticService</code> (✔ Activo)</td>
-										<td><code>wp-json/wp/v2/site-health</code></td>
-										<td><span style="color:#46b450; font-weight:700;">✔ <?php esc_html_e( 'Pantalla Operativa', 'tf-multilingual' ); ?></span></td>
-									</tr>
-									<tr>
-										<td><strong><?php esc_html_e( 'Posts y Páginas', 'tf-multilingual' ); ?></strong></td>
-										<td><code>EditorialTranslationService</code> (✔ Activo)</td>
-										<td><code>/tf-multilingual/v1/translations</code></td>
-										<td><span style="color:#46b450; font-weight:700;">✔ <?php esc_html_e( 'Centro de Traducciones (Fase 3.44)', 'tf-multilingual' ); ?></span>, <?php esc_html_e( 'Metabox en editor y columnas', 'tf-multilingual' ); ?></td>
-									</tr>
-									<tr>
-										<td><strong><?php esc_html_e( 'Taxonomías y Términos', 'tf-multilingual' ); ?></strong></td>
-										<td><code>TermQueryFilter</code> (✔ Activo)</td>
-										<td><code>/tf-multilingual/v1/terms</code></td>
-										<td><?php esc_html_e( 'Columnas en edit-tags.php', 'tf-multilingual' ); ?></td>
-									</tr>
-									<tr>
-										<td><strong><?php esc_html_e( 'Media y Adjuntos', 'tf-multilingual' ); ?></strong></td>
-										<td><code>MediaTranslationResolver</code> (✔ Activo)</td>
-										<td><code>/tf-multilingual/v1/media</code></td>
-										<td><?php esc_html_e( 'Campos en modal de adjuntos', 'tf-multilingual' ); ?></td>
-									</tr>
-									<tr>
-										<td><strong><?php esc_html_e( 'Menús y Navegación', 'tf-multilingual' ); ?></strong></td>
-										<td><code>NavMenuFrontendFilter</code> (✔ Activo)</td>
-										<td><code>Theme Locations / Groups</code></td>
-										<td><?php esc_html_e( 'Asignaciones automáticas por TranslationGroup', 'tf-multilingual' ); ?></td>
-									</tr>
-									<tr>
-										<td><strong><?php esc_html_e( 'SEO y Sitemaps', 'tf-multilingual' ); ?></strong></td>
-										<td><code>HreflangGenerator / CanonicalUrl</code> (✔ Activo)</td>
-										<td><code>wp-sitemap.xml</code></td>
-										<td><?php esc_html_e( 'Filtros automáticos de cabecera', 'tf-multilingual' ); ?></td>
-									</tr>
+									<?php if ( empty( $all_languages ) ) : ?>
+										<tr>
+											<td colspan="8" style="text-align:center; padding:20px;">
+												<em><?php esc_html_e( 'No hay idiomas configurados en el catálogo.', 'tf-multilingual' ); ?></em>
+											</td>
+										</tr>
+									<?php else : ?>
+										<?php foreach ( $all_languages as $lang ) : ?>
+											<?php
+											$code       = $lang->get_code();
+											$is_default = ( $code === $default_code );
+											$is_active  = $lang->is_active();
+
+											$toggle_url = function_exists( 'wp_nonce_url' )
+												? wp_nonce_url(
+													admin_url( 'admin.php?page=' . self::PARENT_SLUG . '&tfml_action=toggle_active&code=' . urlencode( $code ) ),
+													self::NONCE_ACTION_TOGGLE . '_' . $code,
+													self::NONCE_NAME
+												)
+												: '#';
+
+											$default_url = function_exists( 'wp_nonce_url' )
+												? wp_nonce_url(
+													admin_url( 'admin.php?page=' . self::PARENT_SLUG . '&tfml_action=set_default&code=' . urlencode( $code ) ),
+													self::NONCE_ACTION_DEFAULT . '_' . $code,
+													self::NONCE_NAME
+												)
+												: '#';
+
+											$delete_url = function_exists( 'wp_nonce_url' )
+												? wp_nonce_url(
+													admin_url( 'admin.php?page=' . self::PARENT_SLUG . '&tfml_action=delete_language&code=' . urlencode( $code ) ),
+													self::NONCE_ACTION_DELETE . '_' . $code,
+													self::NONCE_NAME
+												)
+												: '#';
+
+											$edit_url = admin_url( 'admin.php?page=' . self::PARENT_SLUG . '&edit=' . urlencode( $code ) );
+											?>
+											<tr>
+												<td style="text-align:center; vertical-align:middle; width:52px;">
+													<?php echo $this->get_flag_html( $code, $lang->get_native_name(), $lang->get_flag_code() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+												</td>
+												<td style="vertical-align:middle;">
+													<strong><?php echo esc_html( $lang->get_native_name() ); ?></strong>
+													<br>
+													<span style="color:#666; font-size:12px;"><?php echo esc_html( $lang->get_name() ); ?></span>
+												</td>
+												<td style="vertical-align:middle;">
+													<code><?php echo esc_html( $code ); ?></code>
+												</td>
+												<td style="vertical-align:middle;">
+													<code><?php echo esc_html( $lang->get_locale() ); ?></code>
+												</td>
+												<td style="text-align:center; vertical-align:middle;">
+													<?php echo (int) $lang->get_order(); ?>
+												</td>
+												<td style="text-align:center; vertical-align:middle;">
+													<?php if ( $is_default ) : ?>
+														<span class="badge" style="background:#1e3a2f; color:#ffffff; padding:4px 8px; border-radius:3px; font-weight:700; font-size:11px; display:inline-block;">
+															★ <?php esc_html_e( 'Predeterminado', 'tf-multilingual' ); ?>
+														</span>
+													<?php elseif ( $is_active ) : ?>
+														<a href="<?php echo esc_url( $default_url ); ?>" class="button button-small" title="<?php esc_attr_e( 'Hacer este idioma el predeterminado del sitio', 'tf-multilingual' ); ?>">
+															<?php esc_html_e( 'Hacer defecto', 'tf-multilingual' ); ?>
+														</a>
+													<?php else : ?>
+														<span style="color:#aaa; font-size:11px;"><em><?php esc_html_e( 'Inactivo', 'tf-multilingual' ); ?></em></span>
+													<?php endif; ?>
+												</td>
+												<td style="text-align:center; vertical-align:middle;">
+													<?php if ( $is_active ) : ?>
+														<span style="color:#46b450; font-weight:700; font-size:12px;">✔ <?php esc_html_e( 'Activo', 'tf-multilingual' ); ?></span>
+													<?php else : ?>
+														<span style="color:#999; font-weight:600; font-size:12px;">✖ <?php esc_html_e( 'Inactivo', 'tf-multilingual' ); ?></span>
+													<?php endif; ?>
+												</td>
+												<td style="text-align:right; vertical-align:middle;">
+													<div style="display:flex; justify-content:flex-end; gap:5px; align-items:center;">
+														<a href="<?php echo esc_url( $edit_url ); ?>" class="button button-small" title="<?php esc_attr_e( 'Editar propiedades del idioma', 'tf-multilingual' ); ?>">
+															<?php esc_html_e( 'Editar', 'tf-multilingual' ); ?>
+														</a>
+
+														<?php if ( ! $is_default ) : ?>
+															<a href="<?php echo esc_url( $toggle_url ); ?>" class="button button-small" title="<?php echo $is_active ? esc_attr__( 'Desactivar idioma', 'tf-multilingual' ) : esc_attr__( 'Activar idioma', 'tf-multilingual' ); ?>">
+																<?php echo $is_active ? esc_html__( 'Desactivar', 'tf-multilingual' ) : esc_html__( 'Activar', 'tf-multilingual' ); ?>
+															</a>
+															<a href="<?php echo esc_url( $delete_url ); ?>" class="button button-small button-link-delete" style="color:#dc3232;" onclick="return confirm('<?php echo esc_js( sprintf( /* translators: 1: language name, 2: language code */ __( '¿Está seguro de eliminar el idioma "%1$s" (%2$s)? Esta acción no puede deshacerse.', 'tf-multilingual' ), $lang->get_name(), $code ) ); ?>');">
+																<?php esc_html_e( 'Eliminar', 'tf-multilingual' ); ?>
+															</a>
+														<?php else : ?>
+															<span style="color:#888; font-size:11px; padding:0 4px;" title="<?php esc_attr_e( 'El idioma predeterminado no puede desactivarse ni eliminarse.', 'tf-multilingual' ); ?>">
+																🔒 <?php esc_html_e( 'Protegido', 'tf-multilingual' ); ?>
+															</span>
+														<?php endif; ?>
+													</div>
+												</td>
+											</tr>
+										<?php endforeach; ?>
+									<?php endif; ?>
 								</tbody>
 							</table>
+						</div>
+
+						<!-- Panel Compacto de Arquitectura de Módulos (Spatial UI) -->
+						<div class="tfml-matrix-compact-card">
+							<div class="matrix-info">
+								<div class="matrix-header-line">
+									<h3 class="matrix-title"><?php esc_html_e( 'Matriz de Módulos & Estado Operativo de TF Multilingual', 'tf-multilingual' ); ?></h3>
+									<span class="matrix-pill">
+										<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+										<?php esc_html_e( '8/8 Módulos Activos y Certificados', 'tf-multilingual' ); ?>
+									</span>
+								</div>
+								<p class="matrix-desc">
+									<?php esc_html_e( 'Servicios de dominio autónomos, endpoints REST soberanos (/tf-multilingual/v1/*), resolución de metadatos SEO y ciclo editorial multilingüe operativo.', 'tf-multilingual' ); ?>
+								</p>
+							</div>
+							<div class="matrix-actions">
+								<a href="<?php echo esc_url( admin_url( 'admin.php?page=tfml-diagnostic' ) ); ?>" class="button button-secondary">
+									<?php esc_html_e( 'Ver Diagnóstico Completo →', 'tf-multilingual' ); ?>
+								</a>
+							</div>
 						</div>
 					</div>
 				</div>

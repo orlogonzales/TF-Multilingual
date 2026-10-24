@@ -79,12 +79,12 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	padding: 16px 20px;
+	padding: 14px 20px;
 	background: var(--tfml-card-bg);
 	border: 1px solid var(--tfml-card-border);
 	border-radius: var(--tfml-radius-lg);
 	box-shadow: var(--tfml-card-shadow);
-	margin-bottom: 24px;
+	margin-bottom: 18px;
 }
 
 .tfml-header-left {
@@ -1088,4 +1088,217 @@
 	border: 1px solid #ced4da;
 	letter-spacing: 0.5px;
 	text-transform: uppercase;
+}
+
+/* ==========================================================================
+   Notice Containment on TFML Admin Pages (Spatial Isolation)
+   ========================================================================== */
+body[class*="tf-multilingual"] #wpbody-content > .notice:not([class*="tfml"]),
+body[class*="tf-multilingual"] #wpbody-content > div.error:not([class*="tfml"]),
+body[class*="tf-multilingual"] #wpbody-content > div.updated:not([class*="tfml"]) {
+	margin: 8px 20px 14px 0;
+	max-width: 100%;
+	border-radius: var(--tfml-radius-sm);
+	box-shadow: var(--tfml-card-shadow);
+	padding: 8px 14px;
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+/* ==========================================================================
+   Languages Screen Layout & 2-Column Responsive Form Grid
+   ========================================================================== */
+.tfml-languages-layout {
+	display: flex;
+	gap: 24px;
+	align-items: flex-start;
+	margin-top: 16px;
+}
+
+.tfml-languages-sidebar {
+	flex: 0 0 460px;
+	max-width: 460px;
+	min-width: 320px;
+}
+
+.tfml-languages-main {
+	flex: 1 1 0;
+	min-width: 0;
+}
+
+@media (max-width: 1200px) {
+	.tfml-languages-sidebar {
+		flex: 0 0 400px;
+		max-width: 400px;
+	}
+}
+
+@media (max-width: 960px) {
+	.tfml-languages-layout {
+		flex-direction: column;
+	}
+	.tfml-languages-sidebar {
+		flex: 1 1 100%;
+		max-width: 100%;
+		width: 100%;
+	}
+	.tfml-languages-main {
+		width: 100%;
+	}
+}
+
+/* Two-column responsive form grid */
+.tfml-form-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 14px;
+}
+
+@media (max-width: 600px) {
+	.tfml-form-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+.tfml-form-grid .form-field-full {
+	grid-column: 1 / -1;
+}
+
+.tfml-form-grid .form-field {
+	margin-top: 0;
+	margin-bottom: 0;
+}
+
+.tfml-form-grid .form-field label {
+	display: block;
+	font-weight: 600;
+	font-size: 12.5px;
+	color: var(--tfml-text-dark);
+	margin-bottom: 5px;
+}
+
+.tfml-form-grid .form-field input[type="text"],
+.tfml-form-grid .form-field input[type="number"],
+.tfml-form-grid .form-field select {
+	width: 100%;
+	padding: 7px 11px;
+	font-size: 13px;
+	border: 1px solid var(--tfml-card-border);
+	border-radius: var(--tfml-radius-sm);
+	background: #ffffff;
+	color: var(--tfml-text-main);
+	box-sizing: border-box;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tfml-form-grid .form-field input[type="text"]:focus,
+.tfml-form-grid .form-field input[type="number"]:focus,
+.tfml-form-grid .form-field select:focus {
+	border-color: var(--tfml-color-primary);
+	box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+	outline: none;
+}
+
+.tfml-form-grid .form-field .description {
+	font-size: 11px;
+	color: var(--tfml-text-muted);
+	margin-top: 4px;
+	line-height: 1.35;
+}
+
+/* Card Panel for Languages */
+.tfml-card-panel {
+	background: var(--tfml-card-bg);
+	border: 1px solid var(--tfml-card-border);
+	border-radius: var(--tfml-radius-md);
+	box-shadow: var(--tfml-card-shadow);
+	padding: 20px;
+}
+
+.tfml-card-panel h2 {
+	margin-top: 0;
+	margin-bottom: 16px;
+	font-size: 16px;
+	font-weight: 700;
+	color: var(--tfml-text-dark);
+	padding-bottom: 10px;
+	border-bottom: 1px solid var(--tfml-card-border);
+}
+
+/* Languages Table Wrapper Card */
+.tfml-table-card {
+	background: var(--tfml-card-bg);
+	border: 1px solid var(--tfml-card-border);
+	border-radius: var(--tfml-radius-md);
+	box-shadow: var(--tfml-card-shadow);
+	overflow-x: auto;
+}
+
+.tfml-table-card .wp-list-table {
+	border: none;
+	box-shadow: none;
+	border-radius: 0;
+	margin: 0;
+}
+
+.tfml-table-card .wp-list-table th,
+.tfml-table-card .wp-list-table td {
+	vertical-align: middle;
+}
+
+/* Architecture & System Status Compact Card */
+.tfml-matrix-compact-card {
+	background: var(--tfml-card-bg);
+	border: 1px solid var(--tfml-card-border);
+	border-left: 4px solid var(--tfml-color-success);
+	border-radius: var(--tfml-radius-md);
+	box-shadow: var(--tfml-card-shadow);
+	padding: 16px 20px;
+	margin-top: 20px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 20px;
+}
+
+.tfml-matrix-compact-card .matrix-info {
+	flex: 1 1 auto;
+}
+
+.tfml-matrix-compact-card .matrix-header-line {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 4px;
+}
+
+.tfml-matrix-compact-card .matrix-title {
+	font-size: 14px;
+	font-weight: 700;
+	color: var(--tfml-text-dark);
+	margin: 0;
+}
+
+.tfml-matrix-compact-card .matrix-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 3px 9px;
+	font-size: 11.5px;
+	font-weight: 600;
+	background: var(--tfml-color-success-bg);
+	color: var(--tfml-color-success-text);
+	border: 1px solid var(--tfml-color-success-border);
+	border-radius: var(--tfml-radius-full);
+}
+
+.tfml-matrix-compact-card .matrix-desc {
+	font-size: 12px;
+	color: var(--tfml-text-secondary);
+	margin: 0;
+	line-height: 1.4;
+}
+
+.tfml-matrix-compact-card .matrix-actions {
+	flex: 0 0 auto;
 }
