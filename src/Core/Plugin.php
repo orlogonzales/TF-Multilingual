@@ -659,6 +659,7 @@ class Plugin {
 		$this->diagnostic_ui->init_hooks();
 		if ( function_exists( 'add_action' ) ) {
 			add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+			add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_frontend_assets' ) );
 			add_action( 'shutdown', array( $this->string_translation_service, 'flush_observed_strings' ) );
 		}
 
@@ -1282,6 +1283,33 @@ class Plugin {
 				);
 			}
 		}
+	}
+
+	/**
+	 * Enqueues targeted frontend styles for the public language switcher and flag icons.
+	 *
+	 * Scoped specifically to .idiomas_header, .idiomas_header_bg, and .tfml-flag
+	 * to ensure controlled flag dimensions (24x16 px) and responsive alignment.
+	 *
+	 * @return void
+	 */
+	public function enqueue_frontend_assets(): void {
+		if ( ! function_exists( 'wp_enqueue_style' ) ) {
+			return;
+		}
+
+		$css_url = defined( 'TFML_PLUGIN_URL' )
+			? TFML_PLUGIN_URL . 'assets/css/frontend-flags.css'
+			: ( function_exists( 'plugins_url' )
+				? plugins_url( 'assets/css/frontend-flags.css', dirname( __DIR__ ) . '/tf-multilingual.php' )
+				: '/wp-content/plugins/tf-multilingual/assets/css/frontend-flags.css' );
+
+		wp_enqueue_style(
+			'tfml-frontend-flags',
+			$css_url,
+			array(),
+			defined( 'TFML_VERSION' ) ? TFML_VERSION : '0.1.0'
+		);
 	}
 
 	/**

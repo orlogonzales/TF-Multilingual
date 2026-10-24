@@ -1,0 +1,60 @@
+/**
+ * TF Multilingual — Frontend Flags & Language Switcher Styles
+ *
+ * Scoped specifically to public language switchers (.idiomas_header,
+ * .idiomas_header_bg, and .tfml-flag) to guarantee controlled dimensions,
+ * visual alignment, and responsive behavior without affecting global
+ * theme or Elementor images.
+ *
+ * @package TF\Multilingual\Assets
+ */
+
+.idiomas_header,
+.idiomas_header_bg {
+	display: inline-flex;
+	align-items: center;
+	vertical-align: middle;
+	gap: 6px;
+}
+
+.idiomas_header a,
+.idiomas_header_bg a {
+	display: inline-flex;
+	align-items: center;
+	line-height: 1;
+	text-decoration: none;
+	transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.idiomas_header a:hover,
+.idiomas_header_bg a:hover {
+	opacity: 0.85;
+	transform: scale(1.05);
+}
+
+.idiomas_header img,
+.idiomas_header_bg img,
+.tfml-flag {
+	width: 24px !important;
+	height: 16px !important;
+	max-width: 24px !important;
+	max-height: 16px !important;
+	object-fit: cover !important;
+	display: inline-block !important;
+	vertical-align: middle !important;
+	border-radius: 2px !important;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15) !important;
+	border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.idiomas_header a.activo img,
+.idiomas_header_bg a.activo img {
+	box-shadow: 0 0 0 1.5px #2563eb, 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+}
+
+.idiomas_header a[aria-disabled="true"],
+.idiomas_header_bg a[aria-disabled="true"] {
+	opacity: 0.45;
+	cursor: not-allowed;
+	pointer-events: none;
+}
