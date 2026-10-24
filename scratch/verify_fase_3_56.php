@@ -557,6 +557,10 @@ try {
 	$plugin = Plugin::get_instance();
 
 	$screens = array(
+		'ControlCenter'  => function () use ( $plugin ) {
+			$ui = $plugin->get_control_center_ui();
+			$ui->render_page();
+		},
 		'Languages'      => function () use ( $plugin ) {
 			$ui = $plugin->get_language_editorial_ui();
 			$ui->render_page();

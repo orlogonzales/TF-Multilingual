@@ -183,15 +183,29 @@ class MigrationUi {
 		}
 
 		?>
-		<div class="wrap tfml-migration-wrap">
-			<h1 class="wp-heading-inline">
-				<span class="dashicons dashicons-database-import" style="font-size:28px; width:28px; height:28px; vertical-align:middle; margin-right:8px; color:#2271b1;"></span>
-				<?php esc_html_e( 'Migración WPML — Panel de Planificación y Auditoría', 'tf-multilingual' ); ?>
-			</h1>
-
-			<p class="description" style="margin-top:4px; margin-bottom:16px;">
-				<?php esc_html_e( 'Auditoría integral, consulta determinista de lotes y visualización del estado relacional entre WPML y TF Multilingual sin alteración de datos.', 'tf-multilingual' ); ?>
-			</p>
+		<div class="wrap tfml-spatial-wrap tfml-migration-wrap">
+			<!-- Spatial Header -->
+			<div class="tfml-spatial-header">
+				<div class="tfml-header-left">
+					<div class="tfml-header-icon" aria-hidden="true" style="color:var(--tfml-color-primary);background:var(--tfml-color-primary-bg);border-color:var(--tfml-color-primary-border);">
+						<svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+					</div>
+					<div>
+						<h1 class="tfml-header-title"><?php esc_html_e( 'Migración WPML — Panel de Planificación y Auditoría', 'tf-multilingual' ); ?></h1>
+						<p class="tfml-header-subtitle"><?php esc_html_e( 'Auditoría integral, consulta determinista de lotes y visualización del estado relacional entre WPML y TF Multilingual sin alteración de datos.', 'tf-multilingual' ); ?></p>
+					</div>
+				</div>
+				<div class="tfml-header-actions">
+					<span class="tfml-pill tfml-pill-info">
+						<span class="dashicons dashicons-shield" style="font-size:14px;line-height:1.2;"></span>
+						<?php esc_html_e( 'Modo Consulta (Solo Lectura)', 'tf-multilingual' ); ?>
+					</span>
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=tf-multilingual' ) ); ?>" class="tfml-btn tfml-btn-outline tfml-btn-sm">
+						<span class="dashicons dashicons-dashboard" style="font-size:16px;line-height:1.2;"></span>
+						<?php esc_html_e( 'Control Center', 'tf-multilingual' ); ?>
+					</a>
+				</div>
+			</div>
 
 			<?php $this->render_security_banner(); ?>
 

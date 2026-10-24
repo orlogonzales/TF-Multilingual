@@ -2394,6 +2394,30 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Suite PHPUnit: **698 pruebas / 2.596 aserciones (100% PASS)** y PHPCS **187/187 archivos PASS**.
     - Invarianza confirmada en `cms_ect` (MD5 `4241ca7e7ec6399a594537cb04790c10`), `cms_ect_lab` y `cms_ect_uat`.
 
+- **Refactorización Visual Spatial UI y Centro de Control Unificado (Directiva Técnica de Mejora UI/UX — ADR-087):**
+  - **Sistema de Diseño Global "Spatial UI" (`assets/css/admin-spatial.css`):**
+    - Hoja de estilos moderna con variables CSS nativas, elevación visual, bordes sutiles (`#e2e8f0`), sombras suaves y tarjetas ergonómicas.
+    - Inyección automática en todas las interfaces de TF Multilingual a través de `Plugin::enqueue_admin_assets()` en `admin_enqueue_scripts`.
+    - Adaptación uniforme de `.tfml-spatial-wrap` y cabeceras de marca unificadas `.tfml-spatial-header`.
+  - **Nuevo Centro de Control Administrativo (`ControlCenterUi.php`):**
+    - Panel central tipo dashboard (`admin.php?page=tf-multilingual`) fielmente alineado con la maqueta de referencia del usuario.
+    - 5 tarjetas de KPI clave: Grupos activos (141), Elementos vinculados (175), Idiomas activos (3: ES, EN, PT con banderas SVG), Traducciones FR retenidas (21 en custodia) y Estado del sistema (Salud óptima).
+    - 3 tarjetas de acceso rápido: Historiales de migración, Traducciones FR retenidas (con salto directo a `#retained-custody`) y Diagnóstico del sistema.
+    - Dashboard operativo de 3 columnas: Tabla de custodia francesa, Checklist de salud del core y Línea de tiempo de fases.
+    - Barra inferior de chips de idiomas activos y caja de documentación / asistencia.
+  - **Reorganización Ergonómica de Menús:**
+    - Página principal y primer submenú asignados a `Control Center` (`tf-multilingual`).
+    - Submenú `Idiomas` expuesto como `tfml-languages`.
+    - Submenú `Menús multilingües` (`tfml-navigation`) integrado bajo el menú principal de TF Multilingual.
+  - **Refactorización de Pantallas Operativas Existentes:**
+    - Modernización visual de `LanguageEditorialUi`, `TranslationsOverviewUi`, `DiagnosticUi`, `StringEditorialUi`, `MigrationUi` y `NavMenuEditorialUi` bajo la clase `.tfml-spatial-wrap`.
+    - Destacado visual y anclaje `#retained-custody` para las 21 traducciones francesas en el Centro de Traducciones.
+  - **Calidad y Verificación Rigurosa:**
+    - Suite PHPUnit incrementada a **701 pruebas / 2.612 aserciones (100% PASS)** con nueva suite `ControlCenterUiTest`.
+    - PHPCS verificado con **189/189 archivos limpios (0 errores, 0 warnings)**.
+    - Verificador de Fase 3.56 (`scratch/verify_fase_3_56.php`): **10/10 controles PASS (0 FAIL)** incluyendo renderizado E2E de 11 interfaces en UAT.
+    - Sincronización completa con el webroot de UAT `D:/laragon/www/uat.ecoterra/wp-content/plugins/tf-multilingual/`.
+
 
 
 

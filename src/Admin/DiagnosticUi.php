@@ -287,18 +287,60 @@ class DiagnosticUi {
 		$overall_label = $status_labels[ $report['overall_status'] ] ?? $report['overall_status'];
 
 		?>
-		<div class="wrap tfml-diagnostic-wrap">
-			<h1><?php esc_html_e( 'TF Multilingual — Diagnóstico del Sistema y Health Check', 'tf-multilingual' ); ?></h1>
-			<p class="description">
-				<?php esc_html_e( 'Herramienta soberana de solo lectura para auditar la integridad estructural, configuración de idiomas y consistencia del núcleo multilingüe.', 'tf-multilingual' ); ?>
-			</p>
+		<div class="wrap tfml-spatial-wrap tfml-diagnostic-wrap">
+			<!-- Spatial Header -->
+			<div class="tfml-spatial-header">
+				<div class="tfml-header-left">
+					<div class="tfml-header-icon" aria-hidden="true" style="color:var(--tfml-color-success);background:var(--tfml-color-success-bg);border-color:var(--tfml-color-success-border);">
+						<svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+					</div>
+					<div>
+						<h1 class="tfml-header-title"><?php esc_html_e( 'TF Multilingual — Diagnóstico del Sistema y Health Check', 'tf-multilingual' ); ?></h1>
+						<p class="tfml-header-subtitle"><?php esc_html_e( 'Herramienta soberana de solo lectura para auditar la integridad estructural, configuración de idiomas y consistencia del núcleo multilingüe.', 'tf-multilingual' ); ?></p>
+					</div>
+				</div>
+				<div class="tfml-header-actions">
+					<form method="post" action="" style="display:inline-block; margin:0;">
+						<?php
+						if ( function_exists( 'wp_nonce_field' ) ) {
+							wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME );
+						}
+						?>
+						<button type="submit" class="tfml-btn tfml-btn-primary tfml-btn-sm">
+							<span class="dashicons dashicons-update" style="font-size:16px;line-height:1.2;"></span>
+							<?php esc_html_e( 'Volver a ejecutar auditoría', 'tf-multilingual' ); ?>
+						</button>
+					</form>
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=tf-multilingual' ) ); ?>" class="tfml-btn tfml-btn-outline tfml-btn-sm">
+						<span class="dashicons dashicons-dashboard" style="font-size:16px;line-height:1.2;"></span>
+						<?php esc_html_e( 'Control Center', 'tf-multilingual' ); ?>
+					</a>
+				</div>
+			</div>
 
-			<div style="background:#fff; border-left:4px solid <?php echo esc_attr( $overall_color ); ?>; padding:15px; margin:20px 0; box-shadow:0 1px 1px rgba(0,0,0,.04);">
-				<h2 style="margin:0 0 10px 0; font-size:18px;">
-					<?php esc_html_e( 'Estado General del Core:', 'tf-multilingual' ); ?>
-					<span style="color:<?php echo esc_attr( $overall_color ); ?>; font-weight:bold;"><?php echo esc_html( $overall_label ); ?></span>
-				</h2>
-				<p style="margin:0;">
+			<div class="tfml-card-panel" style="border-left:4px solid <?php echo esc_attr( $overall_color ); ?>; margin-bottom:20px;">
+				<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+					<div>
+						<div style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--tfml-text-muted);">
+							<?php esc_html_e( 'Estado General del Core', 'tf-multilingual' ); ?>
+						</div>
+						<div style="font-size:22px; font-weight:800; color:<?php echo esc_attr( $overall_color ); ?>; margin-top:2px;">
+							<?php echo esc_html( $overall_label ); ?>
+						</div>
+					</div>
+					<span class="tfml-pill tfml-pill-success" style="font-size:12px; padding:4px 10px;">
+						<?php
+						printf(
+							/* translators: 1: Passed count, 2: Warnings count, 3: Critical count */
+							esc_html__( '%1$d módulos OK · %2$d advertencias · %3$d errores', 'tf-multilingual' ),
+							(int) $report['summary']['passed'],
+							(int) $report['summary']['warnings'],
+							(int) $report['summary']['critical']
+						);
+						?>
+					</span>
+				</div>
+				<p style="margin:8px 0 0 0; color:var(--tfml-text-secondary); font-size:13px;">
 					<?php
 					printf(
 						/* translators: 1: Passed count, 2: Warnings count, 3: Critical count */
@@ -310,19 +352,6 @@ class DiagnosticUi {
 					?>
 				</p>
 			</div>
-
-			<form method="post" action="">
-				<?php
-				if ( function_exists( 'wp_nonce_field' ) ) {
-					wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME );
-				}
-				?>
-				<p>
-					<button type="submit" class="button button-primary">
-						<?php esc_html_e( 'Volver a ejecutar auditoría', 'tf-multilingual' ); ?>
-					</button>
-				</p>
-			</form>
 
 			<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap:20px; margin-top:20px;">
 				<!-- Tarjeta 1: Entorno -->

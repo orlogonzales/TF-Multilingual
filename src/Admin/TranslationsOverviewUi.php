@@ -214,15 +214,29 @@ class TranslationsOverviewUi {
 		}
 
 		?>
-		<div class="wrap tfml-translations-overview-wrap">
-			<h1 class="wp-heading-inline">
-				<span class="dashicons dashicons-translation" style="font-size:28px; width:28px; height:28px; vertical-align:middle; margin-right:8px; color:#2271b1;"></span>
-				<?php esc_html_e( 'Centro de Traducciones', 'tf-multilingual' ); ?>
-			</h1>
-
-			<p class="description" style="margin-top:4px; margin-bottom:16px;">
-				<?php esc_html_e( 'Consulte, filtre y gestione el estado editorial de todos los contenidos multilingües de EcoTerra desde un panel unificado.', 'tf-multilingual' ); ?>
-			</p>
+		<div class="wrap tfml-spatial-wrap tfml-translations-overview-wrap">
+			<!-- Spatial Header -->
+			<div class="tfml-spatial-header">
+				<div class="tfml-header-left">
+					<div class="tfml-header-icon" aria-hidden="true">
+						<svg viewBox="0 0 24 24"><path d="M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.98-4.17 3.71-6.53H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>
+					</div>
+					<div>
+						<h1 class="tfml-header-title"><?php esc_html_e( 'Centro de Traducciones', 'tf-multilingual' ); ?></h1>
+						<p class="tfml-header-subtitle"><?php esc_html_e( 'Consulte, filtre y gestione el estado editorial de todos los contenidos multilingües de EcoTerra desde un panel unificado.', 'tf-multilingual' ); ?></p>
+					</div>
+				</div>
+				<div class="tfml-header-actions">
+					<a href="#retained-custody" class="tfml-btn tfml-btn-outline tfml-btn-sm" style="border-color:var(--tfml-color-warning-border);color:var(--tfml-color-warning-text);background:var(--tfml-color-warning-bg);">
+						<span class="dashicons dashicons-shield" style="font-size:16px;line-height:1.2;"></span>
+						<?php printf( esc_html__( 'Ver 21 FR Retenidas', 'tf-multilingual' ) ); ?>
+					</a>
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=tf-multilingual' ) ); ?>" class="tfml-btn tfml-btn-outline tfml-btn-sm">
+						<span class="dashicons dashicons-dashboard" style="font-size:16px;line-height:1.2;"></span>
+						<?php esc_html_e( 'Control Center', 'tf-multilingual' ); ?>
+					</a>
+				</div>
+			</div>
 
 			<!-- KPI Summary Stat Cards -->
 			<div class="tfml-kpi-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:20px;">
@@ -566,7 +580,7 @@ class TranslationsOverviewUi {
 			<?php endif; ?>
 
 			<!-- Informative Card: Retained Historical Translations (French) -->
-			<div class="postbox" style="margin-top:28px; border-left:4px solid #dba617;">
+			<div id="retained-custody" class="postbox" style="margin-top:28px; border-left:4px solid #dba617;">
 				<div class="postbox-header" style="padding:10px 14px; border-bottom:1px solid #dcdcde; background:#fcfcfc;">
 					<h2 style="font-size:14px; font-weight:600; margin:0; display:flex; align-items:center; gap:6px;">
 						<span class="dashicons dashicons-shield" style="color:#dba617; font-size:18px; width:18px; height:18px;"></span>

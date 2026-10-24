@@ -156,27 +156,37 @@ class LanguageEditorialUi {
 				'dashicons-translation',
 				58
 			);
+
+			// Customize first submenu item to display as "Idiomas" instead of duplicating "TF Multilingual".
+			add_submenu_page(
+				self::PARENT_SLUG,
+				__( 'Idiomas — TF Multilingual', 'tf-multilingual' ),
+				__( 'Idiomas', 'tf-multilingual' ),
+				$cap,
+				self::PARENT_SLUG,
+				array( $this, 'render_page' )
+			);
+
+			// Also register the explicit alias slug "tfml-languages".
+			add_submenu_page(
+				null,
+				__( 'Idiomas — TF Multilingual', 'tf-multilingual' ),
+				__( 'Idiomas', 'tf-multilingual' ),
+				$cap,
+				self::ALIAS_SLUG,
+				array( $this, 'render_page' )
+			);
+		} else {
+			// Parent menu already registered (e.g. by ControlCenterUi); register visible submenu under parent.
+			add_submenu_page(
+				self::PARENT_SLUG,
+				__( 'Idiomas — TF Multilingual', 'tf-multilingual' ),
+				__( 'Idiomas', 'tf-multilingual' ),
+				$cap,
+				self::ALIAS_SLUG,
+				array( $this, 'render_page' )
+			);
 		}
-
-		// Customize first submenu item to display as "Idiomas" instead of duplicating "TF Multilingual".
-		add_submenu_page(
-			self::PARENT_SLUG,
-			__( 'Idiomas — TF Multilingual', 'tf-multilingual' ),
-			__( 'Idiomas', 'tf-multilingual' ),
-			$cap,
-			self::PARENT_SLUG,
-			array( $this, 'render_page' )
-		);
-
-		// Also register the explicit alias slug "tfml-languages".
-		add_submenu_page(
-			null,
-			__( 'Idiomas — TF Multilingual', 'tf-multilingual' ),
-			__( 'Idiomas', 'tf-multilingual' ),
-			$cap,
-			self::ALIAS_SLUG,
-			array( $this, 'render_page' )
-		);
 	}
 
 	/**
@@ -623,11 +633,25 @@ class LanguageEditorialUi {
 		}
 
 		?>
-		<div class="wrap tfml-languages-wrap">
-			<h1 class="wp-heading-inline">
-				<?php esc_html_e( 'Idiomas — TF Multilingual', 'tf-multilingual' ); ?>
-			</h1>
-			<hr class="wp-header-end">
+		<div class="wrap tfml-spatial-wrap tfml-languages-wrap">
+			<!-- Spatial Header -->
+			<div class="tfml-spatial-header">
+				<div class="tfml-header-left">
+					<div class="tfml-header-icon" aria-hidden="true">
+						<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+					</div>
+					<div>
+						<h1 class="tfml-header-title"><?php esc_html_e( 'Idiomas — TF Multilingual', 'tf-multilingual' ); ?></h1>
+						<p class="tfml-header-subtitle"><?php esc_html_e( 'Configuración, activación y catálogo de idiomas soberanos de EcoTerra.', 'tf-multilingual' ); ?></p>
+					</div>
+				</div>
+				<div class="tfml-header-actions">
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=tf-multilingual' ) ); ?>" class="tfml-btn tfml-btn-outline tfml-btn-sm">
+						<span class="dashicons dashicons-dashboard" style="font-size:16px;line-height:1.2;"></span>
+						<?php esc_html_e( 'Control Center', 'tf-multilingual' ); ?>
+					</a>
+				</div>
+			</div>
 
 			<?php if ( null !== $this->notice ) : ?>
 				<div class="notice notice-<?php echo esc_attr( $this->notice['type'] ); ?> is-dismissible" style="margin-top:15px;">
@@ -661,7 +685,7 @@ class LanguageEditorialUi {
 				<!-- Columna Izquierda: Formulario Agregar / Editar -->
 				<div id="col-left" style="width:32%; float:left;">
 					<div class="col-wrap">
-						<div class="form-wrap">
+						<div class="form-wrap tfml-card-panel" style="padding:20px;">
 							<?php if ( null !== $edit_lang ) : ?>
 								<h2><?php esc_html_e( 'Editar idioma', 'tf-multilingual' ); ?>: <?php echo esc_html( $edit_lang->get_name() ); ?></h2>
 								<form method="post" action="<?php echo esc_url( admin_url( 'admin.php?page=' . self::PARENT_SLUG ) ); ?>">

@@ -2531,6 +2531,38 @@
 - **JUSTIFICACIÓN:** Cumplir integralmente los principios de menor privilegio y custodia de secretos, cerrando la brecha de exposición HTTP de credenciales UAT y alineando el acceso al dominio solicitado por el propietario sin poner en riesgo la base de datos consolidada.
 - **CONSECUENCIAS:** Verificador `verify_fase_3_56.php` con **10/10 controles PASS (0 FAIL)**, suite PHPUnit de **698 pruebas / 2.596 aserciones (100% PASS)**, PHPCS **187/187 archivos PASS**, 0 secretos en el repositorio y entrega lista para la aceptación funcional del propietario en `http://lab.ecoterra.test/punko`.
 
+### ADR-087: Sistema de Diseño Spatial UI y Centro de Control Administrativo Unificado (Directiva Técnica de Mejora UI/UX)
+- **FECHA:** 2026-10-24
+- **DECISIÓN:**
+  1. **Sistema de Diseño Global "Spatial UI" (`assets/css/admin-spatial.css`):**
+     - Creación de una hoja de estilos de diseño moderno basada en principios de Spatial UI: superficies limpias, tarjetas con bordes suaves (`#e2e8f0`), sombras sutiles multinivel (`0 1px 3px rgba(15,23,42,0.05)`), esquinas redondeadas (`8px`, `12px`, `16px`), jerarquía visual clara, tipografía contemporánea (-apple-system / Segoe UI), paleta de colores semántica y espaciado generoso.
+     - Estilos aplicados de forma coherente en todo el panel de administración a través de la clase contenedora `.tfml-spatial-wrap` y cabeceras unificadas `.tfml-spatial-header`.
+     - Carga global automática en pantallas de TF Multilingual mediante el hook `admin_enqueue_scripts` en `Plugin::enqueue_admin_assets()`.
+  2. **Nuevo Centro de Control Unificado (`ControlCenterUi.php`):**
+     - Implementación de la pantalla ejecutiva central `TF Multilingual → Control Center` (`admin.php?page=tf-multilingual`), alineada visualmente con la maqueta de referencia del usuario.
+     - **Métricas KPI en tarjetas superiores elevadas:** Grupos activos (141), Elementos vinculados (175), Idiomas activos (3: ES, EN, PT con banderas SVG), Traducciones FR retenidas (21) y Estado del sistema (Salud óptima).
+     - **Acciones rápidas de acceso directo:** Historiales de migración (`admin.php?page=tfml-migration&tab=history`), 21 Traducciones FR en custodia (`admin.php?page=tfml-translations#retained-custody`) y Diagnóstico del sistema (`admin.php?page=tfml-diagnostic`).
+     - **Dashboard operativo de 3 columnas:** Vista previa de traducciones retenidas (TRID, Grupo, Título, Estado "En custodia"), Checklist de salud del sistema (servicios, tablas, integridad relacional, rutas, sitemaps, frontend) y Línea de tiempo de fases de migración.
+     - **Sección inferior:** Chips visuales de idiomas activos con banderas y caja de asistencia / documentación.
+  3. **Jerarquía de Menús y Retrocompatibilidad:**
+     - La página principal del menú de nivel superior `TF Multilingual` abre el Centro de Control (`tf-multilingual`).
+     - El primer submenú corresponde a `Control Center` (`tf-multilingual`).
+     - El submenú `Idiomas` se expone de forma visible bajo el slug canónico `tfml-languages` preservando compatibilidad completa con pruebas previas.
+     - El submenú `Menús multilingües` (`tfml-navigation`) se añade bajo el menú principal de `TF Multilingual` mientras se conserva su acceso alternativo en Apariencia (`themes.php?page=tfml-navigation`).
+  4. **Refactorización Visual de Pantallas Preexistentes:**
+     - Actualización de `LanguageEditorialUi`, `TranslationsOverviewUi`, `DiagnosticUi`, `StringEditorialUi`, `MigrationUi` y `NavMenuEditorialUi` para adoptar el contenedor `.tfml-spatial-wrap`, las cabeceras `.tfml-spatial-header` y los componentes de tarjeta del sistema Spatial UI, preservando 100% de la lógica funcional, noce-checks, endpoints REST y capacidades de usuario.
+     - Sección de custodia histórica francesa en `TranslationsOverviewUi` destacada con anchor `#retained-custody` para navegación instantánea desde el Centro de Control.
+  5. **Invarianza Estricta y Verificación:**
+     - Cero cambios en esquemas de base de datos ni lógica transaccional.
+     - Suite PHPUnit ampliada a **701 pruebas / 2.612 aserciones (100% PASS)** incluyendo cobertura de `ControlCenterUiTest`.
+     - PHPCS: **189/189 archivos (100% PASS)** con 0 errores y 0 advertencias.
+     - Verificador de Fase 3.56 (`scratch/verify_fase_3_56.php`): **10/10 controles PASS (0 FAIL)** con 11 pantallas administrativas renderizadas E2E sin errores PHP.
+     - Invarianza confirmada en `cms_ect` (MD5 `4241ca7e7ec6399a594537cb04790c10`), `cms_ect_lab` (141 grupos, 175 elementos, 21 retenidas FR) y sincronización con `cms_ect_uat`.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Directiva Técnica — Mejora UI/UX TF Multilingual en Estilo "Spatial UI".
+- **JUSTIFICACIÓN:** Transformar la experiencia visual administrativa de un formulario plano crudo a una interfaz ejecutiva moderna, escaneable y tipo dashboard, facilitando la auditoría humana en UAT.
+- **CONSECUENCIAS:** Mayor usabilidad, claridad visual para el propietario y operadores, y total solidez técnica sin regresiones.
+
 
 
 

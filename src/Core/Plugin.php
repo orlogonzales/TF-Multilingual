@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace TF\Multilingual\Core;
 
 use TF\Multilingual\Admin\AdminListColumnsUi;
+use TF\Multilingual\Admin\ControlCenterUi;
 use TF\Multilingual\Admin\CustomFieldsSettingsUi;
 use TF\Multilingual\Admin\DiagnosticUi;
 use TF\Multilingual\Admin\LanguageEditorialUi;
@@ -330,6 +331,13 @@ class Plugin {
 	private ?MigrationUi $migration_ui = null;
 
 	/**
+	 * Control Center UI component.
+	 *
+	 * @var ControlCenterUi|null
+	 */
+	private ?ControlCenterUi $control_center_ui = null;
+
+	/**
 	 * Migration manager.
 	 *
 	 * @var MigrationManager|null
@@ -581,6 +589,12 @@ class Plugin {
 		$this->diagnostic_ui                    = new DiagnosticUi(
 			$this->diagnostic_service
 		);
+		$this->control_center_ui                = new ControlCenterUi(
+			$this->language_registry,
+			$group_repo,
+			$retained_registry,
+			$this->diagnostic_service
+		);
 		$this->migration_ui                     = new MigrationUi(
 			$this->get_migration_manager(),
 			$this->language_registry,
@@ -644,6 +658,7 @@ class Plugin {
 		$this->migration_ui->init_hooks();
 		$this->diagnostic_ui->init_hooks();
 		if ( function_exists( 'add_action' ) ) {
+			add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
 			add_action( 'shutdown', array( $this->string_translation_service, 'flush_observed_strings' ) );
 		}
 
@@ -1217,6 +1232,56 @@ class Plugin {
 		}
 
 		return $this->diagnostic_ui;
+	}
+
+	/**
+	 * Gets the control center UI component instance.
+	 *
+	 * @return ControlCenterUi
+	 */
+	public function get_control_center_ui(): ControlCenterUi {
+		if ( null === $this->control_center_ui ) {
+			$group_repo              = new TranslationGroupRepository();
+			$retained_registry       = new RetainedTranslationRegistry( $GLOBALS['wpdb'] ?? null );
+			$this->control_center_ui = new ControlCenterUi(
+				$this->get_language_registry(),
+				$group_repo,
+				$retained_registry,
+				$this->get_diagnostic_service()
+			);
+		}
+
+		return $this->control_center_ui;
+	}
+
+	/**
+	 * Enqueues the Spatial UI stylesheet on TF Multilingual administrative screens.
+	 *
+	 * @param string $hook_suffix Admin hook suffix.
+	 * @return void
+	 */
+	public function enqueue_admin_assets( string $hook_suffix ): void {
+		// Enqueue on all TFML screens (e.g. toplevel_page_tf-multilingual, tf-multilingual_page_tfml-*)
+		if (
+			false !== strpos( $hook_suffix, 'tf-multilingual' ) ||
+			false !== strpos( $hook_suffix, 'tfml-' )
+		) {
+			$css_url = defined( 'TFML_PLUGIN_URL' )
+				? TFML_PLUGIN_URL . 'assets/css/admin-spatial.css'
+				: ( function_exists( 'plugins_url' )
+					? plugins_url( 'assets/css/admin-spatial.css', dirname( __DIR__ ) . '/tf-multilingual.php' )
+					: '/wp-content/plugins/tf-multilingual/assets/css/admin-spatial.css' );
+			$ver     = defined( 'TFML_VERSION' ) ? TFML_VERSION : '0.1.0';
+
+			if ( function_exists( 'wp_enqueue_style' ) ) {
+				wp_enqueue_style(
+					'tfml-admin-spatial',
+					$css_url,
+					array( 'dashicons' ),
+					$ver
+				);
+			}
+		}
 	}
 
 	/**

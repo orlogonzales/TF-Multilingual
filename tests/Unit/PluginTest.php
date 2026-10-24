@@ -73,5 +73,6 @@ class PluginTest extends TestCase {
 		$plugin->init();
 		$this->assertTrue( $plugin->is_initialized() );
 		$this->assertInstanceOf( \TF\Multilingual\Admin\AdminListColumnsUi::class, $plugin->get_admin_list_columns_ui() );
+		$this->assertInstanceOf( \TF\Multilingual\Admin\ControlCenterUi::class, $plugin->get_control_center_ui() );
 	}
 }

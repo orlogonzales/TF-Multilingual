@@ -102,7 +102,7 @@ class NavMenuEditorialUi {
 	}
 
 	/**
-	 * Registers the Multilingual Menus submenu under Appearance.
+	 * Registers the Multilingual Menus submenu under Appearance and under TF Multilingual.
 	 *
 	 * @return void
 	 */
@@ -114,6 +114,17 @@ class NavMenuEditorialUi {
 			self::PAGE_SLUG,
 			array( $this, 'render_admin_page' )
 		);
+
+		if ( function_exists( 'add_submenu_page' ) ) {
+			add_submenu_page(
+				'tf-multilingual',
+				__( 'Menús Multilingües — TF Multilingual', 'tf-multilingual' ),
+				__( 'Menús multilingües', 'tf-multilingual' ),
+				'edit_theme_options',
+				self::PAGE_SLUG,
+				array( $this, 'render_admin_page' )
+			);
+		}
 	}
 
 	/**
@@ -198,11 +209,25 @@ class NavMenuEditorialUi {
 		$native_locations     = $this->get_native_locations();
 
 		?>
-		<div class="wrap">
-			<h1><?php esc_html_e( 'Navegación y Menús Multilingües', 'tf-multilingual' ); ?></h1>
-			<p class="description">
-				<?php esc_html_e( 'Asocia cada ubicación de menú de tu tema con el menú correspondiente en cada idioma.', 'tf-multilingual' ); ?>
-			</p>
+		<div class="wrap tfml-spatial-wrap tfml-nav-menus-wrap">
+			<!-- Spatial Header -->
+			<div class="tfml-spatial-header">
+				<div class="tfml-header-left">
+					<div class="tfml-header-icon" aria-hidden="true">
+						<svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+					</div>
+					<div>
+						<h1 class="tfml-header-title"><?php esc_html_e( 'Navegación y Menús Multilingües', 'tf-multilingual' ); ?></h1>
+						<p class="tfml-header-subtitle"><?php esc_html_e( 'Asocia cada ubicación de menú de tu tema con el menú correspondiente en cada idioma.', 'tf-multilingual' ); ?></p>
+					</div>
+				</div>
+				<div class="tfml-header-actions">
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=tf-multilingual' ) ); ?>" class="tfml-btn tfml-btn-outline tfml-btn-sm">
+						<span class="dashicons dashicons-dashboard" style="font-size:16px;line-height:1.2;"></span>
+						<?php esc_html_e( 'Control Center', 'tf-multilingual' ); ?>
+					</a>
+				</div>
+			</div>
 
 			<?php if ( null !== $this->notice ) : ?>
 				<div class="notice notice-<?php echo esc_attr( $this->notice['type'] ); ?> is-dismissible">
