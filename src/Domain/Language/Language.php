@@ -61,14 +61,22 @@ final class Language {
 	private int $order;
 
 	/**
+	 * Visual flag identifier (e.g. 'es', 'us', 'gb', 'pt', 'br', 'fr').
+	 *
+	 * @var string|null
+	 */
+	private ?string $flag_code;
+
+	/**
 	 * Private constructor. Enforces validation and canonical normalization.
 	 *
-	 * @param string $code        Language code.
-	 * @param string $locale      WordPress locale.
-	 * @param string $name        International name.
-	 * @param string $native_name Native endonym.
-	 * @param bool   $active      Active flag.
-	 * @param int    $order       Sort order.
+	 * @param string      $code        Language code.
+	 * @param string      $locale      WordPress locale.
+	 * @param string      $name        International name.
+	 * @param string      $native_name Native endonym.
+	 * @param bool        $active      Active flag.
+	 * @param int         $order       Sort order.
+	 * @param string|null $flag_code   Optional visual flag identifier.
 	 *
 	 * @throws InvalidLanguageException If validation fails.
 	 */
@@ -78,7 +86,8 @@ final class Language {
 		string $name,
 		string $native_name,
 		bool $active = true,
-		int $order = 10
+		int $order = 10,
+		?string $flag_code = null
 	) {
 		$normalized_code   = self::normalize_code( $code );
 		$normalized_locale = self::normalize_locale( $locale );
@@ -106,17 +115,21 @@ final class Language {
 		$this->native_name = $trimmed_native;
 		$this->active      = $active;
 		$this->order       = $order;
+		$this->flag_code   = ( null !== $flag_code && '' !== trim( $flag_code ) )
+			? strtolower( trim( $flag_code ) )
+			: null;
 	}
 
 	/**
 	 * Named factory constructor.
 	 *
-	 * @param string $code        Language code.
-	 * @param string $locale      WordPress locale.
-	 * @param string $name        International name.
-	 * @param string $native_name Native endonym.
-	 * @param bool   $active      Active flag.
-	 * @param int    $order       Sort order.
+	 * @param string      $code        Language code.
+	 * @param string      $locale      WordPress locale.
+	 * @param string      $name        International name.
+	 * @param string      $native_name Native endonym.
+	 * @param bool        $active      Active flag.
+	 * @param int         $order       Sort order.
+	 * @param string|null $flag_code   Optional visual flag identifier.
 	 * @return self
 	 */
 	public static function create(
@@ -125,9 +138,10 @@ final class Language {
 		string $name,
 		string $native_name,
 		bool $active = true,
-		int $order = 10
+		int $order = 10,
+		?string $flag_code = null
 	): self {
-		return new self( $code, $locale, $name, $native_name, $active, $order );
+		return new self( $code, $locale, $name, $native_name, $active, $order, $flag_code );
 	}
 
 	/**
@@ -153,8 +167,11 @@ final class Language {
 		$native_name = isset( $data['native_name'] ) && is_string( $data['native_name'] ) ? $data['native_name'] : $name;
 		$active      = isset( $data['active'] ) ? (bool) $data['active'] : true;
 		$order       = isset( $data['order'] ) && is_numeric( $data['order'] ) ? (int) $data['order'] : 10;
+		$flag_code   = isset( $data['flag_code'] ) && is_string( $data['flag_code'] ) && '' !== trim( $data['flag_code'] )
+			? trim( $data['flag_code'] )
+			: null;
 
-		return new self( $code, $locale, $name, $native_name, $active, $order );
+		return new self( $code, $locale, $name, $native_name, $active, $order, $flag_code );
 	}
 
 	/**
@@ -298,6 +315,15 @@ final class Language {
 	}
 
 	/**
+	 * Gets visual flag identifier, or null if relying on default mapping.
+	 *
+	 * @return string|null
+	 */
+	public function get_flag_code(): ?string {
+		return $this->flag_code;
+	}
+
+	/**
 	 * Returns a new instance with altered active state (immutable evolution).
 	 *
 	 * @param bool $active New active state.
@@ -314,7 +340,8 @@ final class Language {
 			$this->name,
 			$this->native_name,
 			$active,
-			$this->order
+			$this->order,
+			$this->flag_code
 		);
 	}
 
@@ -335,7 +362,34 @@ final class Language {
 			$this->name,
 			$this->native_name,
 			$this->active,
-			$order
+			$order,
+			$this->flag_code
+		);
+	}
+
+	/**
+	 * Returns a new instance with altered flag code (immutable evolution).
+	 *
+	 * @param string|null $flag_code New visual flag identifier or null to reset.
+	 * @return self
+	 */
+	public function with_flag_code( ?string $flag_code ): self {
+		$normalized = ( null !== $flag_code && '' !== trim( $flag_code ) )
+			? strtolower( trim( $flag_code ) )
+			: null;
+
+		if ( $this->flag_code === $normalized ) {
+			return $this;
+		}
+
+		return new self(
+			$this->code,
+			$this->locale,
+			$this->name,
+			$this->native_name,
+			$this->active,
+			$this->order,
+			$normalized
 		);
 	}
 
@@ -345,26 +399,28 @@ final class Language {
 	 * @param string      $name        New international name.
 	 * @param string      $native_name New native endonym.
 	 * @param string|null $locale      Optional new locale.
+	 * @param string|null $flag_code   Optional new flag code.
 	 * @return self
 	 */
-	public function with_details( string $name, string $native_name, ?string $locale = null ): self {
+	public function with_details( string $name, string $native_name, ?string $locale = null, ?string $flag_code = null ): self {
 		return new self(
 			$this->code,
 			null !== $locale ? $locale : $this->locale,
 			$name,
 			$native_name,
 			$this->active,
-			$this->order
+			$this->order,
+			null !== $flag_code ? $flag_code : $this->flag_code
 		);
 	}
 
 	/**
 	 * Serializes to associative array representation for persistence.
 	 *
-	 * @return array{code: string, locale: string, name: string, native_name: string, active: bool, order: int}
+	 * @return array<string, mixed>
 	 */
 	public function to_array(): array {
-		return array(
+		$data = array(
 			'code'        => $this->code,
 			'locale'      => $this->locale,
 			'name'        => $this->name,
@@ -372,5 +428,11 @@ final class Language {
 			'active'      => $this->active,
 			'order'       => $this->order,
 		);
+
+		if ( null !== $this->flag_code && '' !== $this->flag_code ) {
+			$data['flag_code'] = $this->flag_code;
+		}
+
+		return $data;
 	}
 }

@@ -13,6 +13,7 @@ declare( strict_types=1 );
 namespace TF\Multilingual\Admin;
 
 use TF\Multilingual\Domain\Language\Language;
+use TF\Multilingual\Domain\Language\LanguageFlagRenderer;
 use TF\Multilingual\Domain\Language\LanguageRegistry;
 use TF\Multilingual\Domain\Translation\TranslationElement;
 use TF\Multilingual\Domain\Translation\TranslationGroup;
@@ -270,7 +271,8 @@ class TranslationsOverviewUi {
 					</div>
 					<div style="font-size:22px; font-weight:700; color:#1d2327; margin-top:6px; display:flex; gap:6px; align-items:center;">
 						<?php foreach ( $active_langs as $code => $lang ) : ?>
-							<span style="background:#f0f0f1; border:1px solid #dcdcde; border-radius:3px; padding:1px 6px; font-size:12px;">
+							<span style="background:#f0f0f1; border:1px solid #dcdcde; border-radius:3px; padding:2px 6px; font-size:12px; display:inline-flex; align-items:center; gap:4px;">
+								<?php echo LanguageFlagRenderer::render( $code, $lang->get_name(), 18, 13, $lang->get_flag_code() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 								<?php echo esc_html( strtoupper( $code ) ); ?>
 							</span>
 						<?php endforeach; ?>
@@ -411,8 +413,11 @@ class TranslationsOverviewUi {
 						<th scope="col" style="width:260px;"><?php esc_html_e( 'Contenido Canónico', 'tf-multilingual' ); ?></th>
 						<?php foreach ( $active_langs as $code => $lang ) : ?>
 							<th scope="col" style="text-align:left;">
-								<span style="font-weight:700; color:#1d2327;"><?php echo esc_html( strtoupper( $code ) ); ?></span>
-								<span style="font-weight:400; font-size:11px; color:#646970;">(<?php echo esc_html( $lang->get_name() ); ?>)</span>
+								<span style="display:inline-flex; align-items:center; gap:6px;">
+									<?php echo LanguageFlagRenderer::render( $code, $lang->get_name(), 20, 14, $lang->get_flag_code() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+									<span style="font-weight:700; color:#1d2327;"><?php echo esc_html( strtoupper( $code ) ); ?></span>
+									<span style="font-weight:400; font-size:11px; color:#646970;">(<?php echo esc_html( $lang->get_name() ); ?>)</span>
+								</span>
 							</th>
 						<?php endforeach; ?>
 					</tr>

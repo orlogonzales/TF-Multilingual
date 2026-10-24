@@ -395,11 +395,13 @@
 }
 
 .tfml-kpi-flag-img {
-	width: 16px;
-	height: 12px;
+	width: 18px;
+	height: 13px;
 	vertical-align: middle;
 	border-radius: 2px;
-	box-shadow: 0 0 1px rgba(0,0,0,0.3);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+	border: 1px solid rgba(0, 0, 0, 0.08);
+	object-fit: cover;
 }
 
 /* ==========================================================================
@@ -1052,4 +1054,38 @@
 	background: var(--tfml-color-warning-bg);
 	border-color: var(--tfml-color-warning-border);
 	border-left-color: var(--tfml-color-warning);
+}
+
+/* ==========================================================================
+   Flag Badges and Images (Spatial UI)
+   ========================================================================== */
+.tfml-flag {
+	display: inline-block;
+	vertical-align: middle;
+	object-fit: cover;
+	border-radius: 3px;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+	border: 1px solid rgba(0, 0, 0, 0.08);
+	flex-shrink: 0;
+	transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tfml-flag:hover {
+	transform: scale(1.08);
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18);
+}
+
+.tfml-flag-fallback {
+	display: inline-block;
+	vertical-align: middle;
+	padding: 1px 5px;
+	font-size: 10px;
+	font-weight: 700;
+	line-height: 16px;
+	background: #e9ecef;
+	color: #495057;
+	border-radius: 3px;
+	border: 1px solid #ced4da;
+	letter-spacing: 0.5px;
+	text-transform: uppercase;
 }

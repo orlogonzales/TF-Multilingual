@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace TF\Multilingual\Admin;
 
+use TF\Multilingual\Domain\Language\LanguageFlagRenderer;
 use TF\Multilingual\Domain\Language\LanguageRegistry;
 use TF\Multilingual\Domain\Navigation\NavMenuLocationRepository;
 use TF\Multilingual\Domain\Translation\ContentTranslationResolver;
@@ -249,8 +250,11 @@ class NavMenuEditorialUi {
 								<th scope="col" style="width: 250px;"><?php esc_html_e( 'Ubicación del Tema', 'tf-multilingual' ); ?></th>
 								<?php foreach ( $active_languages as $lang ) : ?>
 									<th scope="col">
-										<?php echo esc_html( $lang->get_name() ); ?>
-										<code>(<?php echo esc_html( $lang->get_code() ); ?>)</code>
+										<span style="display:inline-flex; align-items:center; gap:6px;">
+											<?php echo LanguageFlagRenderer::render( $lang->get_code(), $lang->get_name(), 18, 13, $lang->get_flag_code() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+											<span><?php echo esc_html( $lang->get_name() ); ?></span>
+											<code>(<?php echo esc_html( $lang->get_code() ); ?>)</code>
+										</span>
 										<?php if ( $lang->get_code() === $default_code ) : ?>
 											<span class="badge" style="background:#e0e0e0; padding:2px 6px; border-radius:3px; font-size:11px;"><?php esc_html_e( 'Nativo', 'tf-multilingual' ); ?></span>
 										<?php endif; ?>

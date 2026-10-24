@@ -429,7 +429,11 @@ class LanguageRegistry {
 			$active = $new_active;
 		}
 
-		$this->languages[ $canonical ] = Language::create( $canonical, $locale, $name, $native_name, $active, $order );
+		$flag_code = array_key_exists( 'flag_code', $properties )
+			? ( is_string( $properties['flag_code'] ) && '' !== trim( $properties['flag_code'] ) ? trim( $properties['flag_code'] ) : null )
+			: $current->get_flag_code();
+
+		$this->languages[ $canonical ] = Language::create( $canonical, $locale, $name, $native_name, $active, $order, $flag_code );
 	}
 
 	/**

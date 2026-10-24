@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace TF\Multilingual\Admin;
 
+use TF\Multilingual\Domain\Language\LanguageFlagRenderer;
 use TF\Multilingual\Domain\Language\LanguageRegistry;
 use TF\Multilingual\Domain\Translation\TranslationStatus;
 use TF\Multilingual\Editorial\Exceptions\EditorialException;
@@ -188,7 +189,8 @@ class PostEditorialUi {
 		<div class="tfml-editorial-container">
 			<p>
 				<strong><?php esc_html_e( 'Current Language:', 'tf-multilingual' ); ?></strong><br>
-				<span class="tfml-current-lang" style="font-size: 1.1em; color: #1d2327;">
+				<span class="tfml-current-lang" style="font-size: 1.1em; color: #1d2327; display: inline-flex; align-items: center; gap: 6px;">
+					<?php echo LanguageFlagRenderer::render( $current_code, $current_name, 20, 14 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 					<?php echo esc_html( $current_name . ' (' . $current_code . ')' ); ?>
 				</span>
 			</p>
@@ -204,7 +206,8 @@ class PostEditorialUi {
 					$is_review = ( TranslationStatus::REVIEW === $status );
 					?>
 					<li style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-						<span>
+						<span style="display: inline-flex; align-items: center; gap: 6px;">
+							<?php echo LanguageFlagRenderer::render( $code, $tinfo['language_name'], 18, 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 							<?php if ( $tinfo['is_current'] ) : ?>
 								<strong><?php echo esc_html( $tinfo['language_name'] ); ?></strong>
 								<?php if ( $is_review ) : ?>
@@ -275,7 +278,8 @@ class PostEditorialUi {
 					<?php foreach ( $missing as $code => $minfo ) : ?>
 						<div class="tfml-missing-lang-card" style="border: 1px solid #c3c4c7; border-radius: 4px; padding: 10px; background: #fafafa;">
 							<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-								<span style="font-weight: 600; font-size: 13px; color: #1d2327;">
+								<span style="font-weight: 600; font-size: 13px; color: #1d2327; display: inline-flex; align-items: center; gap: 6px;">
+									<?php echo LanguageFlagRenderer::render( $code, $minfo['language_name'], 18, 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 									<?php echo esc_html( $minfo['language_name'] . ' (' . strtoupper( $code ) . ')' ); ?>
 								</span>
 								<span style="font-size: 11px; color: #646970; background: #e7e7e7; padding: 1px 6px; border-radius: 3px;">

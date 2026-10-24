@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace TF\Multilingual\Admin;
 
+use TF\Multilingual\Domain\Language\LanguageFlagRenderer;
 use TF\Multilingual\Domain\Language\LanguageRegistry;
 use TF\Multilingual\Domain\Translation\TranslationStatus;
 use TF\Multilingual\Editorial\Exceptions\EditorialException;
@@ -130,7 +131,8 @@ class TermEditorialUi {
 				<?php else : ?>
 					<p>
 						<strong><?php esc_html_e( 'Current Language:', 'tf-multilingual' ); ?></strong>
-						<span style="font-weight: 600; color: #1d2327;">
+						<span style="font-weight: 600; color: #1d2327; display: inline-flex; align-items: center; gap: 6px;">
+							<?php echo LanguageFlagRenderer::render( $data['current_language'], $data['current_language_name'], 20, 14 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 							<?php echo esc_html( $data['current_language_name'] . ' (' . $data['current_language'] . ')' ); ?>
 						</span>
 					</p>
@@ -142,7 +144,8 @@ class TermEditorialUi {
 							$status    = $tinfo['status'] ?? TranslationStatus::UPDATED;
 							$is_review = ( TranslationStatus::REVIEW === $status );
 							?>
-							<li style="margin-bottom: 6px;">
+							<li style="margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+								<?php echo LanguageFlagRenderer::render( $code, $tinfo['language_name'], 18, 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 								<?php if ( $tinfo['is_current'] ) : ?>
 									<strong><?php echo esc_html( $tinfo['language_name'] ); ?></strong>
 									<?php if ( $is_review ) : ?>
@@ -175,7 +178,10 @@ class TermEditorialUi {
 									<input type="hidden" name="taxonomy" value="<?php echo esc_attr( $taxonomy ); ?>">
 									<input type="hidden" name="target_language" value="<?php echo esc_attr( $code ); ?>">
 									<?php wp_nonce_field( self::NONCE_ACTION_CREATE . $tag->term_id, 'tfml_create_term_nonce' ); ?>
-									<label style="font-weight: 600; min-width: 70px;"><?php echo esc_html( $minfo['language_name'] ); ?>:</label>
+									<label style="font-weight: 600; min-width: 70px; display: inline-flex; align-items: center; gap: 6px;">
+										<?php echo LanguageFlagRenderer::render( $code, $minfo['language_name'], 18, 13 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+										<?php echo esc_html( $minfo['language_name'] ); ?>:
+									</label>
 									<input type="text" name="target_term_name" placeholder="<?php esc_attr_e( 'New term name', 'tf-multilingual' ); ?>" required style="flex: 1;">
 									<button type="submit" class="button button-secondary button-small">
 										<?php esc_html_e( 'Create', 'tf-multilingual' ); ?>

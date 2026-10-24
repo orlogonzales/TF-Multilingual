@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace TF\Multilingual\Admin;
 
+use TF\Multilingual\Domain\Language\LanguageFlagRenderer;
 use TF\Multilingual\Domain\Language\LanguageRegistry;
 use TF\Multilingual\Domain\Strings\StringRepository;
 use TF\Multilingual\Domain\Strings\StringStatus;
@@ -424,7 +425,10 @@ class StringEditorialUi {
 												<input type="hidden" name="string_id" value="<?php echo esc_attr( (string) $string_id ); ?>" />
 												<input type="hidden" name="language_code" value="<?php echo esc_attr( $lang_code ); ?>" />
 												
-												<strong><?php echo esc_html( strtoupper( $lang_code ) ); ?>:</strong>
+												<strong style="display: inline-flex; align-items: center; gap: 4px;">
+													<?php echo LanguageFlagRenderer::render( $lang_code, '', 16, 11 ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+													<?php echo esc_html( strtoupper( $lang_code ) ); ?>:
+												</strong>
 												
 												<?php if ( StringStatus::DB_UP_TO_DATE === $status ) : ?>
 													<span class="dashicons dashicons-yes-alt" style="color: #46b450;" title="UPDATED"></span>

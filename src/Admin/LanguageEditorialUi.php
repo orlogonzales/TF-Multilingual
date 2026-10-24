@@ -14,6 +14,7 @@ use TF\Multilingual\Domain\Language\Exceptions\DuplicateLanguageException;
 use TF\Multilingual\Domain\Language\Exceptions\InvalidLanguageException;
 use TF\Multilingual\Domain\Language\Exceptions\LanguageNotFoundException;
 use TF\Multilingual\Domain\Language\Language;
+use TF\Multilingual\Domain\Language\LanguageFlagRenderer;
 use TF\Multilingual\Domain\Language\LanguageRegistry;
 use TF\Multilingual\Migration\RetainedTranslationRegistry;
 use Throwable;
@@ -260,13 +261,15 @@ class LanguageEditorialUi {
 		$active = ! empty( $_POST['active'] );
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
 		$is_default = ! empty( $_POST['is_default'] );
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$flag_code = isset( $_POST['flag_code'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['flag_code'] ) ) : null;
 
 		if ( '' === $native_name ) {
 			$native_name = $name;
 		}
 
 		try {
-			$language = Language::create( $code, $locale, $name, $native_name, $active, $order );
+			$language = Language::create( $code, $locale, $name, $native_name, $active, $order, $flag_code );
 			$this->registry->add_language( $language, $is_default );
 			$this->registry->persist();
 
@@ -480,6 +483,8 @@ class LanguageEditorialUi {
 		$locale = isset( $_POST['locale'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['locale'] ) ) : '';
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
 		$order = isset( $_POST['order'] ) ? (int) $_POST['order'] : 10;
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$flag_code = isset( $_POST['flag_code'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['flag_code'] ) ) : null;
 
 		try {
 			$this->registry->update_language(
@@ -489,6 +494,7 @@ class LanguageEditorialUi {
 					'native_name' => $native_name,
 					'locale'      => $locale,
 					'order'       => $order,
+					'flag_code'   => $flag_code,
 				)
 			);
 			$this->registry->persist();
@@ -517,26 +523,31 @@ class LanguageEditorialUi {
 				'name'        => 'Spanish',
 				'native_name' => 'Español',
 				'locale'      => 'es_ES',
+				'flag'        => 'es',
 			),
 			'en'    => array(
 				'name'        => 'English',
 				'native_name' => 'English',
 				'locale'      => 'en_US',
+				'flag'        => 'us',
 			),
 			'pt'    => array(
 				'name'        => 'Portuguese',
 				'native_name' => 'Português',
 				'locale'      => 'pt_PT',
+				'flag'        => 'pt',
 			),
 			'pt-br' => array(
 				'name'        => 'Portuguese (Brazil)',
 				'native_name' => 'Português do Brasil',
 				'locale'      => 'pt_BR',
+				'flag'        => 'br',
 			),
 			'fr'    => array(
 				'name'        => 'French',
 				'native_name' => 'Français',
 				'locale'      => 'fr_FR',
+				'flag'        => 'fr',
 			),
 			'de'    => array(
 				'name'        => 'German',
@@ -574,34 +585,13 @@ class LanguageEditorialUi {
 	/**
 	 * Renders an HTML flag or fallback badge for a language code.
 	 *
-	 * @param string $code Language code.
-	 * @param string $name Language label.
+	 * @param string      $code      Language code.
+	 * @param string      $name      Language label.
+	 * @param string|null $flag_code Optional visual flag override.
 	 * @return string HTML representation.
 	 */
-	public function get_flag_html( string $code, string $name ): string {
-		$code_clean  = strtolower( (string) preg_replace( '/[^a-zA-Z0-9_-]/', '', trim( $code ) ) );
-		$plugin_root = dirname( __DIR__, 2 );
-		$flags_dir   = $plugin_root . '/assets/images/flags';
-		$flag_base   = function_exists( 'plugins_url' )
-			? plugins_url( 'assets/images/flags/', $plugin_root . '/tf-multilingual.php' )
-			: '/wp-content/plugins/tf-multilingual/assets/images/flags/';
-
-		foreach ( array( 'svg', 'png' ) as $ext ) {
-			$file = $flags_dir . '/' . $code_clean . '.' . $ext;
-			if ( is_file( $file ) && is_readable( $file ) ) {
-				$url = rtrim( $flag_base, '/' ) . '/' . $code_clean . '.' . $ext;
-				return sprintf(
-					'<img src="%s" alt="%s" style="width:24px; height:16px; vertical-align:middle; border-radius:2px; box-shadow:0 1px 2px rgba(0,0,0,0.15); display:inline-block;" />',
-					esc_url( $url ),
-					esc_attr( $name )
-				);
-			}
-		}
-
-		return sprintf(
-			'<span style="display:inline-block; padding:1px 6px; font-size:10px; font-weight:700; background:#e0e0e0; color:#333; border-radius:3px; letter-spacing:0.5px;">%s</span>',
-			esc_html( strtoupper( $code ) )
-		);
+	public function get_flag_html( string $code, string $name, ?string $flag_code = null ): string {
+		return LanguageFlagRenderer::render( $code, $name, 28, 20, $flag_code );
 	}
 
 	/**
@@ -717,6 +707,26 @@ class LanguageEditorialUi {
 									</div>
 
 									<div class="form-field">
+										<label for="edit_flag_code"><?php esc_html_e( 'Bandera visual', 'tf-multilingual' ); ?></label>
+										<div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+											<span id="edit_flag_preview">
+												<?php echo $this->get_flag_html( $edit_lang->get_code(), $edit_lang->get_native_name(), $edit_lang->get_flag_code() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+											</span>
+											<select name="flag_code" id="edit_flag_code" style="flex:1;">
+												<option value="" <?php selected( empty( $edit_lang->get_flag_code() ) ); ?>>
+													<?php esc_html_e( '— Automática según código / locale —', 'tf-multilingual' ); ?>
+												</option>
+												<?php foreach ( LanguageFlagRenderer::get_available_flags() as $flag_id => $flag_label ) : ?>
+													<option value="<?php echo esc_attr( $flag_id ); ?>" <?php selected( $edit_lang->get_flag_code(), $flag_id ); ?>>
+														<?php echo esc_html( $flag_label ); ?>
+													</option>
+												<?php endforeach; ?>
+											</select>
+										</div>
+										<p class="description"><?php esc_html_e( 'Bandera nacional que representará a este idioma en el panel administrativo.', 'tf-multilingual' ); ?></p>
+									</div>
+
+									<div class="form-field">
 										<label for="edit_order"><?php esc_html_e( 'Orden de visualización', 'tf-multilingual' ); ?></label>
 										<input type="number" name="order" id="edit_order" value="<?php echo (int) $edit_lang->get_order(); ?>" style="width:100px;">
 									</div>
@@ -744,6 +754,7 @@ class LanguageEditorialUi {
 													data-name="<?php echo esc_attr( $p_data['name'] ); ?>"
 													data-native="<?php echo esc_attr( $p_data['native_name'] ); ?>"
 													data-locale="<?php echo esc_attr( $p_data['locale'] ); ?>"
+													data-flag="<?php echo esc_attr( $p_data['flag'] ?? '' ); ?>"
 													<?php echo $is_already ? 'disabled' : ''; ?>>
 													<?php echo esc_html( $p_data['native_name'] . ' (' . $p_data['name'] . ') [' . $p_code . ']' . ( $is_already ? ' — ' . __( 'Registrado', 'tf-multilingual' ) : '' ) ); ?>
 												</option>
@@ -773,6 +784,17 @@ class LanguageEditorialUi {
 										<label for="tfml_locale"><?php esc_html_e( 'Locale de WordPress', 'tf-multilingual' ); ?> <span class="description">(<?php esc_html_e( 'requerido', 'tf-multilingual' ); ?>)</span></label>
 										<input type="text" name="locale" id="tfml_locale" placeholder="ej. fr_FR, de_DE" required style="width:100%;">
 										<p class="description"><?php esc_html_e( 'Código de configuración regional utilizado por WordPress para traducciones gettext.', 'tf-multilingual' ); ?></p>
+									</div>
+
+									<div class="form-field">
+										<label for="tfml_flag_code"><?php esc_html_e( 'Bandera visual', 'tf-multilingual' ); ?></label>
+										<select name="flag_code" id="tfml_flag_code" style="width:100%;">
+											<option value=""><?php esc_html_e( '— Automática según código / locale —', 'tf-multilingual' ); ?></option>
+											<?php foreach ( LanguageFlagRenderer::get_available_flags() as $flag_id => $flag_label ) : ?>
+												<option value="<?php echo esc_attr( $flag_id ); ?>"><?php echo esc_html( $flag_label ); ?></option>
+											<?php endforeach; ?>
+										</select>
+										<p class="description"><?php esc_html_e( 'Seleccione la bandera nacional que representará a este idioma en el panel administrativo.', 'tf-multilingual' ); ?></p>
 									</div>
 
 									<div class="form-field">
@@ -810,6 +832,10 @@ class LanguageEditorialUi {
 										document.getElementById('tfml_name').value = opt.getAttribute('data-name') || '';
 										document.getElementById('tfml_native_name').value = opt.getAttribute('data-native') || '';
 										document.getElementById('tfml_locale').value = opt.getAttribute('data-locale') || '';
+										var flagSel = document.getElementById('tfml_flag_code');
+										if (flagSel) {
+											flagSel.value = opt.getAttribute('data-flag') || '';
+										}
 									});
 								})();
 								</script>
@@ -824,7 +850,7 @@ class LanguageEditorialUi {
 						<table class="wp-list-table widefat striped tfml-languages-table" style="table-layout:auto;">
 							<thead>
 								<tr>
-									<th scope="col" style="width:48px; text-align:center;"><?php esc_html_e( 'Icono', 'tf-multilingual' ); ?></th>
+									<th scope="col" style="width:52px; text-align:center;"><?php esc_html_e( 'Bandera', 'tf-multilingual' ); ?></th>
 									<th scope="col" style="min-width:140px; white-space:nowrap;"><?php esc_html_e( 'Idioma / Endónimo', 'tf-multilingual' ); ?></th>
 									<th scope="col" style="width:65px; white-space:nowrap;"><?php esc_html_e( 'Código', 'tf-multilingual' ); ?></th>
 									<th scope="col" style="width:85px; white-space:nowrap;"><?php esc_html_e( 'Locale', 'tf-multilingual' ); ?></th>
@@ -875,8 +901,8 @@ class LanguageEditorialUi {
 										$edit_url = admin_url( 'admin.php?page=' . self::PARENT_SLUG . '&edit=' . urlencode( $code ) );
 										?>
 										<tr>
-											<td style="text-align:center; vertical-align:middle;">
-												<?php echo $this->get_flag_html( $code, $lang->get_native_name() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+											<td style="text-align:center; vertical-align:middle; width:52px;">
+												<?php echo $this->get_flag_html( $code, $lang->get_native_name(), $lang->get_flag_code() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 											</td>
 											<td style="vertical-align:middle;">
 												<strong><?php echo esc_html( $lang->get_native_name() ); ?></strong>

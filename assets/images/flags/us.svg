@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 741 390" width="741" height="390">
+  <!-- 13 Stripes -->
+  <rect width="741" height="390" fill="#b22234"/>
+  <rect y="30" width="741" height="30" fill="#ffffff"/>
+  <rect y="90" width="741" height="30" fill="#ffffff"/>
+  <rect y="150" width="741" height="30" fill="#ffffff"/>
+  <rect y="210" width="741" height="30" fill="#ffffff"/>
+  <rect y="270" width="741" height="30" fill="#ffffff"/>
+  <rect y="330" width="741" height="30" fill="#ffffff"/>
+  <!-- Canton -->
+  <rect width="296.4" height="210" fill="#3c3b6e"/>
+  <!-- Stars definition -->
+  <defs>
+    <g id="us-star">
+      <polygon points="0,-7 2.057,-2.163 7,-2.163 3.003,1.337 4.531,6.163 0,3.3 -4.531,6.163 -3.003,1.337 -7,-2.163 -2.057,-2.163" fill="#ffffff"/>
+    </g>
+  </defs>
+  <!-- 50 Stars: 9 alternating rows of 6 and 5 -->
+  <!-- Row 1 (6 stars) -->
+  <use href="#us-star" x="24.7" y="21"/>
+  <use href="#us-star" x="74.1" y="21"/>
+  <use href="#us-star" x="123.5" y="21"/>
+  <use href="#us-star" x="172.9" y="21"/>
+  <use href="#us-star" x="222.3" y="21"/>
+  <use href="#us-star" x="271.7" y="21"/>
+  <!-- Row 2 (5 stars) -->
+  <use href="#us-star" x="49.4" y="42"/>
+  <use href="#us-star" x="98.8" y="42"/>
+  <use href="#us-star" x="148.2" y="42"/>
+  <use href="#us-star" x="197.6" y="42"/>
+  <use href="#us-star" x="247.0" y="42"/>
+  <!-- Row 3 (6 stars) -->
+  <use href="#us-star" x="24.7" y="63"/>
+  <use href="#us-star" x="74.1" y="63"/>
+  <use href="#us-star" x="123.5" y="63"/>
+  <use href="#us-star" x="172.9" y="63"/>
+  <use href="#us-star" x="222.3" y="63"/>
+  <use href="#us-star" x="271.7" y="63"/>
+  <!-- Row 4 (5 stars) -->
+  <use href="#us-star" x="49.4" y="84"/>
+  <use href="#us-star" x="98.8" y="84"/>
+  <use href="#us-star" x="148.2" y="84"/>
+  <use href="#us-star" x="197.6" y="84"/>
+  <use href="#us-star" x="247.0" y="84"/>
+  <!-- Row 5 (6 stars) -->
+  <use href="#us-star" x="24.7" y="105"/>
+  <use href="#us-star" x="74.1" y="105"/>
+  <use href="#us-star" x="123.5" y="105"/>
+  <use href="#us-star" x="172.9" y="105"/>
+  <use href="#us-star" x="222.3" y="105"/>
+  <use href="#us-star" x="271.7" y="105"/>
+  <!-- Row 6 (5 stars) -->
+  <use href="#us-star" x="49.4" y="126"/>
+  <use href="#us-star" x="98.8" y="126"/>
+  <use href="#us-star" x="148.2" y="126"/>
+  <use href="#us-star" x="197.6" y="126"/>
+  <use href="#us-star" x="247.0" y="126"/>
+  <!-- Row 7 (6 stars) -->
+  <use href="#us-star" x="24.7" y="147"/>
+  <use href="#us-star" x="74.1" y="147"/>
+  <use href="#us-star" x="123.5" y="147"/>
+  <use href="#us-star" x="172.9" y="147"/>
+  <use href="#us-star" x="222.3" y="147"/>
+  <use href="#us-star" x="271.7" y="147"/>
+  <!-- Row 8 (5 stars) -->
+  <use href="#us-star" x="49.4" y="168"/>
+  <use href="#us-star" x="98.8" y="168"/>
+  <use href="#us-star" x="148.2" y="168"/>
+  <use href="#us-star" x="197.6" y="168"/>
+  <use href="#us-star" x="247.0" y="168"/>
+  <!-- Row 9 (6 stars) -->
+  <use href="#us-star" x="24.7" y="189"/>
+  <use href="#us-star" x="74.1" y="189"/>
+  <use href="#us-star" x="123.5" y="189"/>
+  <use href="#us-star" x="172.9" y="189"/>
+  <use href="#us-star" x="222.3" y="189"/>
+  <use href="#us-star" x="271.7" y="189"/>
+</svg>

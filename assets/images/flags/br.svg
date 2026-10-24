@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 490" width="700" height="490">
+  <rect width="700" height="490" fill="#009739"/>
+  <polygon points="350,38.5 647.5,245 350,451.5 52.5,245" fill="#fed100"/>
+  <circle cx="350" cy="245" r="122.5" fill="#002776"/>
+  <!-- Curved White Celestial Band -->
+  <path d="M227.5,245 C280,210 420,210 472.5,245 C420,225 280,225 227.5,245 Z" fill="#ffffff"/>
+  <!-- Stars in celestial sphere -->
+  <circle cx="350" cy="285" r="3" fill="#ffffff"/>
+  <circle cx="330" cy="305" r="2.5" fill="#ffffff"/>
+  <circle cx="370" cy="305" r="2.5" fill="#ffffff"/>
+  <circle cx="350" cy="320" r="2" fill="#ffffff"/>
+  <circle cx="410" cy="290" r="2.5" fill="#ffffff"/>
+  <circle cx="290" cy="290" r="2.5" fill="#ffffff"/>
+  <circle cx="360" cy="185" r="2.5" fill="#ffffff"/>
+</svg>

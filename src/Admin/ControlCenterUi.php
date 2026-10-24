@@ -16,6 +16,7 @@ declare(strict_types=1);
 namespace TF\Multilingual\Admin;
 
 use TF\Multilingual\Diagnostic\DiagnosticService;
+use TF\Multilingual\Domain\Language\LanguageFlagRenderer;
 use TF\Multilingual\Domain\Language\LanguageRegistry;
 use TF\Multilingual\Domain\Translation\TranslationGroupRepository;
 use TF\Multilingual\Migration\RetainedTranslationRegistry;
@@ -226,8 +227,8 @@ class ControlCenterUi {
 					<div class="tfml-kpi-value"><?php echo esc_html( (string) $active_count ); ?></div>
 					<div class="tfml-kpi-flags">
 						<?php foreach ( $active_langs as $l_code => $lang_obj ) : ?>
-							<span style="display:inline-flex;align-items:center;gap:3px;">
-								<img src="<?php echo esc_url( $flags_url . $l_code . '.svg' ); ?>" alt="<?php echo esc_attr( $l_code ); ?>" class="tfml-kpi-flag-img" onerror="this.style.display='none'" />
+							<span style="display:inline-flex;align-items:center;gap:4px;">
+								<?php echo LanguageFlagRenderer::render( $l_code, $lang_obj->get_name(), 18, 13, $lang_obj->get_flag_code(), 'tfml-kpi-flag-img' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 								<?php echo esc_html( strtoupper( $l_code ) ); ?>
 							</span>
 						<?php endforeach; ?>
@@ -576,7 +577,7 @@ class ControlCenterUi {
 					<div class="tfml-lang-chips">
 						<?php foreach ( $active_langs as $l_code => $lang_obj ) : ?>
 							<div class="tfml-lang-chip">
-								<img src="<?php echo esc_url( $flags_url . $l_code . '.svg' ); ?>" alt="<?php echo esc_attr( $l_code ); ?>" onerror="this.style.display='none'" />
+								<?php echo LanguageFlagRenderer::render( $l_code, $lang_obj->get_native_name(), 22, 15, $lang_obj->get_flag_code() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 								<span><?php echo esc_html( strtoupper( $l_code ) ); ?></span>
 								<span class="tfml-lang-chip-code"><?php echo esc_html( $lang_obj->get_native_name() ); ?></span>
 								<span class="tfml-pill tfml-pill-success" style="font-size:10.5px;padding:2px 7px;">

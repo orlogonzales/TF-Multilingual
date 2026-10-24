@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace TF\Multilingual\Admin;
 
 use TF\Multilingual\Domain\Language\Language;
+use TF\Multilingual\Domain\Language\LanguageFlagRenderer;
 use TF\Multilingual\Domain\Language\LanguageRegistry;
 use TF\Multilingual\Domain\Media\MediaTranslation;
 use TF\Multilingual\Domain\Media\MediaTranslationRepository;
@@ -137,7 +138,10 @@ class MediaEditorialUi {
 					<span class="tfml-tab-button button <?php echo 0 === $index ? 'button-primary' : ''; ?>"
 						data-target="tfml-lang-panel-<?php echo esc_attr( $code ); ?>"
 						style="margin-right: 5px; margin-bottom: -1px; cursor: pointer;">
-						<strong><?php echo esc_html( strtoupper( $code ) ); ?></strong> — <?php echo esc_html( $lang->get_name() ); ?>
+						<span style="display:inline-flex; align-items:center; gap:4px;">
+							<?php echo LanguageFlagRenderer::render( $code, $lang->get_name(), 18, 13, $lang->get_flag_code() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+							<strong><?php echo esc_html( strtoupper( $code ) ); ?></strong> — <?php echo esc_html( $lang->get_name() ); ?>
+						</span>
 						<?php if ( $has_trans ) : ?>
 							<span class="dashicons dashicons-yes" style="font-size: 16px; line-height: 22px; color: #46b450;" title="<?php echo esc_attr__( 'Traducido en TFML', 'tf-multilingual' ); ?>"></span>
 						<?php else : ?>
@@ -156,8 +160,9 @@ class MediaEditorialUi {
 				?>
 				<div id="tfml-lang-panel-<?php echo esc_attr( $code ); ?>" class="tfml-lang-panel" style="<?php echo 0 === $index ? 'display: block;' : 'display: none;'; ?> background: #fff; border: 1px solid #ccd0d4; padding: 15px; margin-bottom: 15px;">
 					<div style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
-						<h3 style="margin: 0; font-size: 14px;">
-							<?php echo esc_html( $lang->get_name() ); ?> (<code><?php echo esc_html( $code ); ?></code>)
+						<h3 style="margin: 0; font-size: 14px; display: inline-flex; align-items: center; gap: 6px;">
+							<?php echo LanguageFlagRenderer::render( $code, $lang->get_name(), 20, 14, $lang->get_flag_code() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+							<span><?php echo esc_html( $lang->get_name() ); ?> (<code><?php echo esc_html( $code ); ?></code>)</span>
 						</h3>
 						<?php if ( $is_fallback ) : ?>
 							<span style="background: #e7f3fe; color: #1e73be; padding: 3px 8px; border-radius: 3px; font-size: 12px;">
