@@ -16,13 +16,14 @@ use TF\Multilingual\Routing\CurrentLanguageResolver;
  * Clase StringFrontendFilter
  *
  * Intercepta y localiza cadenas compartidas de interfaz y temas en el frontend
- * mediante un búfer de salida no intrusivo y de alto rendimiento.
+ * mediante un procesador contextual, acotado y de alto rendimiento.
  *
- * Características:
- * - Se activa únicamente en peticiones públicas elegibles de frontend.
- * - Cero sobrecarga en el idioma por defecto (Español): omite el búfer si el idioma es el predeterminado.
- * - Traduce cadenas compartidas de ecoCMS y Elementor registradas en StringTranslationService.
- * - Respeta estrictamente los valores administrables desde TF Multilingual -> Cadenas de texto.
+ * Principios de seguridad lingüística (DT-TFML-093):
+ * - Delimita estrictamente nodos de texto visibles y atributos permitidos (alt, title, aria-label).
+ * - Protege y preserva intactos bloques opacos técnicos: scripts, JSON-LD, estilos, SVGs y comentarios.
+ * - Rechaza la alteración de atributos técnicos: href, src, id, class, name, data-*, style, rel, action.
+ * - Cero sobrecarga en el idioma predeterminado (Español): omite el búfer si el idioma es el primario.
+ * - No modifica HTML malformado ni entidades, preservando codificación UTF-8 y marcado Elementor.
  * - Previene regresiones en REST API, AJAX administrativo, Cron y CLI.
  */
 class StringFrontendFilter {
@@ -54,6 +55,13 @@ class StringFrontendFilter {
 	 * @var array<string>
 	 */
 	private array $target_domains = array( 'ecoCMS', 'theme', 'default' );
+
+	/**
+	 * Atributos HTML expresamente traducibles permitidos.
+	 *
+	 * @var array<string>
+	 */
+	private array $whitelisted_attributes = array( 'alt', 'title', 'aria-label' );
 
 	/**
 	 * Indicador de si el búfer fue iniciado.
@@ -152,10 +160,11 @@ class StringFrontendFilter {
 	}
 
 	/**
-	 * Filtra el contenido del búfer reemplazando cadenas originales por sus traducciones gestionadas.
+	 * Filtra el contenido del búfer reemplazando cadenas originales por sus traducciones gestionadas
+	 * exclusivamente en nodos de texto visibles y atributos permitidos (alt, title, aria-label).
 	 *
 	 * @param string $buffer Contenido HTML de la página.
-	 * @return string HTML con las cadenas traducidas.
+	 * @return string HTML con las cadenas traducidas contextualmente.
 	 */
 	public function filtrar_salida_buffer( string $buffer ): string {
 		if ( '' === trim( $buffer ) ) {
@@ -177,6 +186,117 @@ class StringFrontendFilter {
 			return $buffer;
 		}
 
-		return strtr( $buffer, $pairs );
+		return $this->procesar_html_contextual( $buffer, $pairs );
+	}
+
+	/**
+	 * Procesa de forma contextual y segura el HTML delimitando bloques opacos, etiquetas y texto visible.
+	 *
+	 * @param string                $html  Documento HTML completo.
+	 * @param array<string, string> $pairs Pares asociativos [original => traducción].
+	 * @return string HTML procesado contextualmente.
+	 */
+	public function procesar_html_contextual( string $html, array $pairs ): string {
+		if ( '' === trim( $html ) || empty( $pairs ) ) {
+			return $html;
+		}
+
+		// 1. Proteger bloques técnicos opacos (scripts, JSON-LD, estilos, SVGs y comentarios).
+		$bloques_protegidos = array();
+		$html_protegido     = $this->proteger_bloques_opacos( $html, $bloques_protegidos );
+
+		// 2. Segmentar el documento entre etiquetas HTML y nodos de texto visibles.
+		$parts = preg_split( '/(<[^>]+>)/s', $html_protegido, -1, PREG_SPLIT_DELIM_CAPTURE );
+		if ( false === $parts ) {
+			return $html;
+		}
+
+		$attr_pattern = '/\b(' . implode( '|', $this->whitelisted_attributes ) . ')\s*=\s*(["\'])(.*?)\2/is';
+
+		for ( $i = 0, $len = count( $parts ); $i < $len; $i++ ) {
+			if ( 1 === ( $i % 2 ) ) {
+				// Índice impar: Etiqueta HTML. Solo se traducen atributos explícitamente autorizados.
+				$parts[ $i ] = $this->localizar_atributos_etiqueta( $parts[ $i ], $pairs, $attr_pattern );
+			} else {
+				// Índice par: Nodo de texto visible entre etiquetas.
+				if ( '' !== trim( $parts[ $i ] ) ) {
+					$parts[ $i ] = strtr( $parts[ $i ], $pairs );
+				}
+			}
+		}
+
+		$html_reconstruido = implode( '', $parts );
+
+		// 3. Restaurar los bloques opacos protegidos en su estado original exacto.
+		if ( ! empty( $bloques_protegidos ) ) {
+			$html_reconstruido = strtr( $html_reconstruido, $bloques_protegidos );
+		}
+
+		return $html_reconstruido;
+	}
+
+	/**
+	 * Protege bloques no traducibles (script, style, svg, comentarios) reemplazándolos con marcadores seguros.
+	 *
+	 * @param string                $html               HTML de entrada.
+	 * @param array<string, string> $bloques_protegidos Array por referencia para almacenar los bloques extraídos.
+	 * @return string HTML con marcadores de protección.
+	 */
+	private function proteger_bloques_opacos( string $html, array &$bloques_protegidos ): string {
+		$prefijo_marcador = '<!--###TFML_OPAQUE_' . bin2hex( random_bytes( 4 ) ) . '_';
+		$indice           = 0;
+
+		$patrones = array(
+			'/<!--.*?-->/s',
+			'/<script\b[^>]*>.*?<\/script>/is',
+			'/<style\b[^>]*>.*?<\/style>/is',
+			'/<svg\b[^>]*>.*?<\/svg>/is',
+		);
+
+		foreach ( $patrones as $patron ) {
+			$html = (string) preg_replace_callback(
+				$patron,
+				static function ( array $coincidencia ) use ( &$bloques_protegidos, $prefijo_marcador, &$indice ): string {
+					$marcador                        = $prefijo_marcador . ( ++$indice ) . '###-->';
+					$bloques_protegidos[ $marcador ] = $coincidencia[0];
+					return $marcador;
+				},
+				$html
+			);
+		}
+
+		return $html;
+	}
+
+	/**
+	 * Localiza exclusivamente los atributos permitidos (alt, title, aria-label) en una etiqueta HTML.
+	 *
+	 * @param string                $tag          Etiqueta HTML completa (ej. <img alt="Texto" src="url">).
+	 * @param array<string, string> $pairs        Pares de traducción.
+	 * @param string                $attr_pattern Patrón regex compilado de atributos permitidos.
+	 * @return string Etiqueta con atributos localizados si correspondía.
+	 */
+	private function localizar_atributos_etiqueta( string $tag, array $pairs, string $attr_pattern ): string {
+		if ( ! preg_match( $attr_pattern, $tag ) ) {
+			return $tag;
+		}
+
+		return (string) preg_replace_callback(
+			$attr_pattern,
+			static function ( array $coincidencia ) use ( $pairs ): string {
+				$nombre_attr = $coincidencia[1];
+				$comilla     = $coincidencia[2];
+				$valor_attr  = $coincidencia[3];
+
+				if ( isset( $pairs[ $valor_attr ] ) ) {
+					$valor_attr = $pairs[ $valor_attr ];
+				} else {
+					$valor_attr = strtr( $valor_attr, $pairs );
+				}
+
+				return $nombre_attr . '=' . $comilla . $valor_attr . $comilla;
+			},
+			$tag
+		);
 	}
 }

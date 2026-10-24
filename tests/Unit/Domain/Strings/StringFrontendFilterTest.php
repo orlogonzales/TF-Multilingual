@@ -86,7 +86,7 @@ class StringFrontendFilterTest extends TestCase {
 	}
 
 	/**
-	 * Test: En idioma secundario (inglés), filtrar_salida_buffer reemplaza las cadenas registradas.
+	 * Test: En idioma secundario (inglés), filtrar_salida_buffer reemplaza las cadenas registradas contextualmente.
 	 */
 	public function test_idioma_secundario_reemplaza_cadenas_correctamente(): void {
 		$this->current_lang_resolver->method( 'get_current_language' )->willReturn( 'en' );
@@ -115,6 +115,82 @@ class StringFrontendFilterTest extends TestCase {
 		$this->assertStringContainsString( 'Developed by:', $resultado );
 		$this->assertStringNotContainsString( '¿Como ponerse en contaco?', $resultado );
 		$this->assertStringNotContainsString( 'Todos los derechos reservados', $resultado );
+	}
+
+	/**
+	 * Test: Bloques opacos (scripts, styles, SVG, comentarios) permanecen intactos (DT-TFML-093).
+	 */
+	public function test_bloques_opacos_permanecen_intactos(): void {
+		$this->current_lang_resolver->method( 'get_current_language' )->willReturn( 'en' );
+
+		$this->string_repo->method( 'get_translation_pairs_by_language' )
+			->willReturn(
+				array(
+					'contacto'                      => 'contact',
+					'Todos los derechos reservados' => 'All rights reserved',
+				)
+			);
+
+		$filter = new StringFrontendFilter(
+			$this->string_repo,
+			$this->registry,
+			$this->current_lang_resolver
+		);
+
+		$html = '<script>var contacto = "contacto";</script><style>.contacto { color: red; }</style><svg><text>contacto</text></svg><!-- comentario contacto -->';
+		$res  = $filter->filtrar_salida_buffer( $html );
+
+		$this->assertStringContainsString( 'var contacto = "contacto";', $res );
+		$this->assertStringContainsString( '.contacto { color: red; }', $res );
+		$this->assertStringContainsString( '<svg><text>contacto</text></svg>', $res );
+		$this->assertStringContainsString( '<!-- comentario contacto -->', $res );
+		$this->assertStringNotContainsString( 'var contact = "contact";', $res );
+	}
+
+	/**
+	 * Test: Atributos técnicos no son alterados mientras que atributos permitidos sí se localizan (DT-TFML-093).
+	 */
+	public function test_atributos_tecnicos_intactos_y_permitidos_localizados(): void {
+		$this->current_lang_resolver->method( 'get_current_language' )->willReturn( 'en' );
+
+		$this->string_repo->method( 'get_translation_pairs_by_language' )
+			->willReturn(
+				array(
+					'contacto'          => 'contact',
+					'Teléfono Contacto' => 'Contact Phone',
+				)
+			);
+
+		$filter = new StringFrontendFilter(
+			$this->string_repo,
+			$this->registry,
+			$this->current_lang_resolver
+		);
+
+		$html = '<div id="box-contacto" class="widget-contacto" data-action="/contacto" style="background: url(/contacto.png)">'
+			. '<a href="/contacto/" class="btn-contacto" title="Teléfono Contacto" aria-label="Teléfono Contacto">'
+			. 'Teléfono Contacto'
+			. '</a>'
+			. '<img src="/images/contacto.png" alt="Teléfono Contacto">'
+			. '</div>';
+
+		$res = $filter->filtrar_salida_buffer( $html );
+
+		// Atributos técnicos intactos
+		$this->assertStringContainsString( 'id="box-contacto"', $res );
+		$this->assertStringContainsString( 'class="widget-contacto"', $res );
+		$this->assertStringContainsString( 'data-action="/contacto"', $res );
+		$this->assertStringContainsString( 'href="/contacto/"', $res );
+		$this->assertStringContainsString( 'class="btn-contacto"', $res );
+		$this->assertStringContainsString( 'src="/images/contacto.png"', $res );
+
+		// Atributos permitidos localizados
+		$this->assertStringContainsString( 'title="Contact Phone"', $res );
+		$this->assertStringContainsString( 'aria-label="Contact Phone"', $res );
+		$this->assertStringContainsString( 'alt="Contact Phone"', $res );
+
+		// Nodo de texto visible localizado
+		$this->assertStringContainsString( '>Contact Phone</a>', $res );
 	}
 
 	/**

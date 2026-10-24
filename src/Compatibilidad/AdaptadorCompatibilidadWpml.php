@@ -237,17 +237,27 @@ class AdaptadorCompatibilidadWpml {
 	 * @return void
 	 */
 	public function sincronizar_constante_idioma_wpml(): void {
-		if ( ! $this->habilitado ) {
+		if ( ! $this->habilitado || defined( 'ICL_LANGUAGE_CODE' ) ) {
 			return;
 		}
 
-		if ( ! defined( 'ICL_LANGUAGE_CODE' ) ) {
-			$codigo = $this->servicio_api->obtener_idioma_actual()
-				?? $this->servicio_api->obtener_idioma_por_defecto()
-				?? 'es';
-
-			define( 'ICL_LANGUAGE_CODE', $codigo );
+		// Preservar estrictamente entornos de consola, cron o pruebas automatizadas.
+		if ( ( defined( 'WP_CLI' ) && WP_CLI ) || defined( 'PHPUNIT_COMPOSER_INSTALL' ) ) {
+			return;
 		}
+
+		if ( function_exists( 'wp_doing_cron' ) && wp_doing_cron() ) {
+			return;
+		}
+
+		$codigo = $this->servicio_api->obtener_idioma_actual();
+
+		// Si el código resuelto es nulo o corresponde a un idioma no activo en el catálogo, usar el idioma por defecto.
+		if ( null === $codigo || ! $this->servicio_api->es_idioma_activo( $codigo ) ) {
+			$codigo = $this->servicio_api->obtener_idioma_por_defecto() ?? 'es';
+		}
+
+		define( 'ICL_LANGUAGE_CODE', $codigo );
 	}
 
 	/**
