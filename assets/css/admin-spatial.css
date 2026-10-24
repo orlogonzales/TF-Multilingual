@@ -1302,3 +1302,108 @@ body[class*="tf-multilingual"] #wpbody-content > div.updated:not([class*="tfml"]
 .tfml-matrix-compact-card .matrix-actions {
 	flex: 0 0 auto;
 }
+
+/* ==========================================================================
+   Translations Overview / Center Spatial UI (DT-TFML-094)
+   ========================================================================== */
+.tfml-translations-overview-wrap .tfml-kpi-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 16px;
+	margin-bottom: 24px;
+}
+
+.tfml-translations-overview-wrap .tfml-kpi-card {
+	background: var(--tfml-card-bg);
+	border: 1px solid var(--tfml-card-border);
+	border-radius: var(--tfml-radius-md);
+	box-shadow: var(--tfml-card-shadow);
+	padding: 16px 20px;
+	transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tfml-translations-overview-wrap .tfml-kpi-card:hover {
+	box-shadow: var(--tfml-card-hover-shadow);
+}
+
+.tfml-translations-overview-wrap .tfml-kpi-card.kpi-groups {
+	border-left: 4px solid var(--tfml-color-primary);
+}
+
+.tfml-translations-overview-wrap .tfml-kpi-card.kpi-elements {
+	border-left: 4px solid var(--tfml-color-success);
+}
+
+.tfml-translations-overview-wrap .tfml-kpi-card.kpi-languages {
+	border-left: 4px solid #72aee6;
+}
+
+.tfml-translations-overview-wrap .tfml-kpi-card.kpi-retained {
+	border-left: 4px solid var(--tfml-color-warning);
+}
+
+.tfml-translations-overview-wrap .tfml-kpi-title {
+	font-size: 11px;
+	color: var(--tfml-text-muted);
+	text-transform: uppercase;
+	font-weight: 700;
+	letter-spacing: 0.5px;
+}
+
+.tfml-translations-overview-wrap .tfml-kpi-val {
+	font-size: 26px;
+	font-weight: 800;
+	color: var(--tfml-text-dark);
+	margin-top: 4px;
+	line-height: 1.1;
+}
+
+.tfml-translations-overview-wrap .tfml-kpi-desc {
+	font-size: 11.5px;
+	color: var(--tfml-text-secondary);
+	margin-top: 4px;
+}
+
+.tfml-translations-overview-wrap .tfml-translations-table {
+	border: 1px solid var(--tfml-card-border);
+	border-radius: var(--tfml-radius-md);
+	overflow: hidden;
+	box-shadow: var(--tfml-card-shadow);
+	background: var(--tfml-card-bg);
+}
+
+.tfml-translations-overview-wrap .tfml-translations-table thead th,
+.tfml-translations-overview-wrap .tfml-translations-table tfoot th {
+	background: #f8fafc;
+	color: var(--tfml-text-dark);
+	font-weight: 700;
+	border-bottom: 1px solid var(--tfml-card-border);
+	padding: 12px 14px;
+}
+
+.tfml-translations-overview-wrap .tfml-translations-table td {
+	padding: 12px 14px;
+	vertical-align: middle;
+	border-top: 1px solid #f1f5f9;
+}
+
+.tfml-translations-overview-wrap .tfml-translations-table tr:hover td {
+	background-color: #f8fafc;
+}
+
+.tfml-translations-overview-wrap #retained-custody {
+	border: 1px solid var(--tfml-color-warning-border);
+	border-left: 4px solid var(--tfml-color-warning);
+	border-radius: var(--tfml-radius-md);
+	box-shadow: var(--tfml-card-shadow);
+	background: var(--tfml-card-bg);
+	overflow: hidden;
+	margin-top: 32px;
+}
+
+.tfml-translations-overview-wrap #retained-custody .postbox-header {
+	background: #fffdf5;
+	border-bottom: 1px solid var(--tfml-color-warning-border);
+	padding: 12px 18px;
+}
+

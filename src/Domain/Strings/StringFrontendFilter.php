@@ -201,17 +201,18 @@ class StringFrontendFilter {
 			return $html;
 		}
 
-		// 1. Proteger bloques técnicos opacos (scripts, JSON-LD, estilos, SVGs y comentarios).
+		// 1. Proteger bloques técnicos opacos (scripts, JSON-LD, estilos, SVGs, textareas y comentarios).
 		$bloques_protegidos = array();
 		$html_protegido     = $this->proteger_bloques_opacos( $html, $bloques_protegidos );
 
-		// 2. Segmentar el documento entre etiquetas HTML y nodos de texto visibles.
-		$parts = preg_split( '/(<[^>]+>)/s', $html_protegido, -1, PREG_SPLIT_DELIM_CAPTURE );
+		// 2. Segmentar el documento entre etiquetas HTML y nodos de texto visibles, respetando comillas con >.
+		$parts = preg_split( '/(<(?:[^>"\'\s]|"[^"]*"|\'[^\']*\'|[\s])*?>)/s', $html_protegido, -1, PREG_SPLIT_DELIM_CAPTURE );
 		if ( false === $parts ) {
 			return $html;
 		}
 
-		$attr_pattern = '/\b(' . implode( '|', $this->whitelisted_attributes ) . ')\s*=\s*(["\'])(.*?)\2/is';
+		// Patrón estricto: requiere delimitador de inicio de atributo [\s<], impidiendo coincidir con data-title o similares.
+		$attr_pattern = '/(?<=[\s<])(' . implode( '|', $this->whitelisted_attributes ) . ')\s*=\s*(?:(["\'])(.*?)\2|([^\s>]+))/is';
 
 		for ( $i = 0, $len = count( $parts ); $i < $len; $i++ ) {
 			if ( 1 === ( $i % 2 ) ) {
@@ -236,7 +237,7 @@ class StringFrontendFilter {
 	}
 
 	/**
-	 * Protege bloques no traducibles (script, style, svg, comentarios) reemplazándolos con marcadores seguros.
+	 * Protege bloques no traducibles (script, style, svg, textarea, comentarios) reemplazándolos con marcadores seguros.
 	 *
 	 * @param string                $html               HTML de entrada.
 	 * @param array<string, string> $bloques_protegidos Array por referencia para almacenar los bloques extraídos.
@@ -251,6 +252,7 @@ class StringFrontendFilter {
 			'/<script\b[^>]*>.*?<\/script>/is',
 			'/<style\b[^>]*>.*?<\/style>/is',
 			'/<svg\b[^>]*>.*?<\/svg>/is',
+			'/<textarea\b[^>]*>.*?<\/textarea>/is',
 		);
 
 		foreach ( $patrones as $patron ) {
@@ -285,8 +287,10 @@ class StringFrontendFilter {
 			$attr_pattern,
 			static function ( array $coincidencia ) use ( $pairs ): string {
 				$nombre_attr = $coincidencia[1];
-				$comilla     = $coincidencia[2];
-				$valor_attr  = $coincidencia[3];
+				$comilla     = $coincidencia[2] ?? '';
+				$valor_attr  = ( isset( $coincidencia[3] ) && '' !== $coincidencia[3] )
+					? $coincidencia[3]
+					: ( $coincidencia[4] ?? '' );
 
 				if ( isset( $pairs[ $valor_attr ] ) ) {
 					$valor_attr = $pairs[ $valor_attr ];

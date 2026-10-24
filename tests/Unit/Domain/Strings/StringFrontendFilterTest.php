@@ -194,6 +194,95 @@ class StringFrontendFilterTest extends TestCase {
 	}
 
 	/**
+	 * Test: data-title, data-alt, data-aria-label y prefijos con guion NO se confunden con atributos traducibles (DT-TFML-094).
+	 */
+	public function test_data_title_y_atributos_con_guion_no_son_alterados(): void {
+		$this->current_lang_resolver->method( 'get_current_language' )->willReturn( 'en' );
+
+		$this->string_repo->method( 'get_translation_pairs_by_language' )
+			->willReturn(
+				array(
+					'Contacto' => 'Contact',
+				)
+			);
+
+		$filter = new StringFrontendFilter(
+			$this->string_repo,
+			$this->registry,
+			$this->current_lang_resolver
+		);
+
+		$html = '<div data-title="Contacto" data-alt="Contacto" data-aria-label="Contacto" custom-title="Contacto" title="Contacto">'
+			. 'Contacto'
+			. '</div>';
+
+		$res = $filter->filtrar_salida_buffer( $html );
+
+		// data-* y custom-* deben conservar 'Contacto' sin traducir
+		$this->assertStringContainsString( 'data-title="Contacto"', $res );
+		$this->assertStringContainsString( 'data-alt="Contacto"', $res );
+		$this->assertStringContainsString( 'data-aria-label="Contacto"', $res );
+		$this->assertStringContainsString( 'custom-title="Contacto"', $res );
+
+		// Únicamente el atributo title nativo y el texto visible se traducen
+		$this->assertStringContainsString( 'title="Contact"', $res );
+		$this->assertStringContainsString( '>Contact</div>', $res );
+	}
+
+	/**
+	 * Test: Etiquetas que contienen el signo '>' dentro de atributos comillados no se segmentan erróneamente (DT-TFML-094).
+	 */
+	public function test_etiquetas_con_signo_mayor_en_atributos_comillados(): void {
+		$this->current_lang_resolver->method( 'get_current_language' )->willReturn( 'en' );
+
+		$this->string_repo->method( 'get_translation_pairs_by_language' )
+			->willReturn(
+				array(
+					'Teléfono Contacto' => 'Contact Phone',
+				)
+			);
+
+		$filter = new StringFrontendFilter(
+			$this->string_repo,
+			$this->registry,
+			$this->current_lang_resolver
+		);
+
+		$html = '<a data-query="price > 100" data-condition=\'count > 0\' title="Teléfono Contacto">Teléfono Contacto</a>';
+		$res  = $filter->filtrar_salida_buffer( $html );
+
+		$this->assertStringContainsString( 'data-query="price > 100"', $res );
+		$this->assertStringContainsString( 'data-condition=\'count > 0\'', $res );
+		$this->assertStringContainsString( 'title="Contact Phone"', $res );
+		$this->assertStringContainsString( '>Contact Phone</a>', $res );
+	}
+
+	/**
+	 * Test: Bloques textarea permanecen protegidos e intactos (DT-TFML-094).
+	 */
+	public function test_textarea_permanece_intacto(): void {
+		$this->current_lang_resolver->method( 'get_current_language' )->willReturn( 'en' );
+
+		$this->string_repo->method( 'get_translation_pairs_by_language' )
+			->willReturn(
+				array(
+					'¿Como ponerse en contaco?' => 'How to get in touch?',
+				)
+			);
+
+		$filter = new StringFrontendFilter(
+			$this->string_repo,
+			$this->registry,
+			$this->current_lang_resolver
+		);
+
+		$html = '<textarea name="comments">¿Como ponerse en contaco?</textarea>';
+		$res  = $filter->filtrar_salida_buffer( $html );
+
+		$this->assertStringContainsString( '<textarea name="comments">¿Como ponerse en contaco?</textarea>', $res );
+	}
+
+	/**
 	 * Test: Búfer vacío o en blanco retorna tal cual sin llamadas a base de datos.
 	 */
 	public function test_buffer_vacio_retorna_inmediatamente(): void {

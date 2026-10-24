@@ -240,56 +240,56 @@ class TranslationsOverviewUi {
 			</div>
 
 			<!-- KPI Summary Stat Cards -->
-			<div class="tfml-kpi-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:20px;">
-				<div class="tfml-kpi-card" style="background:#fff; border:1px solid #c3c4c7; border-left:4px solid #2271b1; border-radius:4px; padding:14px 16px;">
-					<div style="font-size:12px; color:#646970; text-transform:uppercase; font-weight:600; letter-spacing:0.5px;">
+			<div class="tfml-kpi-grid">
+				<div class="tfml-kpi-card kpi-groups">
+					<div class="tfml-kpi-title">
 						<?php esc_html_e( 'Grupos Registrados', 'tf-multilingual' ); ?>
 					</div>
-					<div style="font-size:26px; font-weight:700; color:#1d2327; margin-top:4px;">
+					<div class="tfml-kpi-val">
 						<?php echo esc_html( number_format_i18n( $total_groups ) ); ?>
 					</div>
-					<div style="font-size:11px; color:#50575e; margin-top:2px;">
+					<div class="tfml-kpi-desc">
 						<?php esc_html_e( 'Grupos de traducción activos en TFML', 'tf-multilingual' ); ?>
 					</div>
 				</div>
 
-				<div class="tfml-kpi-card" style="background:#fff; border:1px solid #c3c4c7; border-left:4px solid #46b450; border-radius:4px; padding:14px 16px;">
-					<div style="font-size:12px; color:#646970; text-transform:uppercase; font-weight:600; letter-spacing:0.5px;">
+				<div class="tfml-kpi-card kpi-elements">
+					<div class="tfml-kpi-title">
 						<?php esc_html_e( 'Elementos Vinculados', 'tf-multilingual' ); ?>
 					</div>
-					<div style="font-size:26px; font-weight:700; color:#1d2327; margin-top:4px;">
+					<div class="tfml-kpi-val">
 						<?php echo esc_html( number_format_i18n( $total_elements ) ); ?>
 					</div>
-					<div style="font-size:11px; color:#50575e; margin-top:2px;">
+					<div class="tfml-kpi-desc">
 						<?php esc_html_e( 'Entidades WordPress activas gestionadas', 'tf-multilingual' ); ?>
 					</div>
 				</div>
 
-				<div class="tfml-kpi-card" style="background:#fff; border:1px solid #c3c4c7; border-left:4px solid #72aee6; border-radius:4px; padding:14px 16px;">
-					<div style="font-size:12px; color:#646970; text-transform:uppercase; font-weight:600; letter-spacing:0.5px;">
+				<div class="tfml-kpi-card kpi-languages">
+					<div class="tfml-kpi-title">
 						<?php esc_html_e( 'Idiomas Activos', 'tf-multilingual' ); ?>
 					</div>
-					<div style="font-size:22px; font-weight:700; color:#1d2327; margin-top:6px; display:flex; gap:6px; align-items:center;">
+					<div class="tfml-kpi-val" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
 						<?php foreach ( $active_langs as $code => $lang ) : ?>
-							<span style="background:#f0f0f1; border:1px solid #dcdcde; border-radius:3px; padding:2px 6px; font-size:12px; display:inline-flex; align-items:center; gap:4px;">
+							<span style="background:#f1f5f9; border:1px solid #e2e8f0; border-radius:4px; padding:3px 8px; font-size:12px; display:inline-flex; align-items:center; gap:5px;">
 								<?php echo LanguageFlagRenderer::render( $code, $lang->get_name(), 18, 13, $lang->get_flag_code() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-								<?php echo esc_html( strtoupper( $code ) ); ?>
+								<span style="font-weight:700; color:#1e293b;"><?php echo esc_html( strtoupper( $code ) ); ?></span>
 							</span>
 						<?php endforeach; ?>
 					</div>
-					<div style="font-size:11px; color:#50575e; margin-top:4px;">
+					<div class="tfml-kpi-desc">
 						<?php esc_html_e( 'Catálogo público en producción', 'tf-multilingual' ); ?>
 					</div>
 				</div>
 
-				<div class="tfml-kpi-card" style="background:#fff; border:1px solid #c3c4c7; border-left:4px solid #dba617; border-radius:4px; padding:14px 16px;">
-					<div style="font-size:12px; color:#646970; text-transform:uppercase; font-weight:600; letter-spacing:0.5px;">
+				<div class="tfml-kpi-card kpi-retained">
+					<div class="tfml-kpi-title">
 						<?php esc_html_e( 'Traducciones Retenidas', 'tf-multilingual' ); ?>
 					</div>
-					<div style="font-size:26px; font-weight:700; color:#dba617; margin-top:4px;">
+					<div class="tfml-kpi-val" style="color:var(--tfml-color-warning, #d97706);">
 						<?php echo esc_html( number_format_i18n( $retained_count ) ); ?>
 					</div>
-					<div style="font-size:11px; color:#50575e; margin-top:2px;">
+					<div class="tfml-kpi-desc">
 						<?php esc_html_e( 'En custodia histórica (Francés)', 'tf-multilingual' ); ?>
 					</div>
 				</div>
