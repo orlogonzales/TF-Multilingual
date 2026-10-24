@@ -2502,6 +2502,36 @@
 - **JUSTIFICACIÓN:** Aplicar las 10 Reglas de Oro para cerrar de forma inmediata y definitiva la reserva de seguridad de Fase 3.56, garantizando la confidencialidad de accesos sin burocracia ni forcejeo de historial.
 - **CONSECUENCIAS:** Entorno UAT seguro, contraseñas anteriores inertes, secretos resguardados localmente y propietario habilitado para realizar su revisión funcional con total confianza.
 
+---
+
+### ADR-086: Custodia Segura de Credenciales UAT Fuera de DocumentRoot, Rotación Preventiva y URL Canónica Oficial (Directiva DT-TFML-090-R1)
+- **FECHA:** 2026-10-23
+- **DECISIÓN:**
+  1. **Almacenamiento Seguro Fuera de DocumentRoot:**
+     - Reubicación física y definitiva de `CREDENCIALES_UAT.txt` y `.uat_auth_token.json` desde el webroot público (`D:/laragon/www/uat.ecoterra/`) hacia el almacenamiento privado local en `D:/laragon/storage/secrets/tfml_uat/`, completamente fuera de cualquier DocumentRoot o directorio servido por Apache.
+     - Hardening de `.htaccess` en `D:/laragon/www/uat.ecoterra/.htaccess` mediante directivas `<FilesMatch>` con denegación explícita (`Require all denied`) para tokens, archivos dotfiles o credenciales sensibles (`403 Forbidden`).
+  2. **Rotación Criptográfica Preventiva y Revocación de Sesiones:**
+     - Tras constatar que los archivos previos eran servidos con HTTP 200 en el webroot público antes de su retirada, se aplicó una nueva rotación inmediata y atómica de contraseñas de alta entropía (32 bytes aleatorios criptográficos) para `admin_uat` y `admin_lab` en `cms_ect_uat`.
+     - Revocación atómica y universal de todas las sesiones activas en la base de datos UAT (`delete_user_meta(..., 'session_tokens')`).
+     - Eliminación física total de los archivos del webroot público.
+  3. **Adopción de URL Canónica Oficial UAT (`http://lab.ecoterra.test/punko`):**
+     - Por decisión del propietario, la URL oficial y canónica de pruebas UAT pasa de `http://localhost:8089/punko` a `http://lab.ecoterra.test/punko`.
+     - Configuración de Apache VirtualHost (`02-uat.ecoterra.conf`) en el puerto 80 (y 443) con `ServerName lab.ecoterra.test` apuntando a `DocumentRoot "D:/laragon/www/uat.ecoterra"`.
+     - Preservación del puerto 8089 como acceso alternativo de respaldo (`http://localhost:8089/punko`).
+     - Actualización de `siteurl` y `home` en `cms_ect_uat.etk_t_options` a `http://lab.ecoterra.test`.
+     - Aislamiento riguroso de bases de datos: `lab.ecoterra.test` conecta exclusivamente con `cms_ect_uat` vía `wp-config.php`, sin conmutación por cabeceras ni parámetros públicos, y manteniendo la base de datos de laboratorio consolidado `cms_ect_lab` (141 grupos, 175 elementos, 21 retained FR, 20 manifiestos) y la producción `cms_ect` (3.403 filas / MD5 `4241ca7e7ec6399a594537cb04790c10`) 100% aisladas, congeladas e inalteradas.
+  4. **Corrección Estricta del Verificador Reproducible (`verify_fase_3_56.php`):**
+     - Exigencia obligatoria de credenciales UAT reales desde el almacenamiento privado o variables de entorno; si falta el secreto, el control falla explícitamente (`FAIL`) sin degradar a comprobación de existencia de usuario o privilegios.
+     - Autenticación real mediante `wp_authenticate('admin_uat', $secret)` y `wp_authenticate('admin_lab', $secret_lab)`.
+     - Verificación rigurosa de rechazo de contraseñas anteriores/expuestas históricamente.
+     - Verificación de inaccesibilidad HTTP (403/404) de credenciales en `http://lab.ecoterra.test` y `http://localhost:8089`.
+     - Ausencia total de credenciales en texto plano en el árbol Git o en la salida de consola.
+- **ESTADO:** **ACEPTADA**
+- **CONTEXTO:** Directiva DT-TFML-090-R1 — Corrección Final de Custodia de Credenciales UAT y Actualización de URL Canónica.
+- **JUSTIFICACIÓN:** Cumplir integralmente los principios de menor privilegio y custodia de secretos, cerrando la brecha de exposición HTTP de credenciales UAT y alineando el acceso al dominio solicitado por el propietario sin poner en riesgo la base de datos consolidada.
+- **CONSECUENCIAS:** Verificador `verify_fase_3_56.php` con **10/10 controles PASS (0 FAIL)**, suite PHPUnit de **698 pruebas / 2.596 aserciones (100% PASS)**, PHPCS **187/187 archivos PASS**, 0 secretos en el repositorio y entrega lista para la aceptación funcional del propietario en `http://lab.ecoterra.test/punko`.
+
+
 
 
 

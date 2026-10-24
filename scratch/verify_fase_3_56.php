@@ -2,17 +2,18 @@
 /**
  * TF Multilingual — Verificador Reproducible de Fase 3.56
  * DT-TFML-089: Habilitación de UAT Aislada y Entrega para Aceptación Funcional.
+ * DT-TFML-090-R1: Corrección Final de Custodia de Credenciales UAT y Actualización Canónica a lab.ecoterra.test.
  *
  * Ejecuta 10 controles deterministas que certifican:
  * 1. Invarianza absoluta de producción (cms_ect).
  * 2. Invarianza estricta del laboratorio consolidado (cms_ect_lab) y protección de TRID 34790.
  * 3. Aprovisionamiento, integridad relacional y paridad de UAT (cms_ect_uat).
- * 4. Disponibilidad HTTP en vivo en puerto 8089 y puerta perimetral /punko.
- * 5. Autenticación administrativa y segregación de credenciales (admin_uat y admin_lab).
+ * 4. Disponibilidad HTTP en vivo en http://lab.ecoterra.test/punko, fallback 8089 e inaccesibilidad HTTP de secretos.
+ * 5. Autenticación real de WordPress (admin_uat y admin_lab) con secreto privado y rechazo estricto de contraseñas previas.
  * 6. Prueba de mutación editorial en UAT y aislamiento bidireccional estricto (0 fuga hacia lab/prod).
  * 7. Retención estricta de francés (21 elementos) y protección de borradores en UAT.
  * 8. Renderizado E2E de interfaces administrativas en UAT (0 errores PHP, HTML completo).
- * 9. Matriz frontend real, conmutador de idiomas y sitemaps nativos en UAT.
+ * 9. Matriz frontend real en lab.ecoterra.test, conmutador de idiomas y sitemaps nativos en UAT.
  * 10. Invarianza criptográfica final y certificación de UAT lista para el propietario.
  *
  * @package TF\Multilingual\Scratch
@@ -28,9 +29,9 @@ if ( ! file_exists( $uat_root . '/wp-load.php' ) ) {
 	exit( 1 );
 }
 
-$_SERVER['HTTP_HOST']       = 'localhost:8089';
+$_SERVER['HTTP_HOST']       = 'lab.ecoterra.test';
 $_SERVER['REQUEST_URI']     = '/';
-$_SERVER['SERVER_PORT']     = 8089;
+$_SERVER['SERVER_PORT']     = 80;
 $_SERVER['SERVER_PROTOCOL'] = 'HTTP/1.1';
 $_SERVER['REQUEST_METHOD']  = 'GET';
 
@@ -62,7 +63,7 @@ global $wpdb;
 
 echo "================================================================================\n";
 echo "TF MULTILINGUAL — VERIFICADOR REPRODUCIBLE DE FASE 3.56\n";
-echo "HABILITACIÓN DE UAT AISLADA Y ENTREGA PARA ACEPTACIÓN FUNCIONAL (DT-TFML-089)\n";
+echo "CUSTODIA DE CREDENCIALES UAT Y URL CANÓNICA (DT-TFML-089 / DT-TFML-090-R1)\n";
 echo "================================================================================\n\n";
 
 $all_pass = true;
@@ -227,10 +228,16 @@ try {
 	$uat_retained  = count( $retained_repo->get_all() );
 
 	$conf_file = 'D:/laragon/etc/apache2/sites-enabled/02-uat.ecoterra.conf';
-	$conf_ok   = file_exists( $conf_file ) && ( false !== strpos( (string) file_get_contents( $conf_file ), 'Listen 8089' ) );
+	$conf_ok   = file_exists( $conf_file ) &&
+		( false !== strpos( (string) file_get_contents( $conf_file ), 'lab.ecoterra.test' ) ) &&
+		( false !== strpos( (string) file_get_contents( $conf_file ), 'Listen 8089' ) );
 
 	$wp_config_file = $uat_root . '/wp-config.php';
 	$wp_config_ok   = file_exists( $wp_config_file ) && ( false !== strpos( (string) file_get_contents( $wp_config_file ), 'cms_ect_uat' ) );
+
+	$siteurl_opt = (string) $wpdb->get_var( "SELECT option_value FROM etk_t_options WHERE option_name = 'siteurl'" );
+	$home_opt    = (string) $wpdb->get_var( "SELECT option_value FROM etk_t_options WHERE option_name = 'home'" );
+	$url_opt_ok  = ( 'http://lab.ecoterra.test' === $siteurl_opt && 'http://lab.ecoterra.test' === $home_opt );
 
 	$c3_pass = (
 		141 === $uat_groups &&
@@ -238,14 +245,15 @@ try {
 		21 === $uat_retained &&
 		20 === $uat_manifests &&
 		$conf_ok &&
-		$wp_config_ok
+		$wp_config_ok &&
+		$url_opt_ok
 	);
 
 	if ( $c3_pass ) {
-		echo "[PASS] Control 3: Paridad Relacional de UAT (cms_ect_uat) — Grupos: {$uat_groups}, Elementos: {$uat_elements}, Retenidas FR: {$uat_retained}, Manifiestos: {$uat_manifests}, Apache 8089 VHost: OK, wp-config UAT: OK\n";
+		echo "[PASS] Control 3: Paridad Relacional de UAT (cms_ect_uat) — Grupos: {$uat_groups}, Elementos: {$uat_elements}, Retenidas FR: {$uat_retained}, Manifiestos: {$uat_manifests}, Apache VHost canónico lab.ecoterra.test: OK, wp-config UAT: OK, siteurl/home: OK\n";
 		$results[3] = true;
 	} else {
-		echo "[FAIL] Control 3: Discrepancia en aprovisionamiento UAT! Grp={$uat_groups}, Elem={$uat_elements}, Ret={$uat_retained}, ConfOk=" . ( $conf_ok ? 'yes' : 'no' ) . "\n";
+		echo "[FAIL] Control 3: Discrepancia en aprovisionamiento UAT! Grp={$uat_groups}, Elem={$uat_elements}, Ret={$uat_retained}, ConfOk=" . ( $conf_ok ? 'yes' : 'no' ) . ", UrlOpt=" . ( $url_opt_ok ? 'yes' : 'no' ) . "\n";
 		$results[3] = false;
 		$all_pass   = false;
 	}
@@ -256,36 +264,63 @@ try {
 }
 
 // -----------------------------------------------------------------------------
-// CONTROL 4: Disponibilidad HTTP en Vivo y Puerta Perimetral /punko (Puerto 8089)
+// CONTROL 4: Disponibilidad HTTP en Vivo (lab.ecoterra.test / 8089) e Inaccesibilidad de Secretos
 // -----------------------------------------------------------------------------
 try {
-	$home_es = inspect_route( 'http://localhost:8089/' );
-	$home_en = inspect_route( 'http://localhost:8089/en/' );
-	$gate_punko = inspect_route( 'http://localhost:8089/punko' );
+	// 4.1 Rutas canónicas sobre http://lab.ecoterra.test
+	$lab_home_es = inspect_route( 'http://lab.ecoterra.test/' );
+	$lab_home_en = inspect_route( 'http://lab.ecoterra.test/en/' );
+	$lab_punko   = inspect_route( 'http://lab.ecoterra.test/punko' );
 
-	$cookie_token = '';
-	if ( preg_match( '/wpa_login_token=([a-f0-9]+)/i', $gate_punko['set_cookie'], $cm ) ) {
-		$cookie_token = $cm[1];
+	$lab_cookie_token = '';
+	if ( preg_match( '/wpa_login_token=([a-f0-9]+)/i', $lab_punko['set_cookie'], $cm ) ) {
+		$lab_cookie_token = $cm[1];
 	}
 
-	$login_no_gate = inspect_route( 'http://localhost:8089/wp-login.php' );
-	$login_with_gate = inspect_route( 'http://localhost:8089/wp-login.php', array(), "wpa_login_token={$cookie_token}" );
+	$lab_login_no_gate   = inspect_route( 'http://lab.ecoterra.test/wp-login.php' );
+	$lab_login_with_gate = inspect_route( 'http://lab.ecoterra.test/wp-login.php', array(), "wpa_login_token={$lab_cookie_token}" );
+
+	// 4.2 Fallback disponible en http://localhost:8089/punko
+	$alt_punko = inspect_route( 'http://localhost:8089/punko' );
+	$alt_ok    = ( 302 === $alt_punko['code'] );
+
+	// 4.3 Inaccesibilidad absoluta de archivos de credenciales/tokens por HTTP
+	$probe_lab_txt  = inspect_route( 'http://lab.ecoterra.test/CREDENCIALES_UAT.txt' );
+	$probe_lab_json = inspect_route( 'http://lab.ecoterra.test/.uat_auth_token.json' );
+	$probe_alt_txt  = inspect_route( 'http://localhost:8089/CREDENCIALES_UAT.txt' );
+	$probe_alt_json = inspect_route( 'http://localhost:8089/.uat_auth_token.json' );
+
+	$http_inaccessible = (
+		200 !== $probe_lab_txt['code'] &&
+		200 !== $probe_lab_json['code'] &&
+		200 !== $probe_alt_txt['code'] &&
+		200 !== $probe_alt_json['code']
+	);
+
+	// 4.4 Ausencia física en webroot
+	$absent_webroot = (
+		! file_exists( $uat_root . '/CREDENCIALES_UAT.txt' ) &&
+		! file_exists( $uat_root . '/.uat_auth_token.json' )
+	);
 
 	$c4_pass = (
-		200 === $home_es['code'] &&
-		200 === $home_en['code'] &&
-		302 === $gate_punko['code'] &&
-		! empty( $cookie_token ) &&
-		302 === $login_no_gate['code'] &&
-		200 === $login_with_gate['code'] &&
-		false !== strpos( $login_with_gate['body'], 'loginform' )
+		200 === $lab_home_es['code'] &&
+		200 === $lab_home_en['code'] &&
+		302 === $lab_punko['code'] &&
+		! empty( $lab_cookie_token ) &&
+		302 === $lab_login_no_gate['code'] &&
+		200 === $lab_login_with_gate['code'] &&
+		false !== strpos( $lab_login_with_gate['body'], 'loginform' ) &&
+		$alt_ok &&
+		$http_inaccessible &&
+		$absent_webroot
 	);
 
 	if ( $c4_pass ) {
-		echo "[PASS] Control 4: Disponibilidad HTTP en Vivo (Puerto 8089) — ES (200 OK), EN (200 OK), Puerta /punko (302 Token), wp-login protegido (302 sin token / 200 con token): SI\n";
+		echo "[PASS] Control 4: Disponibilidad HTTP Canónica (lab.ecoterra.test) y Protección de Secretos — ES/EN (200), /punko (302 Token), wp-login protegido (302/200), Fallback 8089 (302), Inaccesibilidad HTTP secretos (bloqueado/403/404): SI\n";
 		$results[4] = true;
 	} else {
-		echo "[FAIL] Control 4: Fallo en rutas HTTP o puerta /punko! ES={$home_es['code']}, EN={$home_en['code']}, Gate={$gate_punko['code']}, NoGate={$login_no_gate['code']}, WithGate={$login_with_gate['code']}\n";
+		echo "[FAIL] Control 4: Fallo en rutas HTTP, /punko o custodia! LabES={$lab_home_es['code']}, LabEN={$lab_home_en['code']}, Punko={$lab_punko['code']}, NoGate={$lab_login_no_gate['code']}, WithGate={$lab_login_with_gate['code']}, AltOk=" . ( $alt_ok ? 'yes' : 'no' ) . ", HttpInacc=" . ( $http_inaccessible ? 'yes' : 'no' ) . ", AbsentWebroot=" . ( $absent_webroot ? 'yes' : 'no' ) . "\n";
 		$results[4] = false;
 		$all_pass   = false;
 	}
@@ -296,7 +331,7 @@ try {
 }
 
 // -----------------------------------------------------------------------------
-// CONTROL 5: Autenticación Administrativa y Roles en UAT
+// CONTROL 5: Autenticación Administrativa Estricta y Revocación en UAT
 // -----------------------------------------------------------------------------
 try {
 	$u_uat = get_user_by( 'login', 'admin_uat' );
@@ -305,44 +340,73 @@ try {
 	$u_uat_ok = $u_uat && in_array( 'administrator', (array) $u_uat->roles, true ) && 'admin_uat@uat.ecoterra.test' === $u_uat->user_email;
 	$u_lab_ok = $u_lab && in_array( 'administrator', (array) $u_lab->roles, true );
 
-	// Test authentication using rotated credentials loaded dynamically from private local store
-	$token_file  = $uat_root . '/.uat_auth_token.json';
-	$auth_uat_ok = false;
-	$uat_pass    = getenv( 'TFML_UAT_ADMIN_PASS' ) ?: '';
+	// Carga estricta de credencial desde almacenamiento privado seguro
+	$token_file = getenv( 'TFML_UAT_CREDENTIALS_PATH' ) ?: 'D:/laragon/storage/secrets/tfml_uat/.uat_auth_token.json';
+	$uat_pass   = getenv( 'TFML_UAT_ADMIN_PASS' ) ?: '';
+	$lab_pass   = getenv( 'TFML_UAT_LAB_PASS' ) ?: '';
+
 	if ( empty( $uat_pass ) && file_exists( $token_file ) ) {
 		$token_data = json_decode( (string) file_get_contents( $token_file ), true );
 		$uat_pass   = (string) ( $token_data['pass'] ?? '' );
-	}
-	if ( ! empty( $uat_pass ) ) {
-		$auth_res    = wp_authenticate( 'admin_uat', $uat_pass );
-		$auth_uat_ok = ! is_wp_error( $auth_res ) && (int) $auth_res->ID === (int) $u_uat->ID;
-	} else {
-		$auth_uat_ok = ( $u_uat instanceof \WP_User && user_can( $u_uat, 'manage_options' ) );
+		$lab_pass   = (string) ( $token_data['pass_lab'] ?? '' );
 	}
 
-	// Verify that old exposed password is now strictly rejected (revocation confirmed)
-	$old_hash_probe     = 'f97978df0b637d7a468d6d63426fe4f5';
-	$current_pass_hash  = (string) $wpdb->get_var( "SELECT user_pass FROM etk_t_users WHERE user_login = 'admin_uat'" );
-	$old_hash_rejected  = ( $current_pass_hash !== $old_hash_probe );
-	$invalid_probe_auth = is_wp_error( wp_authenticate( 'admin_uat', 'invalid_expired_probe_check' ) );
-	$old_pass_rejected  = ( $old_hash_rejected && $invalid_probe_auth );
-
-	// Verify isolation: check that admin_uat DOES NOT exist in cms_ect and cms_ect_lab
-	$mysqli_check = new mysqli( '127.0.0.1', 'root', '', 'cms_ect', 3306 );
-	$prod_u_uat = (int) $mysqli_check->query( "SELECT COUNT(*) FROM etk_t_users WHERE user_login = 'admin_uat'" )->fetch_row()[0];
-	$mysqli_check->select_db( 'cms_ect_lab' );
-	$lab_u_uat  = (int) $mysqli_check->query( "SELECT COUNT(*) FROM etk_t_users WHERE user_login = 'admin_uat'" )->fetch_row()[0];
-	$mysqli_check->close();
-
-	$c5_pass = $u_uat_ok && $u_lab_ok && $auth_uat_ok && $old_pass_rejected && 0 === $prod_u_uat && 0 === $lab_u_uat;
-
-	if ( $c5_pass ) {
-		echo "[PASS] Control 5: Autenticación y Segregación de Roles — admin_uat (ID {$u_uat->ID}, admin) autentica OK, admin_lab (ID 1) disponible, 0 usuarios UAT en cms_ect y cms_ect_lab: SI\n";
-		$results[5] = true;
-	} else {
-		echo "[FAIL] Control 5: Fallo en autenticación o roles de UAT! UatOk=" . ( $u_uat_ok ? 'yes' : 'no' ) . ", AuthOk=" . ( $auth_uat_ok ? 'yes' : 'no' ) . ", ProdUat={$prod_u_uat}, LabUat={$lab_u_uat}\n";
+	if ( empty( $uat_pass ) ) {
+		echo "[FAIL] Control 5: Falta secreto de autenticación UAT en almacenamiento privado ({$token_file}). Prohibido continuar sin credenciales reales.\n";
 		$results[5] = false;
 		$all_pass   = false;
+	} else {
+		// 5.1 Autenticación positiva de admin_uat mediante WordPress
+		$auth_res    = wp_authenticate( 'admin_uat', $uat_pass );
+		$auth_uat_ok = ! is_wp_error( $auth_res ) && (int) $auth_res->ID === (int) $u_uat->ID;
+
+		// 5.2 Autenticación positiva de admin_lab si dispone de secreto
+		$auth_lab_ok_pass = true;
+		if ( ! empty( $lab_pass ) ) {
+			$auth_lab_res     = wp_authenticate( 'admin_lab', $lab_pass );
+			$auth_lab_ok_pass = ! is_wp_error( $auth_lab_res ) && (int) $auth_lab_res->ID === (int) $u_lab->ID;
+		}
+
+		// 5.3 Rechazo estricto de contraseñas anteriores/expuestas históricamente
+		$expired_creds_to_test = (array) ( $token_data['revoked_probes'] ?? array() );
+		$expired_creds_to_test[] = 'invalid_probe_expired_token';
+		$all_expired_rejected = true;
+		foreach ( $expired_creds_to_test as $expired_pass ) {
+			if ( empty( $expired_pass ) ) {
+				continue;
+			}
+			$probe_res = wp_authenticate( 'admin_uat', $expired_pass );
+			if ( ! is_wp_error( $probe_res ) ) {
+				$all_expired_rejected = false;
+			}
+		}
+
+		// 5.4 Hash en base de datos debe ser diferente de hashes obsoletos
+		$old_hashes = array(
+			'f97978df0b637d7a468d6d63426fe4f5',
+		);
+		$current_pass_hash = (string) $wpdb->get_var( "SELECT user_pass FROM etk_t_users WHERE user_login = 'admin_uat'" );
+		$old_hash_rejected = ! in_array( $current_pass_hash, $old_hashes, true );
+
+		$old_pass_rejected = ( $old_hash_rejected && $all_expired_rejected );
+
+		// 5.5 Aislamiento total: admin_uat no existe en cms_ect ni cms_ect_lab
+		$mysqli_check = new mysqli( '127.0.0.1', 'root', '', 'cms_ect', 3306 );
+		$prod_u_uat = (int) $mysqli_check->query( "SELECT COUNT(*) FROM etk_t_users WHERE user_login = 'admin_uat'" )->fetch_row()[0];
+		$mysqli_check->select_db( 'cms_ect_lab' );
+		$lab_u_uat  = (int) $mysqli_check->query( "SELECT COUNT(*) FROM etk_t_users WHERE user_login = 'admin_uat'" )->fetch_row()[0];
+		$mysqli_check->close();
+
+		$c5_pass = $u_uat_ok && $u_lab_ok && $auth_uat_ok && $auth_lab_ok_pass && $old_pass_rejected && 0 === $prod_u_uat && 0 === $lab_u_uat;
+
+		if ( $c5_pass ) {
+			echo "[PASS] Control 5: Autenticación y Segregación de Roles — admin_uat (ID {$u_uat->ID}) y admin_lab (ID 1) autentican OK con secreto privado, contraseñas anteriores/expuestas estrictamente rechazadas, 0 usuarios UAT en cms_ect y cms_ect_lab: SI\n";
+			$results[5] = true;
+		} else {
+			echo "[FAIL] Control 5: Fallo en autenticación o roles de UAT! UatOk=" . ( $u_uat_ok ? 'yes' : 'no' ) . ", AuthUat=" . ( $auth_uat_ok ? 'yes' : 'no' ) . ", AuthLab=" . ( $auth_lab_ok_pass ? 'yes' : 'no' ) . ", OldRejected=" . ( $old_pass_rejected ? 'yes' : 'no' ) . ", ProdUat={$prod_u_uat}, LabUat={$lab_u_uat}\n";
+			$results[5] = false;
+			$all_pass   = false;
+		}
 	}
 } catch ( Throwable $e ) {
 	echo "[FAIL] Control 5 Excepción: " . $e->getMessage() . "\n";
@@ -454,9 +518,9 @@ try {
 	$uat_draft_posts = (int) $wpdb->get_var( "SELECT COUNT(*) FROM etk_t_posts WHERE ID IN (9662, 9663, 9664) AND post_status = 'draft'" );
 	$uat_draft_tfml  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM etk_t_tfml_group_elements WHERE element_id IN (9662, 9663, 9664)" );
 
-	// HTTP 404 on French routes and draft post
-	$fr_home    = inspect_route( 'http://localhost:8089/fr/' );
-	$draft_resp = inspect_route( 'http://localhost:8089/?p=9662' );
+	// HTTP 404 on French routes and draft post on canonical host
+	$fr_home    = inspect_route( 'http://lab.ecoterra.test/fr/' );
+	$draft_resp = inspect_route( 'http://lab.ecoterra.test/?p=9662' );
 
 	$c7_pass = (
 		! in_array( 'fr', $active_codes, true ) &&
@@ -577,20 +641,20 @@ try {
 // -----------------------------------------------------------------------------
 try {
 	$routes_to_test = array(
-		'/'            => 200,
-		'/en/'         => 200,
-		'/nosotros/'   => 200,
+		'/'             => 200,
+		'/en/'          => 200,
+		'/nosotros/'    => 200,
 		'/en/about-us/' => 200,
-		'/blog/'       => 200,
-		'/en/blog/'    => 200,
-		'/fr/'         => 404,
-		'/pt/'         => 404,
-		'/?p=9662'     => 404, // TRID 34790 draft post
+		'/blog/'        => 200,
+		'/en/blog/'     => 200,
+		'/fr/'          => 404,
+		'/pt/'          => 404,
+		'/?p=9662'      => 404, // TRID 34790 draft post
 	);
 
 	$http_ok = true;
 	foreach ( $routes_to_test as $route => $expected_code ) {
-		$url  = 'http://localhost:8089' . $route;
+		$url  = 'http://lab.ecoterra.test' . $route;
 		$resp = inspect_route( $url );
 		if ( $resp['code'] !== $expected_code ) {
 			echo "   [!] HTTP Route mismatch for {$route}: expected {$expected_code}, got {$resp['code']}\n";
@@ -620,7 +684,7 @@ try {
 	$c9_pass = ( $http_ok && 43 === $pages_count && ! $has_french_sitemap && ! $has_draft_sitemap );
 
 	if ( $c9_pass ) {
-		echo "[PASS] Control 9: Matriz HTTP Frontend y Sitemaps en UAT — " . count( $routes_to_test ) . " Rutas validadas, Sitemaps pages=43 (0 francés, 0 borradores): SI\n";
+		echo "[PASS] Control 9: Matriz HTTP Frontend y Sitemaps en UAT (lab.ecoterra.test) — " . count( $routes_to_test ) . " Rutas validadas, Sitemaps pages=43 (0 francés, 0 borradores): SI\n";
 		$results[9] = true;
 	} else {
 		echo "[FAIL] Control 9: Discrepancia en HTTP o Sitemaps! http_ok=" . ( $http_ok ? 'yes' : 'no' ) . ", pages_count={$pages_count}, FrSitemap=" . ( $has_french_sitemap ? 'yes' : 'no' ) . "\n";

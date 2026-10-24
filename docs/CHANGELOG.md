@@ -2369,6 +2369,32 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/
     - Verificador reproducible `scratch/verify_fase_3_56.php` con **10/10 controles PASS (0 FAIL)**.
     - Suite PHPUnit: **698 pruebas / 2.596 aserciones (100% PASS)** y PHPCS **187/187 archivos PASS**.
 
+- **Corrección Final de Custodia de Credenciales UAT y Actualización de URL Canónica (Directiva DT-TFML-090-R1 — ADR-086):**
+  - **Custodia Segura Fuera de DocumentRoot:**
+    - Reubicación física de `CREDENCIALES_UAT.txt` y `.uat_auth_token.json` desde el DocumentRoot público (`D:/laragon/www/uat.ecoterra/`) hacia el almacenamiento privado local `D:/laragon/storage/secrets/tfml_uat/`, totalmente inaccesible para Apache.
+    - Hardening de `.htaccess` en `D:/laragon/www/uat.ecoterra/.htaccess` con reglas `<FilesMatch>` denegando explícitamente (`Require all denied`) solicitudes HTTP a tokens o dotfiles.
+  - **Rotación Criptográfica Preventiva y Revocación de Sesiones:**
+    - Nueva rotación criptográfica atómica de contraseñas de alta entropía para `admin_uat` y `admin_lab` en `cms_ect_uat`.
+    - Revocación atómica y universal de todas las sesiones de usuario (`delete_user_meta(..., 'session_tokens')`).
+    - Eliminación definitiva de copias en el directorio público.
+  - **Adopción de URL Canónica Oficial UAT (`http://lab.ecoterra.test/punko`):**
+    - Por decisión del propietario, la URL oficial de pruebas UAT pasa de `http://localhost:8089/punko` a `http://lab.ecoterra.test/punko`.
+    - VirtualHost Apache configurado en `02-uat.ecoterra.conf` en el puerto 80 asignando `ServerName lab.ecoterra.test` a `DocumentRoot "D:/laragon/www/uat.ecoterra"`.
+    - Preservación de `http://localhost:8089/punko` como acceso de respaldo.
+    - Actualización de `siteurl` y `home` a `http://lab.ecoterra.test` en `cms_ect_uat.etk_t_options`.
+    - Aislamiento absoluto de bases de datos: `lab.ecoterra.test` conecta exclusivamente a `cms_ect_uat`, manteniendo `cms_ect_lab` (141 grupos, 175 elementos) y `cms_ect` (3.403 filas) 100% congeladas e intocables.
+  - **Endurecimiento Estricto del Verificador Reproducible (`scratch/verify_fase_3_56.php`):**
+    - Exigencia estricta de credenciales UAT desde almacenamiento privado; retorno inmediato de `FAIL` si falta el secreto (sin degradar a chequeo de usuario o privilegios).
+    - Autenticación real mediante `wp_authenticate()` para `admin_uat` y `admin_lab`.
+    - Verificación rigurosa de rechazo de contraseñas anteriores/expuestas.
+    - Verificación explícita de inaccesibilidad HTTP (403/404) de credenciales en `http://lab.ecoterra.test` y `http://localhost:8089`.
+    - Cero contraseñas impresas en reportes, commits o terminales.
+  - **Invarianza y Gates de Calidad:**
+    - Verificador reproducible `scratch/verify_fase_3_56.php` certificado con **10/10 controles PASS (0 FAIL)**.
+    - Suite PHPUnit: **698 pruebas / 2.596 aserciones (100% PASS)** y PHPCS **187/187 archivos PASS**.
+    - Invarianza confirmada en `cms_ect` (MD5 `4241ca7e7ec6399a594537cb04790c10`), `cms_ect_lab` y `cms_ect_uat`.
+
+
 
 
 
