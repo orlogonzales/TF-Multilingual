@@ -2,7 +2,7 @@
 /**
  * Plugin Name: TF Multilingual
  * Description: Multilingual content management for WordPress.
- * Version: 0.1.0
+ * Version: 1.0.0-rc1
  * Requires at least: 6.8
  * Requires PHP: 8.1
  * Text Domain: tf-multilingual
@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
 
 // Define base technical constants.
 if ( ! defined( 'TFML_VERSION' ) ) {
-	define( 'TFML_VERSION', '0.1.0' );
+	define( 'TFML_VERSION', '1.0.0-rc1' );
 }
 
 if ( ! defined( 'TFML_PLUGIN_FILE' ) ) {

@@ -42,7 +42,7 @@ class PluginTest extends TestCase {
 	public function test_get_version_matches_constant(): void {
 		$plugin = Plugin::get_instance();
 
-		$this->assertSame( '0.1.0', $plugin->get_version() );
+		$this->assertSame( '1.0.0-rc1', $plugin->get_version() );
 		$this->assertSame( Plugin::VERSION, $plugin->get_version() );
 	}
 

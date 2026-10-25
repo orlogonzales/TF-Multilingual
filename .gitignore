@@ -1,5 +1,6 @@
 # Composer dependencies and tooling
 /vendor/
+/dist/
 
 # Test artifacts and coverage
 /coverage/

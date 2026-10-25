@@ -18,6 +18,8 @@
     <exclude-pattern>/vendor/*</exclude-pattern>
     <exclude-pattern>/docs/*</exclude-pattern>
     <exclude-pattern>/scratch/*</exclude-pattern>
+    <exclude-pattern>/scripts/*</exclude-pattern>
+    <exclude-pattern>/dist/*</exclude-pattern>
 
     <!-- Config PHP minimum version -->
     <config name="testVersion" value="8.1-"/>

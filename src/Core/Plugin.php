@@ -67,7 +67,7 @@ class Plugin {
 	/**
 	 * Plugin technical version.
 	 */
-	public const VERSION = '0.1.0';
+	public const VERSION = '1.0.0-rc1';
 
 	/**
 	 * Minimum supported PHP version.
@@ -1304,7 +1304,7 @@ class Plugin {
 				: ( function_exists( 'plugins_url' )
 					? plugins_url( 'assets/css/admin-spatial.css', dirname( __DIR__ ) . '/tf-multilingual.php' )
 					: '/wp-content/plugins/tf-multilingual/assets/css/admin-spatial.css' );
-			$ver     = defined( 'TFML_VERSION' ) ? TFML_VERSION : '0.1.0';
+			$ver     = defined( 'TFML_VERSION' ) ? TFML_VERSION : self::VERSION;
 
 			if ( function_exists( 'wp_enqueue_style' ) ) {
 				wp_enqueue_style(
@@ -1340,7 +1340,7 @@ class Plugin {
 			'tfml-frontend-flags',
 			$css_url,
 			array(),
-			defined( 'TFML_VERSION' ) ? TFML_VERSION : '0.1.0'
+			defined( 'TFML_VERSION' ) ? TFML_VERSION : self::VERSION
 		);
 	}
 
