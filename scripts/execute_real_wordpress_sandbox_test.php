@@ -52,20 +52,63 @@ function step(bool $cond, string $title, string $details = ''): void {
 }
 
 // -------------------------------------------------------------------------
+// FUNCIONES DE SALVAGUARDA ESTRICTA DE SEGURIDAD
+// -------------------------------------------------------------------------
+function assert_safe_disposable_db(string $db_name): void {
+    $protected = [
+        'cms_ect', 'cms_ect_lab', 'cms_ect_uat',
+        'mysql', 'information_schema', 'performance_schema', 'sys'
+    ];
+    $clean_name = strtolower(trim($db_name));
+    if (in_array($clean_name, $protected, true)) {
+        throw new \RuntimeException("SEGURIDAD VIOLADA: Intento de manipular base de datos protegida: '{$db_name}'");
+    }
+    if (!str_starts_with($clean_name, 'cms_ect_disposable_')) {
+        throw new \RuntimeException("SEGURIDAD VIOLADA: Nombre de base no contiene prefijo 'cms_ect_disposable_': '{$db_name}'");
+    }
+}
+
+function assert_safe_sandbox_dir(string $dir): void {
+    $normalized = str_replace('\\', '/', rtrim(trim($dir), '/\\'));
+    if (empty($normalized) || strlen($normalized) < 10) {
+        throw new \RuntimeException("SEGURIDAD VIOLADA: Ruta de sandbox insegura o vacía: '{$dir}'");
+    }
+    $leaf = basename($normalized);
+    if (!str_contains($leaf, 'sandbox_rc1_wp')) {
+        throw new \RuntimeException("SEGURIDAD VIOLADA: Directorio no contiene firma de sandbox desechable 'sandbox_rc1_wp': '{$leaf}'");
+    }
+    $protected_dirs = [
+        'd:', 'c:', 'd:/laragon/www', 'd:/laragon/www/uat.ecoterra',
+        'd:/laragon/www/cms.ecoterra', 'd:/laragon/www/cms.ecoterra/wp-content/plugins/tf-multilingual'
+    ];
+    $lower_norm = strtolower($normalized);
+    foreach ($protected_dirs as $prot) {
+        if ($lower_norm === $prot || str_starts_with($prot, $lower_norm)) {
+            throw new \RuntimeException("SEGURIDAD VIOLADA: Intento de manipular directorio protegido: '{$normalized}'");
+        }
+    }
+}
+
+// -------------------------------------------------------------------------
 // PASO 0: Seguridad preliminar y preparación de base de datos desechable
 // -------------------------------------------------------------------------
+assert_safe_disposable_db($disposable_db);
+assert_safe_sandbox_dir($sandbox_wp_dir);
+
 $mysqli = new mysqli('localhost', 'root', '');
 if ($mysqli->connect_error) {
     die("FATAL: No se pudo conectar a MySQL: " . $mysqli->connect_error . "\n");
 }
 
 // Ensure disposable DB is clean
+assert_safe_disposable_db($disposable_db);
 $mysqli->query("DROP DATABASE IF EXISTS `{$disposable_db}`");
 $db_created = $mysqli->query("CREATE DATABASE `{$disposable_db}` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
 step($db_created, "Paso 0.1: Base de datos desechable creada limpiamente ({$disposable_db})");
 
 // Ensure sandbox directory is clean
 if (is_dir($sandbox_wp_dir)) {
+    assert_safe_sandbox_dir($sandbox_wp_dir);
     exec("rmdir /s /q \"" . str_replace('/', '\\', $sandbox_wp_dir) . "\"");
 }
 mkdir($sandbox_wp_dir, 0777, true);
@@ -171,6 +214,7 @@ $installer_script = $sandbox_wp_dir . '/run_installer.php';
 $installer_code = '<?php
 define("WP_INSTALLING", true);
 require_once __DIR__ . "/wp-load.php";
+add_filter("pre_wp_mail", "__return_true");
 require_once ABSPATH . "wp-admin/includes/upgrade.php";
 
 $result = wp_install("Sandbox RC1 Test", "admin", "admin@sandbox.test", true, "", "admin_sandbox_pass_123");
@@ -490,9 +534,11 @@ step(
 // PASO 6: Limpieza y Teardown Seguro
 // -------------------------------------------------------------------------
 echo "-> Ejecutando limpieza y desmontaje seguro del entorno desechable... \n";
+assert_safe_disposable_db($disposable_db);
 $mysqli->query("DROP DATABASE IF EXISTS `{$disposable_db}`");
 $mysqli->close();
 
+assert_safe_sandbox_dir($sandbox_wp_dir);
 exec("rmdir /s /q \"" . str_replace('/', '\\', $sandbox_wp_dir) . "\"");
 step(
     !is_dir($sandbox_wp_dir),
