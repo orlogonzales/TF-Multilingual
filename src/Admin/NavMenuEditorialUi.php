@@ -241,6 +241,20 @@ class NavMenuEditorialUi {
 					<p><?php esc_html_e( 'El tema actual no tiene ubicaciones de menú registradas.', 'tf-multilingual' ); ?></p>
 				</div>
 			<?php else : ?>
+				<?php if ( $this->is_elementor_builder_active() ) : ?>
+					<div class="tfml-card tfml-nav-notice-card" style="background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid #2563eb; border-radius:8px; padding:16px 20px; margin-top:20px; margin-bottom:18px;">
+						<div style="display:flex; align-items:flex-start; gap:12px;">
+							<span class="dashicons dashicons-info" style="color:#2563eb; font-size:22px; width:22px; height:22px; margin-top:2px;"></span>
+							<div>
+								<strong style="color:#0f172a; font-size:13.5px;"><?php esc_html_e( 'Integración con plantilla de cabecera activa (ecoCMS / Elementor)', 'tf-multilingual' ); ?></strong>
+								<p style="margin:4px 0 0 0; font-size:12.5px; color:#475569; line-height:1.5;">
+									<?php esc_html_e( 'La cabecera pública de EcoTerra está construida mediante plantillas dinámicas de Elementor vinculadas por idioma (Header Paginas / Header Home en ES y EN). TF Multilingual intercepta y localiza automáticamente todos los elementos, enlaces y submenús en el frontend. Si su tema utilizara las ubicaciones nativas de WordPress Core (Primary Menu), las asignaciones de esta tabla determinarían el menú a cargar por idioma.', 'tf-multilingual' ); ?>
+								</p>
+							</div>
+						</div>
+					</div>
+				<?php endif; ?>
+
 				<form method="post" action="">
 					<?php wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME ); ?>
 
@@ -370,5 +384,30 @@ class NavMenuEditorialUi {
 		}
 
 		return $menus_map;
+	}
+
+	/**
+	 * Checks if Elementor or ecoCMS template header builder is active in the environment.
+	 *
+	 * @return bool
+	 */
+	public function is_elementor_builder_active(): bool {
+		if ( isset( $GLOBALS['wp_test_is_elementor_builder_active'] ) ) {
+			return (bool) $GLOBALS['wp_test_is_elementor_builder_active'];
+		}
+
+		if ( defined( 'ELEMENTOR_VERSION' ) || class_exists( '\Elementor\Plugin' ) ) {
+			return true;
+		}
+
+		if ( function_exists( 'has_filter' ) && has_filter( 'qomfort_render_header' ) ) {
+			return true;
+		}
+
+		if ( function_exists( 'get_template' ) && in_array( get_template(), array( 'ecoCMS', 'qomfort' ), true ) ) {
+			return true;
+		}
+
+		return false;
 	}
 }

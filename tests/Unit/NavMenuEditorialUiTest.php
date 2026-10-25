@@ -161,4 +161,34 @@ class NavMenuEditorialUiTest extends TestCase {
 		$this->assertStringContainsString( 'English', $html );
 		$this->assertStringContainsString( 'Main Menu EN', $html );
 	}
+
+	/**
+	 * Tests is_elementor_builder_active returns expected boolean based on environment.
+	 */
+	public function test_is_elementor_builder_active(): void {
+		$GLOBALS['wp_test_is_elementor_builder_active'] = true;
+		$this->assertTrue( $this->ui->is_elementor_builder_active() );
+
+		$GLOBALS['wp_test_is_elementor_builder_active'] = false;
+		$this->assertFalse( $this->ui->is_elementor_builder_active() );
+
+		unset( $GLOBALS['wp_test_is_elementor_builder_active'] );
+	}
+
+	/**
+	 * Tests render_admin_page displays builder notice when Elementor builder is active.
+	 */
+	public function test_render_admin_page_displays_builder_notice(): void {
+		$GLOBALS['wp_test_current_user_can']            = true;
+		$GLOBALS['wp_test_is_elementor_builder_active'] = true;
+
+		ob_start();
+		$this->ui->render_admin_page();
+		$html = ob_get_clean();
+
+		$this->assertStringContainsString( 'Integración con plantilla de cabecera activa (ecoCMS / Elementor)', $html );
+		$this->assertStringContainsString( 'Header Paginas / Header Home', $html );
+
+		unset( $GLOBALS['wp_test_is_elementor_builder_active'] );
+	}
 }
