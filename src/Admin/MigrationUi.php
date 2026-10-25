@@ -941,8 +941,8 @@ class MigrationUi {
 						<th scope="col" style="width:80px; text-align:center;"><?php esc_html_e( 'Idioma', 'tf-multilingual' ); ?></th>
 						<th scope="col" style="width:100px;"><?php esc_html_e( 'Elemento ID', 'tf-multilingual' ); ?></th>
 						<th scope="col"><?php esc_html_e( 'Título de la Entrada (WordPress)', 'tf-multilingual' ); ?></th>
-						<th scope="col" style="width:160px;"><?php esc_html_e( 'Estado de Custodia', 'tf-multilingual' ); ?></th>
-						<th scope="col" style="width:160px;"><?php esc_html_e( 'Fecha de Registro', 'tf-multilingual' ); ?></th>
+						<th scope="col" style="width:230px;"><?php esc_html_e( 'Estado de Custodia', 'tf-multilingual' ); ?></th>
+						<th scope="col" style="width:150px;"><?php esc_html_e( 'Fecha de Registro', 'tf-multilingual' ); ?></th>
 					</tr>
 				</thead>
 				<tbody>
@@ -991,15 +991,15 @@ class MigrationUi {
 										<?php endif; ?>
 									</div>
 								</td>
-								<td>
+								<td style="white-space:nowrap; padding-right:16px;">
 									<?php if ( RetainedTranslationRegistry::STATUS_RETAINED_INACTIVE_LANGUAGE === $status || 'retained_inactive_language' === $status ) : ?>
-										<span style="background:#e8f4fd; border:1px solid #bfe0fb; color:#0c5460; padding:2px 8px; border-radius:3px; font-size:11px; font-weight:600; display:inline-block; white-space:nowrap;" title="<?php echo esc_attr( $status ); ?>">
+										<span style="background:#e8f4fd; border:1px solid #bfe0fb; color:#0c5460; padding:3px 9px; border-radius:4px; font-size:11px; font-weight:600; display:inline-block; white-space:nowrap;" title="<?php echo esc_attr( $status ); ?>">
 											<span class="dashicons dashicons-lock" style="font-size:12px; width:12px; height:12px; vertical-align:text-top; margin-right:2px;"></span>
 											<?php esc_html_e( 'En custodia — idioma inactivo', 'tf-multilingual' ); ?>
 										</span>
-										<code style="display:block; font-size:10px; color:#646970; margin-top:2px; background:none; padding:0;"><?php echo esc_html( $status ); ?></code>
+										<code style="display:block; font-size:10px; color:#646970; margin-top:3px; background:none; padding:0; white-space:nowrap;"><?php echo esc_html( $status ); ?></code>
 									<?php else : ?>
-										<span style="background:#f0f0f1; border:1px solid #dcdcde; color:#2c3338; padding:2px 8px; border-radius:3px; font-size:11px; font-weight:600; display:inline-block;">
+										<span style="background:#f0f0f1; border:1px solid #dcdcde; color:#2c3338; padding:3px 9px; border-radius:4px; font-size:11px; font-weight:600; display:inline-block; white-space:nowrap;">
 											<?php echo esc_html( $status ); ?>
 										</span>
 									<?php endif; ?>
