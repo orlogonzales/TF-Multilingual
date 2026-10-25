@@ -391,13 +391,18 @@ class MigrationUi {
 	 * @return void
 	 */
 	private function render_tab_nav( string $current_tab ): void {
-		$tabs = array(
+		$manifests_count = count( $this->get_all_manifests() );
+		$tabs            = array(
 			'plan'       => array(
 				'label' => __( 'Plan Determinista', 'tf-multilingual' ),
 				'icon'  => 'dashicons-list-view',
 			),
 			'history'    => array(
-				'label' => __( 'Historial de Lotes (13)', 'tf-multilingual' ),
+				'label' => sprintf(
+					/* translators: %d: count of history manifests */
+					__( 'Historial de Lotes (%d)', 'tf-multilingual' ),
+					$manifests_count
+				),
 				'icon'  => 'dashicons-backup',
 			),
 			'retained'   => array(
@@ -987,9 +992,17 @@ class MigrationUi {
 									</div>
 								</td>
 								<td>
-									<span style="background:#e8f4fd; border:1px solid #bfe0fb; color:#0c5460; padding:2px 8px; border-radius:3px; font-size:11px; font-weight:600;">
-										<?php echo esc_html( $status ); ?>
-									</span>
+									<?php if ( RetainedTranslationRegistry::STATUS_RETAINED_INACTIVE_LANGUAGE === $status || 'retained_inactive_language' === $status ) : ?>
+										<span style="background:#e8f4fd; border:1px solid #bfe0fb; color:#0c5460; padding:2px 8px; border-radius:3px; font-size:11px; font-weight:600; display:inline-block; white-space:nowrap;" title="<?php echo esc_attr( $status ); ?>">
+											<span class="dashicons dashicons-lock" style="font-size:12px; width:12px; height:12px; vertical-align:text-top; margin-right:2px;"></span>
+											<?php esc_html_e( 'En custodia — idioma inactivo', 'tf-multilingual' ); ?>
+										</span>
+										<code style="display:block; font-size:10px; color:#646970; margin-top:2px; background:none; padding:0;"><?php echo esc_html( $status ); ?></code>
+									<?php else : ?>
+										<span style="background:#f0f0f1; border:1px solid #dcdcde; color:#2c3338; padding:2px 8px; border-radius:3px; font-size:11px; font-weight:600; display:inline-block;">
+											<?php echo esc_html( $status ); ?>
+										</span>
+									<?php endif; ?>
 								</td>
 								<td style="font-size:12px; color:#50575e;">
 									<?php echo esc_html( $created_at ); ?>

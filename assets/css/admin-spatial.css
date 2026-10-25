@@ -1407,3 +1407,33 @@ body[class*="tf-multilingual"] #wpbody-content > div.updated:not([class*="tfml"]
 	padding: 12px 18px;
 }
 
+/* ==========================================================================
+   Non-intrusive presentation for third-party notices on TFML screens
+   ========================================================================== */
+.toplevel_page_tf-multilingual .e-notice,
+.tf-multilingual_page_tfml-migration .e-notice,
+.tf-multilingual_page_tfml-diagnostic .e-notice,
+.tf-multilingual_page_tfml-translations-overview .e-notice,
+.tf-multilingual_page_tfml-nav-menus .e-notice,
+.tf-multilingual_page_tfml-strings .e-notice,
+.tf-multilingual_page_tfml-languages .e-notice {
+	max-height: 48px;
+	overflow: hidden;
+	opacity: 0.88;
+	margin: 10px 0 14px 0;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+	transition: max-height 0.25s ease, opacity 0.25s ease;
+}
+
+.toplevel_page_tf-multilingual .e-notice:hover,
+.tf-multilingual_page_tfml-migration .e-notice:hover,
+.tf-multilingual_page_tfml-diagnostic .e-notice:hover,
+.tf-multilingual_page_tfml-translations-overview .e-notice:hover,
+.tf-multilingual_page_tfml-nav-menus .e-notice:hover,
+.tf-multilingual_page_tfml-strings .e-notice:hover,
+.tf-multilingual_page_tfml-languages .e-notice:hover {
+	max-height: 320px;
+	opacity: 1;
+}
+
+

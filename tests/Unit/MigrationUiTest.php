@@ -243,6 +243,7 @@ class MigrationUiTest extends TestCase {
 
 		$this->assertStringContainsString( 'Punto de Control (Checkpoint) Activo', $output );
 		$this->assertStringContainsString( 'Historial de Manifiestos de Ejecución', $output );
+		$this->assertStringContainsString( 'Historial de Lotes (1)', $output );
 		$this->assertStringContainsString( '#9545', $output );
 		$this->assertStringContainsString( 'test_token_1', $output );
 		$this->assertStringContainsString( 'c82cb04b1cd6c79e...', $output );
@@ -273,6 +274,8 @@ class MigrationUiTest extends TestCase {
 
 		$this->assertStringContainsString( 'Traducciones Retenidas en Custodia (Idioma Inactivo FR)', $output );
 		$this->assertStringContainsString( 'Modelo de Cero Polución', $output );
+		$this->assertStringContainsString( 'En custodia — idioma inactivo', $output );
+		$this->assertStringContainsString( 'retained_inactive_language', $output );
 		$this->assertStringContainsString( '#197', $output );
 		$this->assertStringContainsString( 'Grupo #587', $output );
 		$this->assertStringContainsString( '#8839', $output );
